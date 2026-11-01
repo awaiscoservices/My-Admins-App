@@ -20,6 +20,9 @@ function Particle({ symbol, style }) {
   );
 }
 
+// All roles that belong to admin panel — add 'admin' to the list
+const ADMIN_ROLES = ['super_admin', 'admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -66,11 +69,10 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await signInWithEmail({ email, password });
-      // Check role and redirect accordingly
+      // Fetch role and redirect: admin roles → /admin, players → /dashboard
       const { supabase: sb } = await import('../../lib/supabase');
       const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single();
-      const adminRoles = ['super_admin','finance','game_ops','support','kyc_agent','risk','reporting','marketing'];
-      if (prof?.role && adminRoles.includes(prof.role)) {
+      if (prof?.role && ADMIN_ROLES.includes(prof.role)) {
         router.push('/admin');
       } else {
         router.push('/dashboard');

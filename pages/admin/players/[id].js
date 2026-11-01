@@ -134,30 +134,33 @@ export default function AdminPlayerDetail() {
 
   async function loadPlayer() {
     setLoading(true)
-    const [
-      { data: prof },
-      { data: wal },
-      { data: deps },
-      { data: gas },
-      { data: txs },
-      { data: kycRec },
-    ] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', id).single(),
-      supabase.from('wallets').select('*').eq('user_id', id).single(),
-      supabase.from('deposits').select('*, payment_methods(name)').eq('user_id', id).order('created_at', { ascending: false }).limit(20),
-      supabase.from('game_accounts').select('*, game_panels(name, accent_color)').eq('user_id', id).order('created_at', { ascending: false }),
-      supabase.from('ledger').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(30),
-      supabase.from('kyc_records').select('*').eq('user_id', id).single(),
-    ])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setLoading(false); return }
 
-    setPlayer(prof)
-    setWallet(wal)
-    setDeposits(deps || [])
-    setGameAccounts(gas || [])
-    setTransactions(txs || [])
-    setKyc(kycRec)
+      const res = await fetch(`/api/admin/players/detail?player_id=${id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        console.error('loadPlayer error:', err)
+        setLoading(false)
+        return
+      }
+      const data = await res.json()
+      setPlayer(data.profile)
+      setWallet(data.wallet)
+      setDeposits(data.deposits || [])
+      setGameAccounts(data.game_accounts || [])
+      setTransactions(data.ledger || [])
+      setKyc(data.kyc)
+    } catch (err) {
+      console.error('loadPlayer exception:', err)
+    }
     setLoading(false)
   }
+
+
 
   async function handleAdjustment(form) {
     const { data: { session } } = await supabase.auth.getSession()

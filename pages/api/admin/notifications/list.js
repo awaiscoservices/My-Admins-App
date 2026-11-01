@@ -32,13 +32,12 @@ export default async function handler(req, res) {
 
   let query = supabaseAdmin
     .from('notifications')
-    .select('id, user_id, type, title, body, is_read, created_at, profiles!notifications_user_id_fkey(full_name, email)', { count: 'exact' })
+    .select('id, user_id, title, message, is_read, created_at, profiles!notifications_user_id_fkey(full_name, email)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
 
   if (status === 'unread') query = query.eq('is_read', false)
   if (status === 'read') query = query.eq('is_read', true)
-  if (type && type !== 'all') query = query.eq('type', type)
 
   const { data: rows, error: listErr, count } = await query
 
