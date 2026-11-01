@@ -29,6 +29,15 @@ export default async function handler(req, res) {
   if (loadErr || !load) return res.status(404).json({ error: 'Game load not found' })
   if (load.status !== 'pending') return res.status(400).json({ error: `Already ${load.status}` })
 
+  // Atomic status lock — prevents double-processing
+  const { data: locked, error: lockErr } = await supabaseAdmin
+    .from('game_loads')
+    .update({ status: action === 'reject' ? 'rejected' : 'processing', reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .eq('id', load_id)
+    .eq('status', 'pending')
+    .select('id').single()
+  if (lockErr || !locked) return res.status(409).json({ error: 'Game load already being processed — try again' })
+
   const { data: wallet, error: walletErr } = await supabaseAdmin
     .from('wallets')
     .select('id, cash_balance_cents, bonus_balance_cents, reserved_cents, version')
@@ -65,12 +74,7 @@ export default async function handler(req, res) {
       description: `Game load rejected — refunded. Ref: ${load.reference_id}`,
     })
 
-    await supabaseAdmin.from('game_loads').update({
-      status: 'rejected',
-      notes,
-      reviewed_by: user.id,
-      reviewed_at: new Date().toISOString(),
-    }).eq('id', load_id)
+    await supabaseAdmin.from('game_loads').update({ notes }).eq('id', load_id)
 
     await supabaseAdmin.from('notifications').insert({
       user_id: load.user_id,
@@ -107,12 +111,7 @@ export default async function handler(req, res) {
     description: `Game load approved — ${load.game_panel_name || 'game'}. Ref: ${load.reference_id}`,
   })
 
-  await supabaseAdmin.from('game_loads').update({
-    status: 'approved',
-    notes,
-    reviewed_by: user.id,
-    reviewed_at: new Date().toISOString(),
-  }).eq('id', load_id)
+  await supabaseAdmin.from('game_loads').update({ status: 'approved', notes }).eq('id', load_id)
 
   await supabaseAdmin.from('notifications').insert({
     user_id: load.user_id,

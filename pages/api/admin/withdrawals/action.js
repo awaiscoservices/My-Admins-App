@@ -29,6 +29,15 @@ export default async function handler(req, res) {
   if (wdErr || !wd) return res.status(404).json({ error: 'Withdrawal not found' })
   if (wd.status !== 'pending') return res.status(400).json({ error: `Already ${wd.status}` })
 
+  // Atomic status lock — prevents double-processing
+  const { data: locked, error: lockErr } = await supabaseAdmin
+    .from('withdrawals')
+    .update({ status: action === 'reject' ? 'rejected' : 'processing', reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .eq('id', withdrawal_id)
+    .eq('status', 'pending')
+    .select('id').single()
+  if (lockErr || !locked) return res.status(409).json({ error: 'Withdrawal already being processed — try again' })
+
   const { data: wallet, error: walletErr } = await supabaseAdmin
     .from('wallets')
     .select('id, cash_balance_cents, withdrawable_cents, reserved_cents, total_withdrawn_cents, version')
@@ -67,12 +76,7 @@ export default async function handler(req, res) {
       description: `Withdrawal rejected — refunded. Ref: ${wd.reference_id}`,
     })
 
-    await supabaseAdmin.from('withdrawals').update({
-      status: 'rejected',
-      notes,
-      reviewed_by: user.id,
-      reviewed_at: new Date().toISOString(),
-    }).eq('id', withdrawal_id)
+    await supabaseAdmin.from('withdrawals').update({ notes }).eq('id', withdrawal_id)
 
     await supabaseAdmin.from('notifications').insert({
       user_id: wd.user_id,
@@ -92,13 +96,15 @@ export default async function handler(req, res) {
   }
 
   // APPROVE — wallet cash was debited at submission; reserved_cents was incremented.
-  // On approval: clear reserved_cents, increment total_withdrawn_cents, append ledger entry.
+  // On approval: clear reserved_cents, decrement withdrawable_cents, increment total_withdrawn_cents.
   const newReserved = Math.max(0, (wallet.reserved_cents || 0) - wd.amount_cents)
+  const newWithdrawable = Math.max(0, (wallet.withdrawable_cents || 0) - wd.amount_cents)
   const newTotalWithdrawn = (wallet.total_withdrawn_cents || 0) + wd.amount_cents
 
   const { data: updated } = await supabaseAdmin.from('wallets')
     .update({
       reserved_cents: newReserved,
+      withdrawable_cents: newWithdrawable,
       total_withdrawn_cents: newTotalWithdrawn,
       updated_at: new Date().toISOString(),
     })
@@ -121,15 +127,12 @@ export default async function handler(req, res) {
   await supabaseAdmin.from('withdrawals').update({
     status: 'completed',
     notes,
-    reviewed_by: user.id,
-    reviewed_at: new Date().toISOString(),
   }).eq('id', withdrawal_id)
 
   await supabaseAdmin.from('notifications').insert({
     user_id: wd.user_id,
-    type: 'withdrawal_approved',
     title: '✅ Withdrawal Sent',
-    body: `Your withdrawal of $${(wd.amount_cents / 100).toFixed(2)} via ${wd.method || 'transfer'} has been processed. Ref: ${wd.reference_id}`,
+    message: `Your withdrawal of $${(wd.amount_cents / 100).toFixed(2)} via ${wd.method || 'transfer'} has been processed. Ref: ${wd.reference_id}`,
   })
 
   await supabaseAdmin.from('audit_logs').insert({

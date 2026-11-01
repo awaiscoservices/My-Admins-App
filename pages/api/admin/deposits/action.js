@@ -29,10 +29,17 @@ export default async function handler(req, res) {
   if (depErr || !deposit) return res.status(404).json({ error: 'Deposit not found' })
   if (deposit.status !== 'pending') return res.status(400).json({ error: `Deposit already ${deposit.status}` })
 
+  // Atomic status lock — prevents double-processing if two admins click simultaneously
+  const { data: locked, error: lockErr } = await supabaseAdmin
+    .from('deposits')
+    .update({ status: action === 'reject' ? 'rejected' : 'processing', reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .eq('id', deposit_id)
+    .eq('status', 'pending')
+    .select('id').single()
+  if (lockErr || !locked) return res.status(409).json({ error: 'Deposit already being processed — try again' })
+
   if (action === 'reject') {
-    await supabaseAdmin.from('deposits').update({
-      status: 'rejected', notes, reviewed_by: user.id, reviewed_at: new Date().toISOString(),
-    }).eq('id', deposit_id)
+    await supabaseAdmin.from('deposits').update({ notes }).eq('id', deposit_id)
 
     await supabaseAdmin.from('notifications').insert({
       user_id: deposit.user_id,
@@ -78,7 +85,11 @@ export default async function handler(req, res) {
     .eq('version', wallet.version)
     .select('id').single()
 
-  if (!updated) return res.status(409).json({ error: 'Wallet conflict, please retry' })
+  if (!updated) {
+    // Wallet version conflict — roll back status lock to pending so it can be retried
+    await supabaseAdmin.from('deposits').update({ status: 'pending', reviewed_by: null, reviewed_at: null }).eq('id', deposit_id)
+    return res.status(409).json({ error: 'Wallet conflict, please retry' })
+  }
 
   // Ledger — cash credit
   await supabaseAdmin.from('ledger').insert({
@@ -117,7 +128,7 @@ export default async function handler(req, res) {
   }
 
   await supabaseAdmin.from('deposits').update({
-    status: 'approved', notes, reviewed_by: user.id, reviewed_at: new Date().toISOString(),
+    status: 'approved', notes,
   }).eq('id', deposit_id)
 
   await supabaseAdmin.from('notifications').insert({
