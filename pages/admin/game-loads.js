@@ -23,7 +23,7 @@ function ReviewModal({ load, onClose, onAction }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>Review Game Load</h2>
+          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>Review Score Request</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
@@ -54,7 +54,7 @@ function ReviewModal({ load, onClose, onAction }) {
   )
 }
 
-export default function AdminGameLoads() {
+export default function AdminScores() {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('pending')
   const [search, setSearch] = useState('')
@@ -68,15 +68,10 @@ export default function AdminGameLoads() {
 
   async function load() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ status: filter !== 'all' ? filter : '', limit: '100' })
-      const res = await fetch(`/api/admin/game-loads/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || [])
-    } catch (e) { console.error('Failed to load game loads', e); setRows([]) }
+    let q = supabase.from('game_loads').select('*, profiles!game_loads_user_id_fkey(full_name,email)').order('created_at', { ascending: false }).limit(100)
+    if (filter !== 'all') q = q.eq('status', filter)
+    const { data } = await q
+    setRows(data || [])
     setLoading(false)
   }
 
@@ -89,7 +84,7 @@ export default function AdminGameLoads() {
     })
     const d = await res.json()
     if (!res.ok) return { error: d.error }
-    showToast(`Game load ${action}d`)
+    showToast(`Score request ${action}d`)
     load()
     return {}
   }
@@ -102,13 +97,13 @@ export default function AdminGameLoads() {
 
   return (
     <AdminLayout>
-      <Head><title>Game Loads — Admin</title></Head>
+      <Head><title>Scores — Admin</title></Head>
       {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
       {selected && <ReviewModal load={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
 
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Game Loads</h1>
-        <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Process player game load requests</p>
+        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Scores</h1>
+        <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Process player score (game load) requests</p>
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -133,7 +128,7 @@ export default function AdminGameLoads() {
             </thead>
             <tbody>
               {loading ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'pending' ? '✅ No pending game loads!' : 'No game loads found'}</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'pending' ? '✅ No pending score requests!' : 'No scores found'}</td></tr>
               : filtered.map(r => (
                 <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}

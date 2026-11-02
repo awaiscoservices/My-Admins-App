@@ -30,7 +30,7 @@ function ReviewModal({ redemption, onClose, onAction }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 500 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>Review Redemption</h2>
+          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>Review Redeem Request</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
@@ -42,7 +42,7 @@ function ReviewModal({ redemption, onClose, onAction }) {
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>Ref: {redemption.reference_id}</div>
         </div>
 
-        {/* Verified amount input — key field */}
+        {/* Verified amount input */}
         <div style={{ background: 'rgba(34,197,94,.07)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>✅ Verified In-Game Amount (USD)</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -69,7 +69,7 @@ function ReviewModal({ redemption, onClose, onAction }) {
   )
 }
 
-export default function AdminRedemptions() {
+export default function AdminRedeems() {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('pending')
   const [search, setSearch] = useState('')
@@ -83,15 +83,10 @@ export default function AdminRedemptions() {
 
   async function load() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ status: filter !== 'all' ? filter : '', limit: '100' })
-      const res = await fetch(`/api/admin/redemptions/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || [])
-    } catch (e) { console.error('Failed to load redemptions', e); setRows([]) }
+    let q = supabase.from('redemptions').select('*, profiles!redemptions_user_id_fkey(full_name,email)').order('created_at', { ascending: false }).limit(100)
+    if (filter !== 'all') q = q.eq('status', filter)
+    const { data } = await q
+    setRows(data || [])
     setLoading(false)
   }
 
@@ -104,7 +99,7 @@ export default function AdminRedemptions() {
     })
     const d = await res.json()
     if (!res.ok) return { error: d.error }
-    showToast(`Redemption ${body.action}d`)
+    showToast(`Redeem request ${body.action}d`)
     load()
     return {}
   }
@@ -117,12 +112,12 @@ export default function AdminRedemptions() {
 
   return (
     <AdminLayout>
-      <Head><title>Redemptions — Admin</title></Head>
+      <Head><title>Redeems — Admin</title></Head>
       {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
       {selected && <ReviewModal redemption={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
 
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Redemptions</h1>
+        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Redeems</h1>
         <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Verify in-game balances and credit player wallets</p>
       </div>
 
@@ -148,7 +143,7 @@ export default function AdminRedemptions() {
             </thead>
             <tbody>
               {loading ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'pending' ? '✅ No pending redemptions!' : 'No redemptions found'}</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'pending' ? '✅ No pending redeem requests!' : 'No redeems found'}</td></tr>
               : filtered.map(r => (
                 <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
