@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import AdminLayout from '../../../components/layout/AdminLayout'
 import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
+import PlayerWalletModal from '../../../components/PlayerWalletModal'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -114,16 +115,17 @@ export default function AdminPlayerDetail() {
   const router = useRouter()
   const { id } = router.query
 
-  const [player, setPlayer] = useState(null)
-  const [wallet, setWallet] = useState(null)
-  const [deposits, setDeposits] = useState([])
+  const [player, setPlayer]           = useState(null)
+  const [wallet, setWallet]           = useState(null)
+  const [deposits, setDeposits]       = useState([])
   const [gameAccounts, setGameAccounts] = useState([])
   const [transactions, setTransactions] = useState([])
-  const [kyc, setKyc] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [kyc, setKyc]                 = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [activeTab, setActiveTab]     = useState('overview')
   const [showAdjModal, setShowAdjModal] = useState(false)
-  const [toast, setToast] = useState(null)
+  const [showWallet, setShowWallet]   = useState(false)   // ← NEW: wallet modal
+  const [toast, setToast]             = useState(null)
 
   useEffect(() => { if (id) loadPlayer() }, [id])
 
@@ -134,33 +136,30 @@ export default function AdminPlayerDetail() {
 
   async function loadPlayer() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { setLoading(false); return }
+    const [
+      { data: prof },
+      { data: wal },
+      { data: deps },
+      { data: gas },
+      { data: txs },
+      { data: kycRec },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', id).single(),
+      supabase.from('wallets').select('*').eq('user_id', id).single(),
+      supabase.from('deposits').select('*, payment_methods(name)').eq('user_id', id).order('created_at', { ascending: false }).limit(20),
+      supabase.from('game_accounts').select('*, game_panels(name, accent_color)').eq('user_id', id).order('created_at', { ascending: false }),
+      supabase.from('ledger').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(30),
+      supabase.from('kyc_records').select('*').eq('user_id', id).single(),
+    ])
 
-      const res = await fetch(`/api/admin/players/detail?player_id=${id}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        console.error('loadPlayer error:', err)
-        setLoading(false)
-        return
-      }
-      const data = await res.json()
-      setPlayer(data.profile)
-      setWallet(data.wallet)
-      setDeposits(data.deposits || [])
-      setGameAccounts(data.game_accounts || [])
-      setTransactions(data.ledger || [])
-      setKyc(data.kyc)
-    } catch (err) {
-      console.error('loadPlayer exception:', err)
-    }
+    setPlayer(prof)
+    setWallet(wal)
+    setDeposits(deps || [])
+    setGameAccounts(gas || [])
+    setTransactions(txs || [])
+    setKyc(kycRec)
     setLoading(false)
   }
-
-
 
   async function handleAdjustment(form) {
     const { data: { session } } = await supabase.auth.getSession()
@@ -222,6 +221,15 @@ export default function AdminPlayerDetail() {
 
       {showAdjModal && <AdjustmentModal playerId={id} onClose={() => setShowAdjModal(false)} onSave={handleAdjustment} />}
 
+      {/* ── WALLET MODAL (Phase B) ── */}
+      {showWallet && (
+        <PlayerWalletModal
+          playerId={id}
+          playerName={player.full_name}
+          onClose={() => setShowWallet(false)}
+        />
+      )}
+
       {/* Back + header */}
       <div style={{ marginBottom: 20 }}>
         <Link href="/admin/players" style={{ color: '#fbbf24', textDecoration: 'none', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>← Players</Link>
@@ -239,6 +247,13 @@ export default function AdminPlayerDetail() {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* ── Wallet Overview button (Phase B) ── */}
+            <button
+              onClick={() => setShowWallet(true)}
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,rgba(59,130,246,.25),rgba(99,102,241,.25))', border: '1px solid rgba(99,102,241,.5)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+              💳 Wallet Overview
+            </button>
+
             <button onClick={() => setShowAdjModal(true)} style={{ padding: '9px 16px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
               ⚖️ Adjust Wallet
             </button>
@@ -320,6 +335,13 @@ export default function AdminPlayerDetail() {
             <InfoRow label="Total Loaded"       value={<MoneyDisplay cents={wallet?.total_loaded_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Redeemed"     value={<MoneyDisplay cents={wallet?.total_redeemed_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Withdrawn"    value={<MoneyDisplay cents={wallet?.total_withdrawn_cents || 0} size="sm" color="#fff" />} />
+            <div style={{ marginTop: 16 }}>
+              <button
+                onClick={() => setShowWallet(true)}
+                style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg,rgba(59,130,246,.2),rgba(99,102,241,.2))', border: '1px solid rgba(99,102,241,.4)', borderRadius: 10, color: '#818cf8', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+                💳 Open Full Wallet Overview →
+              </button>
+            </div>
           </div>
         </div>
       )}

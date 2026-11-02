@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
+import PlayerWalletModal from '../../components/PlayerWalletModal'
 
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-function PlayerModal({ player, onClose, onAction }) {
+function PlayerModal({ player, onClose, onAction, onWallet }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -35,6 +37,19 @@ function PlayerModal({ player, onClose, onAction }) {
           </div>
         </div>
         {error && <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
+
+        {/* Wallet + Profile links */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={() => { onClose(); onWallet(player) }}
+            style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg,rgba(59,130,246,.2),rgba(99,102,241,.2))', border: '1px solid rgba(99,102,241,.4)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+            💳 Wallet Overview
+          </button>
+          <Link href={`/admin/players/${player.id}`} style={{ flex: 1, padding: '10px', background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            👤 Full Profile →
+          </Link>
+        </div>
+
         <div style={{ display: 'flex', gap: 10 }}>
           {player.status === 'active'
             ? <button onClick={() => toggle('suspend')} disabled={saving} style={{ flex: 1, padding: '11px', background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Suspend Player</button>
@@ -48,12 +63,13 @@ function PlayerModal({ player, onClose, onAction }) {
 }
 
 export default function AdminPlayers() {
-  const [rows, setRows] = useState([])
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null)
-  const [toast, setToast] = useState(null)
+  const [rows, setRows]           = useState([])
+  const [filter, setFilter]       = useState('all')
+  const [search, setSearch]       = useState('')
+  const [loading, setLoading]     = useState(true)
+  const [selected, setSelected]   = useState(null)   // quick-action modal
+  const [walletPlayer, setWalletPlayer] = useState(null) // wallet modal
+  const [toast, setToast]         = useState(null)
 
   useEffect(() => { load() }, [filter])
 
@@ -61,15 +77,10 @@ export default function AdminPlayers() {
 
   async function load() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ status: filter !== 'all' ? filter : '', limit: '100' })
-      const res = await fetch(`/api/admin/players/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || [])
-    } catch (e) { console.error('Failed to load players', e); setRows([]) }
+    let q = supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(100)
+    if (filter !== 'all') q = q.eq('status', filter)
+    const { data } = await q
+    setRows(data || [])
     setLoading(false)
   }
 
@@ -97,7 +108,24 @@ export default function AdminPlayers() {
     <AdminLayout>
       <Head><title>Players — Admin</title></Head>
       {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
-      {selected && <PlayerModal player={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
+
+      {selected && (
+        <PlayerModal
+          player={selected}
+          onClose={() => setSelected(null)}
+          onAction={handleAction}
+          onWallet={p => setWalletPlayer(p)}
+        />
+      )}
+
+      {/* Wallet modal — opens on top of everything */}
+      {walletPlayer && (
+        <PlayerWalletModal
+          playerId={walletPlayer.id}
+          playerName={walletPlayer.full_name}
+          onClose={() => setWalletPlayer(null)}
+        />
+      )}
 
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Players</h1>
@@ -142,7 +170,25 @@ export default function AdminPlayers() {
                   <td style={{ padding: '12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
                   <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
                   <td style={{ padding: '12px 14px' }}>
-                    <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>View</button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {/* Wallet icon button */}
+                      <button
+                        onClick={() => setWalletPlayer(r)}
+                        title="Wallet Overview"
+                        style={{ padding: '6px 10px', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 8, color: '#818cf8', fontSize: 14, cursor: 'pointer', lineHeight: 1 }}>
+                        💳
+                      </button>
+                      <button
+                        onClick={() => setSelected(r)}
+                        style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+                        View
+                      </button>
+                      <Link
+                        href={`/admin/players/${r.id}`}
+                        style={{ padding: '6px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, color: 'rgba(255,255,255,.5)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                        →
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
