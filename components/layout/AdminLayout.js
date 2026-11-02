@@ -335,19 +335,19 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
 
-        {/* Centre — 6 notification badge buttons */}
+        {/* Centre — 6 notification badge buttons — fills remaining header space */}
         {visibleBadges.length > 0 && (
-          <div className="header-badges" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div className="header-badges" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', padding: '0 12px' }}>
             {visibleBadges.map(b => {
               const count = pendingCounts[b.key] || 0
               const isCurrentPage = router.pathname.startsWith(b.href)
               return (
                 <Link key={b.key} href={b.href}
-                  style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', background: isCurrentPage ? `${b.color}20` : (count > 0 ? `${b.color}12` : 'rgba(255,255,255,.04)'), border: `1px solid ${isCurrentPage ? b.color + '60' : (count > 0 ? b.color + '40' : 'rgba(255,255,255,.1)')}`, borderRadius: 10, textDecoration: 'none', color: count > 0 ? '#fff' : 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: count > 0 ? 700 : 500, whiteSpace: 'nowrap', transition: 'all .15s' }}
+                  style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, flex: 1, padding: '9px 12px', background: isCurrentPage ? `${b.color}22` : (count > 0 ? `${b.color}14` : 'rgba(255,255,255,.05)'), border: `1px solid ${isCurrentPage ? b.color + '70' : (count > 0 ? b.color + '45' : 'rgba(255,255,255,.12)')}`, borderRadius: 12, textDecoration: 'none', color: count > 0 ? '#fff' : 'rgba(255,255,255,.45)', fontSize: 13, fontWeight: count > 0 ? 700 : 500, whiteSpace: 'nowrap', transition: 'all .15s', minWidth: 0 }}
                   className="badge-btn">
-                  <span>{b.label}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.label}</span>
                   {count > 0 && (
-                    <span style={{ background: b.color, color: '#050505', fontSize: 10, fontWeight: 900, padding: '1px 6px', borderRadius: 99, lineHeight: 1.5 }}>{count > 99 ? '99+' : count}</span>
+                    <span style={{ background: b.color, color: '#050505', fontSize: 11, fontWeight: 900, padding: '2px 7px', borderRadius: 99, lineHeight: 1.5, flexShrink: 0 }}>{count > 99 ? '99+' : count}</span>
                   )}
                 </Link>
               )
@@ -442,15 +442,12 @@ export default function AdminLayout({ children }) {
         .dropdown-item:hover { background: rgba(255,255,255,.06) !important; }
         .dropdown-item-danger:hover { background: rgba(239,68,68,.1) !important; }
 
-        @media (max-width: 1200px) {
-          .header-badges .badge-btn span:first-child { display: none; }
-        }
         @media (max-width: 900px) {
           .admin-logo-full  { display: none; }
           .admin-logo-icon  { display: inline-flex; }
           .admin-crumb      { display: none; }
-          .header-badges    { gap: 2; }
-          .header-badges .badge-btn { padding: 6px 7px; }
+          .header-badges .badge-btn span:first-child { display: none; }
+          .header-badges .badge-btn { padding: 8px 10px; }
         }
         @media (max-width: 768px) {
           .admin-sidebar    { transform: translateX(-100%); transition: transform .25s; }
