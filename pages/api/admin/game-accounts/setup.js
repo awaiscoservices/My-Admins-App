@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   const { account_id, game_username, game_password, game_id, admin_notes, action } = req.body
   if (!account_id) return res.status(400).json({ error: 'account_id required' })
 
-  // Load account — simple select, no FK alias joins (those can silently fail)
+  // Load account
   const { data: account, error: accountErr } = await supabaseAdmin
     .from('game_accounts')
     .select('id, user_id, status, reference_id, game_panel_id, game_username')
@@ -92,13 +92,15 @@ export default async function handler(req, res) {
   if (!game_password?.trim() && account.status === 'pending')
     return res.status(400).json({ error: 'Password is required for new accounts' })
 
+  // Build update — only columns that actually exist in the game_accounts table.
+  // NOTE: activated_at does NOT exist in the schema; use updated_at (auto-managed by Supabase).
   const updates = {
     game_username:    game_username.trim(),
     game_id:          game_id?.trim() || null,
     status:           'active',
     created_by_admin: admin.id,
     admin_notes:      admin_notes?.trim() || null,
-    activated_at:     new Date().toISOString(),
+    // activated_at removed — column does not exist; updated_at is handled automatically
   }
 
   if (game_password?.trim()) {

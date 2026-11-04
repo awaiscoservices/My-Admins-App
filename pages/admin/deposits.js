@@ -30,9 +30,13 @@ function ReviewModal({ deposit, onClose, onAction }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{deposit.profiles?.full_name}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{deposit.profiles?.email}</div>
           <div style={{ fontSize: 13, color: '#22c55e', fontWeight: 700, marginTop: 8 }}>{fmt(deposit.amount_cents)}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Method: {deposit.payment_method_name || deposit.payment_method_type || '—'}</div>
+          {deposit.bonus_cents > 0 && (
+            <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 2 }}>+{fmt(deposit.bonus_cents)} bonus</div>
+          )}
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>Ref: {deposit.reference_id}</div>
-          {deposit.proof_url && <a href={deposit.proof_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: '#fbbf24' }}>View Proof ↗</a>}
+          {deposit.player_reference && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Player ref: {deposit.player_reference}</div>}
+          {deposit.screenshot_url && <a href={deposit.screenshot_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: '#fbbf24' }}>View Proof ↗</a>}
+          {deposit.player_notes && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Note: {deposit.player_notes}</div>}
         </div>
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Notes (optional)</label>
@@ -66,13 +70,18 @@ export default function AdminDeposits() {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ status: filter !== 'all' ? filter : '', limit: '100' })
+      if (!session) { setDeposits([]); setLoading(false); return }
+      const params = new URLSearchParams({ status: filter })
       const res = await fetch(`/api/admin/deposits/list?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const d = await res.json()
-      setDeposits(d.rows || [])
-    } catch (e) { console.error('Failed to load deposits', e); setDeposits([]) }
+      if (!res.ok) { showToast(d.error || 'Failed to load deposits', 'error'); setDeposits([]); }
+      else setDeposits(d.deposits || [])
+    } catch (e) {
+      console.error('Failed to load deposits', e)
+      setDeposits([])
+    }
     setLoading(false)
   }
 
@@ -93,7 +102,9 @@ export default function AdminDeposits() {
   const rows = deposits.filter(r => {
     if (!search) return true
     const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) || r.profiles?.email?.toLowerCase().includes(s) || r.reference_id?.toLowerCase().includes(s)
+    return r.profiles?.full_name?.toLowerCase().includes(s) ||
+      r.profiles?.email?.toLowerCase().includes(s) ||
+      r.reference_id?.toLowerCase().includes(s)
   })
 
   return (
@@ -122,31 +133,47 @@ export default function AdminDeposits() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Player', 'Method', 'Amount', 'Bonus', 'Status', 'Date', 'Actions'].map(h => (
+                {['Reference', 'Player', 'Amount', 'Bonus', 'Status', 'Date', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : rows.length === 0 ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No deposits found</td></tr>
-              : rows.map(r => (
-                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
+              {loading ? (
+                <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                  {filter === 'pending' ? '✅ No pending deposits!' : 'No deposits found'}
+                </td></tr>
+              ) : rows.map(d => (
+                <tr key={d.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 14px' }}><span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{r.reference_id}</span></td>
                   <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.profiles?.full_name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{d.reference_id}</div>
                   </td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.payment_method_name || r.payment_method_type || '—'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmt(r.amount_cents)}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: r.bonus_cents > 0 ? '#fbbf24' : 'rgba(255,255,255,.2)' }}>{r.bonus_cents > 0 ? '+' + fmt(r.bonus_cents) : '—'}</td>
-                  <td style={{ padding: '12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
-                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
                   <td style={{ padding: '12px 14px' }}>
-                    {r.status === 'pending' && (
-                      <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 8, color: '#050505', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Review</button>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{d.profiles?.full_name || '—'}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{d.profiles?.email}</div>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmt(d.amount_cents)}</div>
+                    {d.total_credit_cents > d.amount_cents && (
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)' }}>Total: {fmt(d.total_credit_cents)}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: d.bonus_cents > 0 ? '#fbbf24' : 'rgba(255,255,255,.25)' }}>
+                    {d.bonus_cents > 0 ? fmt(d.bonus_cents) : '—'}
+                  </td>
+                  <td style={{ padding: '12px 14px' }}><StatusBadge status={d.status} size="xs" /></td>
+                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.3)', whiteSpace: 'nowrap' }}>{fmtDate(d.created_at)}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    {d.status === 'pending' ? (
+                      <button onClick={() => setSelected(d)} style={{ padding: '6px 14px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 8, color: '#050505', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap' }}>
+                        ⚡ Review
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.25)' }}>{d.rejection_reason ? 'Rejected' : 'Done'}</span>
                     )}
                   </td>
                 </tr>

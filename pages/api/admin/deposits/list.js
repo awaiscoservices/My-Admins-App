@@ -1,3 +1,8 @@
+/**
+ * GET /api/admin/deposits/list
+ * Returns deposits with player info. Uses service role to bypass RLS.
+ * Roles: super_admin, admin, finance
+ */
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -5,7 +10,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-const ALLOWED_ROLES = ['super_admin', 'finance', 'support']
+const ALLOWED_ROLES = ['super_admin', 'admin', 'finance']
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -16,35 +21,29 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return res.status(403).json({ error: 'Forbidden' })
+  const { data: actor } = await supabaseAdmin
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (!actor || !ALLOWED_ROLES.includes(actor.role))
+    return res.status(403).json({ error: 'Forbidden' })
 
-  const { page = '1', limit = '25', search = '', status = '' } = req.query
-  const pageNum = Math.max(1, parseInt(page))
-  const limitNum = Math.min(100, parseInt(limit))
-  const offset = (pageNum - 1) * limitNum
+  const { status } = req.query
 
-  let query = supabaseAdmin
+  let q = supabaseAdmin
     .from('deposits')
     .select(`
-      id, reference_id, amount_cents, bonus_cents, status,
-      payment_method_name, payment_method_type,
-      proof_url, notes, created_at, updated_at,
-      profiles!deposits_user_id_fkey(full_name, email)
-    `, { count: 'exact' })
+      id, reference_id, amount_cents, bonus_cents, total_credit_cents,
+      status, player_reference, screenshot_url, player_notes, admin_notes,
+      rejection_reason, created_at, reviewed_at,
+      payment_method_id,
+      profiles!deposits_user_id_fkey ( id, full_name, email )
+    `)
     .order('created_at', { ascending: false })
-    .range(offset, offset + limitNum - 1)
+    .limit(100)
 
-  if (status) query = query.eq('status', status)
-  if (search) query = query.or(`reference_id.ilike.%${search}%,profiles.full_name.ilike.%${search}%,profiles.email.ilike.%${search}%`)
+  if (status && status !== 'all') q = q.eq('status', status)
 
-  const { data, error, count } = await query
+  const { data, error } = await q
   if (error) return res.status(500).json({ error: error.message })
 
-  return res.status(200).json({
-    rows: data || [],
-    total: count || 0,
-    page: pageNum,
-    pages: Math.ceil((count || 0) / limitNum),
-  })
+  return res.status(200).json({ deposits: data || [] })
 }
