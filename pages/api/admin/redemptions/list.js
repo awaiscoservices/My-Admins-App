@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     .from('redemptions')
     .select(`
       id, reference_id, amount_cents, approved_cents, status, created_at, notes, reviewed_at,
-      game_accounts ( id, username, game_panels ( name ) ),
+      game_accounts ( id, game_username, game_panels ( name ) ),
       profiles!redemptions_user_id_fkey ( id, full_name, email )
     `)
     .order('created_at', { ascending: false })

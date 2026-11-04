@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     .from('game_loads')
     .select(`
       id, reference_id, amount_cents, status, created_at, notes, reviewed_at,
-      game_accounts ( id, username, game_panels ( name ) ),
+      game_accounts ( id, game_username, game_panels ( name ) ),
       profiles!game_loads_user_id_fkey ( id, full_name, email )
     `)
     .order('created_at', { ascending: false })
