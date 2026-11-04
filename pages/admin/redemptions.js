@@ -44,23 +44,21 @@ export default function AdminRedemptions() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setLoading(false); return }
 
+    // Fetch role for UI gating
     const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
     setRole(p?.role || '')
 
-    let q = supabase
-      .from('redemptions')
-      .select(`
-        id, reference_id, amount_cents, approved_cents, status, created_at, notes, reviewed_at,
-        game_accounts ( id, username, game_panels ( name ) ),
-        profiles ( id, full_name, email )
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100)
-
-    if (status !== 'all') q = q.eq('status', status)
-
-    const { data, error } = await q
-    if (error) { showToast(error.message, 'error'); setLoading(false); return }
+    // Use service-role API route to avoid FK ambiguity error
+    // (redemptions has two FKs to profiles: user_id + processed_by)
+    const res = await fetch(`/api/admin/redemptions/list?status=${status}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      showToast(j.error || 'Failed to load redemptions', 'error')
+      setLoading(false); return
+    }
+    const { data } = await res.json()
     setItems(data || [])
     setLoading(false)
   }
