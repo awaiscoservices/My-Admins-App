@@ -196,7 +196,7 @@ export default function AdminGameLoads() {
                     {fmt(item.amount_cents)}
                   </div>
                   {canAct && item.status === 'pending' && (
-                    <div style={{ display:'flex', gap:8' }}>
+                    <div style={{ display:'flex', gap:8 }}>
                       <button onClick={() => openModal(item, 'approve')} disabled={acting === item.id} style={{ padding:'8px 16px', background:'rgba(34,197,94,.12)', border:'1px solid rgba(34,197,94,.3)', borderRadius:8, color:'#22c55e', fontSize:12, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                         Approve
                       </button>
