@@ -1,167 +1,251 @@
+/**
+ * /admin/staff
+ *
+ * Admin — Staff Management
+ * List all staff accounts. Invite new staff, change roles, deactivate.
+ * super_admin only.
+ */
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
-import StatusBadge from '../../components/ui/StatusBadge'
 
+const ROLES = ['admin', 'finance', 'game_ops', 'support']
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-const ROLES = ['super_admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
-
-function StaffModal({ member, onClose, onSave }) {
-  const isNew = !member
-  const [form, setForm] = useState({
-    email: member?.email || '',
-    full_name: member?.full_name || '',
-    role: member?.role || 'support',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  async function submit() {
-    if (!form.email.trim() || !form.full_name.trim()) { setError('Email and name are required'); return }
-    setSaving(true); setError('')
-    const result = await onSave(member?.id, form)
-    if (result?.error) { setError(result.error); setSaving(false) }
-    else onClose()
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>{isNew ? 'Invite Staff' : 'Edit Staff'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {[{ key: 'full_name', label: 'Full Name', placeholder: 'Staff member name', type: 'text' }, { key: 'email', label: 'Email', placeholder: 'staff@casinoze.com', type: 'email' }].map(f => (
-            <div key={f.key}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{f.label}</label>
-              <input type={f.type} placeholder={f.placeholder} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} disabled={!isNew && f.key === 'email'}
-                style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box', opacity: !isNew && f.key === 'email' ? 0.5 : 1 }} />
-            </div>
-          ))}
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Role</label>
-            <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
-              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
-              {ROLES.map(r => <option key={r} value={r} style={{ background: '#0e1a2e' }}>{r.replace(/_/g, ' ')}</option>)}
-            </select>
-          </div>
-        </div>
-        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>{saving ? 'Saving…' : isNew ? 'Send Invite' : 'Save Changes'}</button>
-          <button onClick={onClose} style={{ padding: '11px 16px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.4)', fontSize: 13, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  )
+const ROLE_COLOR = {
+  super_admin: '#f59e0b',
+  admin:       '#fbbf24',
+  finance:     '#22c55e',
+  game_ops:    '#38bdf8',
+  support:     '#a78bfa',
 }
 
 export default function AdminStaff() {
-  const [rows, setRows] = useState([])
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(undefined)
-  const [toast, setToast] = useState(null)
+  const [staff,    setStaff]    = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [role,     setRole]     = useState('')
+  const [toast,    setToast]    = useState(null)
+  const [modal,    setModal]    = useState(null)   // 'invite' | { type:'role'|'deactivate', member }
+  const [invite,   setInvite]   = useState({ email:'', role:'admin' })
+  const [saving,   setSaving]   = useState(false)
+  const [myId,     setMyId]     = useState(null)
 
-  useEffect(() => { load() }, [filter])
+  useEffect(() => { load() }, [])
 
-  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
+  function showToast(msg, type = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 4000)
+  }
 
   async function load() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ role: filter !== 'all' ? filter : '', limit: '100' })
-      const res = await fetch(`/api/admin/staff/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || d.staff || [])
-    } catch (e) { console.error('Failed to load staff', e); setRows([]) }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); return }
+    setMyId(session.user.id)
+
+    const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    setRole(p?.role || '')
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role, is_active, created_at')
+      .in('role', ['super_admin', 'admin', 'finance', 'game_ops', 'support'])
+      .order('created_at', { ascending: true })
+
+    if (error) { showToast(error.message, 'error'); setLoading(false); return }
+    setStaff(data || [])
     setLoading(false)
   }
 
-  async function handleSave(id, form) {
+  async function changeRole(memberId, newRole) {
+    setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/admin/staff/save', {
+    const res = await fetch('/api/admin/staff/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(id ? { staff_id: id, ...form } : form),
+      body: JSON.stringify({ user_id: memberId, action: 'change_role', role: newRole }),
     })
-    const d = await res.json()
-    if (!res.ok) return { error: d.error }
-    showToast(id ? 'Staff updated' : 'Invite sent')
+    const json = await res.json()
+    setSaving(false)
+    setModal(null)
+    if (!res.ok) { showToast(json.error || 'Failed', 'error'); return }
+    showToast('Role updated')
     load()
-    return {}
   }
 
-  const filtered = rows.filter(r => {
-    if (!search) return true
-    const s = search.toLowerCase()
-    return r.full_name?.toLowerCase().includes(s) || r.email?.toLowerCase().includes(s) || r.role?.toLowerCase().includes(s)
-  })
+  async function deactivate(memberId) {
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/staff/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ user_id: memberId, action: 'deactivate' }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    setModal(null)
+    if (!res.ok) { showToast(json.error || 'Failed', 'error'); return }
+    showToast('Staff member deactivated')
+    load()
+  }
+
+  async function sendInvite() {
+    if (!invite.email.trim()) { showToast('Email required', 'error'); return }
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/staff/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify(invite),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { showToast(json.error || 'Invite failed', 'error'); return }
+    showToast(`Invite sent to ${invite.email}`)
+    setModal(null)
+    setInvite({ email:'', role:'admin' })
+    load()
+  }
+
+  const isSuperAdmin = role === 'super_admin'
 
   return (
     <AdminLayout>
       <Head><title>Staff — Admin</title></Head>
-      {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
-      {selected !== undefined && <StaffModal member={selected || null} onClose={() => setSelected(undefined)} onSave={handleSave} />}
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Staff</h1>
-          <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Manage admin team members and roles</p>
+      {toast && (
+        <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999,
+          background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)',
+          borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600,
+          fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
+          {toast.msg}
         </div>
-        <button onClick={() => setSelected(null)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>+ Invite Staff</button>
-      </div>
+      )}
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, flexWrap: 'wrap' }}>
-          {['all', ...ROLES].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s.replace(/_/g, ' ')}</button>
-          ))}
-        </div>
-        <input type="text" placeholder="Search name, email, role…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 220 }} />
-      </div>
-
-      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions'].map(h => (
-                  <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
+      {/* Invite modal */}
+      {modal === 'invite' && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#0d1f35', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:28, maxWidth:400, width:'100%' }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:20, fontFamily:"'Cinzel',serif" }}>Invite Staff Member</div>
+            <FieldInput label="Email Address" value={invite.email} onChange={v => setInvite(i => ({...i, email:v}))} type="email" />
+            <div style={{ marginTop:14, marginBottom:20 }}>
+              <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>Role</label>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {ROLES.map(r => (
+                  <button key={r} onClick={() => setInvite(i => ({...i, role:r}))} style={{
+                    padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif",
+                    background: invite.role===r ? `${ROLE_COLOR[r]}22` : 'rgba(255,255,255,.05)',
+                    border: invite.role===r ? `1px solid ${ROLE_COLOR[r]}55` : '1px solid rgba(255,255,255,.1)',
+                    color: invite.role===r ? (ROLE_COLOR[r]||'#fbbf24') : 'rgba(255,255,255,.4)',
+                  }}>{r}</button>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No staff found</td></tr>
-              : filtered.map(r => (
-                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.full_name}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.email}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7', textTransform: 'uppercase', letterSpacing: '.04em' }}>{r.role?.replace(/_/g, ' ')}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}><StatusBadge status={r.status || 'active'} size="xs" /></td>
-                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Edit</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={sendInvite} disabled={saving} style={{ flex:1, padding:'10px 0', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                {saving ? 'Sending…' : 'Send Invite'}
+              </button>
+              <button onClick={() => setModal(null)} style={{ padding:'10px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.5)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Change role modal */}
+      {modal?.type === 'role' && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#0d1f35', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:28, maxWidth:360, width:'100%' }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:6, fontFamily:"'Cinzel',serif" }}>Change Role</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:20 }}>{modal.member.full_name}</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+              {ROLES.map(r => (
+                <button key={r} onClick={() => changeRole(modal.member.id, r)} disabled={modal.member.role===r || saving} style={{
+                  padding:'10px 16px', borderRadius:10, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif", textAlign:'left',
+                  background: modal.member.role===r ? `${ROLE_COLOR[r]}22` : 'rgba(255,255,255,.04)',
+                  border: modal.member.role===r ? `1px solid ${ROLE_COLOR[r]}55` : '1px solid rgba(255,255,255,.08)',
+                  color: modal.member.role===r ? (ROLE_COLOR[r]||'#fbbf24') : 'rgba(255,255,255,.6)',
+                  opacity: modal.member.role===r ? 1 : undefined,
+                }}>
+                  {r} {modal.member.role===r && '← current'}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setModal(null)} style={{ width:'100%', padding:'10px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.5)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', margin:0 }}>Staff</h1>
+          <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Manage admin team members and roles</p>
+        </div>
+        {isSuperAdmin && (
+          <button onClick={() => setModal('invite')} style={{ padding:'10px 20px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+            + Invite Staff
+          </button>
+        )}
       </div>
+
+      {loading ? (
+        <div style={{ padding:60, textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {staff.map(member => {
+            const color = ROLE_COLOR[member.role] || '#94a3b8'
+            const isMe = member.id === myId
+            return (
+              <div key={member.id} style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, opacity: member.is_active===false ? 0.4 : 1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                  <div style={{ width:38, height:38, borderRadius:'50%', background:`${color}22`, border:`1px solid ${color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color, flexShrink:0, fontFamily:"'Cinzel',serif" }}>
+                    {member.full_name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>
+                      {member.full_name || '—'}
+                      {isMe && <span style={{ marginLeft:8, fontSize:10, color:'rgba(255,255,255,.3)', fontWeight:400 }}>(you)</span>}
+                      {member.is_active === false && <span style={{ marginLeft:8, fontSize:10, color:'#f87171' }}>Deactivated</span>}
+                    </div>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>
+                      {member.email} · Joined {fmtDate(member.created_at)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${color}22`, color }}>
+                    {member.role}
+                  </span>
+                  {isSuperAdmin && !isMe && member.role !== 'super_admin' && member.is_active !== false && (
+                    <>
+                      <button onClick={() => setModal({ type:'role', member })} style={{ padding:'7px 12px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.5)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                        Change Role
+                      </button>
+                      <button onClick={() => { if(window.confirm(`Deactivate ${member.full_name}?`)) deactivate(member.id) }} style={{ padding:'7px 12px', background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', borderRadius:8, color:'#f87171', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                        Deactivate
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </AdminLayout>
+  )
+}
+
+function FieldInput({ label, value, onChange, type='text' }) {
+  return (
+    <div>
+      <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)}
+        style={{ width:'100%', padding:'9px 12px', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.12)', borderRadius:8, color:'#fff', fontSize:14, fontFamily:"'Outfit',sans-serif", outline:'none', boxSizing:'border-box' }} />
+    </div>
   )
 }

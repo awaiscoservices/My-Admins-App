@@ -1,100 +1,171 @@
+/**
+ * /admin/adjustments
+ *
+ * Admin — Wallet Adjustments log
+ * Read-only audit of all manual balance adjustments (credit/debit) by staff.
+ * Adjustments are made from the player detail page; this is the full log.
+ * Roles: super_admin, admin, finance
+ */
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 
-const fmt = c => {
-  if (c === null || c === undefined) return '—'
-  const abs = Math.abs(c)
-  const str = '$' + (abs / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
-  return c < 0 ? '−' + str : '+' + str
+const fmt     = cents => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+const fmtDate = d => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
+const TYPE_STYLE = {
+  credit: { color: '#22c55e', prefix: '+' },
+  debit:  { color: '#f87171', prefix: '-' },
 }
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
 export default function AdminAdjustments() {
-  const [rows, setRows] = useState([])
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
+  const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
+  const [search,  setSearch]  = useState('')
+  const [toast,   setToast]   = useState(null)
+  const [page,    setPage]    = useState(0)
+  const PAGE_SIZE = 50
 
-  useEffect(() => { load() }, [filter])
+  useEffect(() => { load() }, [page])
+
+  function showToast(msg, type = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
 
   async function load() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ type: filter !== 'all' ? filter : '', limit: '200' })
-      const res = await fetch(`/api/admin/adjustments/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || d.adjustments || [])
-    } catch (e) { console.error('Failed to load adjustments', e); setRows([]) }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); return }
+
+    // Auth check
+    const { data: actor } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    if (!actor || !['super_admin', 'admin', 'finance'].includes(actor.role)) {
+      showToast('Access denied', 'error')
+      setLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('wallet_adjustments')
+      .select(`
+        id, reference_id, amount_cents, direction, bucket, reason, notes, created_at,
+        user_id,
+        profiles!wallet_adjustments_user_id_fkey ( full_name, email ),
+        actor:profiles!wallet_adjustments_actor_id_fkey ( full_name )
+      `)
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    if (error) { showToast(error.message, 'error'); setLoading(false); return }
+    setItems(data || [])
     setLoading(false)
   }
 
-  const filtered = rows.filter(r => {
+  const filtered = items.filter(item => {
     if (!search) return true
-    const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) || r.profiles?.email?.toLowerCase().includes(s) || r.reason?.toLowerCase().includes(s)
+    const q = search.toLowerCase()
+    return (
+      item.profiles?.full_name?.toLowerCase().includes(q) ||
+      item.profiles?.email?.toLowerCase().includes(q) ||
+      item.reference_id?.toLowerCase().includes(q) ||
+      item.reason?.toLowerCase().includes(q)
+    )
   })
 
   return (
     <AdminLayout>
       <Head><title>Adjustments — Admin</title></Head>
 
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Adjustments</h1>
-        <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Manual wallet adjustment history</p>
+      {toast && (
+        <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999,
+          background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)',
+          borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600,
+          fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', margin:0 }}>Adjustments</h1>
+          <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Audit log of all manual wallet adjustments</p>
+        </div>
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search player, ref, reason…"
+          style={{ padding:'9px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', width:240 }}
+        />
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10 }}>
-          {['all', 'credit', 'debit'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
-          ))}
-        </div>
-        <input type="text" placeholder="Search player, email, reason…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }} />
-      </div>
+      {loading ? (
+        <div style={{ padding:60, textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding:60, textAlign:'center', color:'rgba(255,255,255,.3)', fontSize:14 }}>No adjustments found</div>
+      ) : (
+        <>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {filtered.map(item => {
+              const ts = TYPE_STYLE[item.direction] || TYPE_STYLE.credit
+              const bucketColor = item.bucket === 'cash' ? '#22c55e' : '#818cf8'
+              return (
+                <div key={item.id} style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.06)', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:14, minWidth:0 }}>
+                    {/* Direction indicator */}
+                    <div style={{
+                      width:36, height:36, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900,
+                      background: item.direction==='credit' ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)',
+                      color: ts.color,
+                    }}>
+                      {ts.prefix}
+                    </div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>
+                        {item.profiles?.full_name || '—'}
+                        <span style={{ marginLeft:8, padding:'2px 6px', borderRadius:10, fontSize:10, fontWeight:700, background:`${bucketColor}22`, color:bucketColor }}>
+                          {item.bucket}
+                        </span>
+                      </div>
+                      <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:2 }}>
+                        {item.reason}
+                      </div>
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,.25)', marginTop:2 }}>
+                        {item.reference_id} · {fmtDate(item.created_at)} · by {item.actor?.full_name || '—'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:18, fontWeight:900, color:ts.color }}>
+                      {ts.prefix}{fmt(item.amount_cents)}
+                    </div>
+                    {item.notes && (
+                      <div style={{ fontSize:11, color:'rgba(255,255,255,.3)', marginTop:4, maxWidth:200, textAlign:'right' }}>
+                        {item.notes}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
-      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Player', 'Type', 'Amount', 'Bucket', 'Reason', 'By', 'Date'].map(h => (
-                  <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No adjustments found</td></tr>
-              : filtered.map(r => (
-                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.profiles?.full_name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, textTransform: 'uppercase', background: r.type === 'credit' ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)', color: r.type === 'credit' ? '#22c55e' : '#ef4444' }}>{r.type}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 800, color: r.type === 'credit' ? '#22c55e' : '#ef4444' }}>{fmt(r.type === 'credit' ? r.amount_cents : -r.amount_cents)}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: r.bucket === 'bonus' ? 'rgba(168,85,247,.15)' : 'rgba(255,255,255,.08)', color: r.bucket === 'bonus' ? '#a855f7' : 'rgba(255,255,255,.4)', textTransform: 'capitalize' }}>{r.bucket || 'cash'}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.6)', maxWidth: 240 }}>{r.reason || '—'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{r.admin?.full_name || '—'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          {/* Pagination */}
+          <div style={{ display:'flex', gap:10, justifyContent:'center', marginTop:20 }}>
+            {page > 0 && (
+              <button onClick={() => setPage(p => p - 1)} style={{ padding:'8px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.6)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                ← Prev
+              </button>
+            )}
+            {items.length === PAGE_SIZE && (
+              <button onClick={() => setPage(p => p + 1)} style={{ padding:'8px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.6)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                Next →
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </AdminLayout>
   )
 }

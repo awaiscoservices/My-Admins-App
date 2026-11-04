@@ -1,3 +1,13 @@
+/**
+ * POST /api/admin/kyc/action
+ *
+ * Body: { kyc_id, action: 'approve'|'reject', rejection_reason? }
+ *
+ * approve: sets kyc_records.status='approved', profiles.kyc_verified=true
+ * reject:  sets kyc_records.status='rejected' + rejection_reason
+ *
+ * Roles: super_admin, admin
+ */
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -5,7 +15,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-const ALLOWED_ROLES = ['super_admin', 'admin', 'kyc_agent', 'support']
+const ALLOWED_ROLES = ['super_admin', 'admin']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -16,56 +26,56 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { data: staff, error: staffErr } = await supabaseAdmin
-    .from('profiles').select('role, full_name').eq('id', user.id).single()
-  if (staffErr || !staff || !ALLOWED_ROLES.includes(staff.role)) {
+  const { data: actor } = await supabaseAdmin
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (!actor || !ALLOWED_ROLES.includes(actor.role))
     return res.status(403).json({ error: 'Forbidden' })
-  }
 
-  const { kyc_id, action, notes } = req.body
-  if (!kyc_id || !['approve', 'reject'].includes(action)) {
+  const { kyc_id, action, rejection_reason } = req.body
+  if (!kyc_id || !['approve', 'reject'].includes(action))
     return res.status(400).json({ error: 'kyc_id and action (approve|reject) required' })
-  }
-  if (action === 'reject' && !notes?.trim()) {
-    return res.status(400).json({ error: 'Rejection reason required' })
-  }
+  if (action === 'reject' && !rejection_reason?.trim())
+    return res.status(400).json({ error: 'rejection_reason required when rejecting' })
 
+  // Fetch KYC record
   const { data: kyc, error: kycErr } = await supabaseAdmin
     .from('kyc_records').select('id, user_id, status').eq('id', kyc_id).single()
   if (kycErr || !kyc) return res.status(404).json({ error: 'KYC record not found' })
-  if (!['pending', 'under_review'].includes(kyc.status)) {
-    return res.status(400).json({ error: 'KYC is not pending review' })
+  if (kyc.status !== 'pending') return res.status(409).json({ error: `Already ${kyc.status}` })
+
+  const now = new Date().toISOString()
+
+  if (action === 'approve') {
+    // Update KYC record
+    await supabaseAdmin.from('kyc_records').update({
+      status: 'approved',
+      reviewed_at: now,
+      reviewed_by: user.id,
+    }).eq('id', kyc_id)
+
+    // Mark profile verified
+    await supabaseAdmin.from('profiles').update({
+      kyc_verified: true,
+    }).eq('id', kyc.user_id)
+
+  } else {
+    await supabaseAdmin.from('kyc_records').update({
+      status: 'rejected',
+      reviewed_at: now,
+      reviewed_by: user.id,
+      rejection_reason: rejection_reason.trim(),
+    }).eq('id', kyc_id)
   }
 
-  const newStatus = action === 'approve' ? 'verified' : 'rejected'
-
-  await supabaseAdmin.from('kyc_records').update({
-    status: newStatus,
-    reviewed_at: new Date().toISOString(),
-    reviewed_by: user.id,
-    reviewer_notes: notes?.trim() || null,
-  }).eq('id', kyc_id)
-
-  // Sync kyc_status on the player's profile row
-  await supabaseAdmin.from('profiles').update({
-    kyc_status: newStatus,
-  }).eq('id', kyc.user_id)
-
-  await supabaseAdmin.from('notifications').insert({
-    user_id: kyc.user_id,
-    title: action === 'approve' ? '✅ Identity Verified' : '❌ KYC Rejected',
-    message: action === 'approve'
-      ? 'Your identity verification has been approved. You can now make withdrawals.'
-      : `Your KYC submission was rejected. Reason: ${notes?.trim()}. Please resubmit with clearer documents.`,
-  })
-
+  // Audit log
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id: user.id,
-    action: `kyc_${action}`,
-    target_type: 'kyc_records',
-    target_id: kyc_id,
-    details: { notes, reviewed_by: staff.full_name, new_status: newStatus },
+    actor_id:    user.id,
+    actor_role:  actor.role,
+    action:      'kyc_reviewed',
+    target_type: 'kyc_record',
+    target_id:   String(kyc_id),
+    description: `KYC ${action}d for user ${kyc.user_id}${action==='reject'?' — '+rejection_reason:''}`,
   })
 
-  return res.status(200).json({ success: true, status: newStatus })
+  return res.status(200).json({ ok: true, action, kyc_id })
 }

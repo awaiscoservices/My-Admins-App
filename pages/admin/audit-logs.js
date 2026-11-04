@@ -1,3 +1,10 @@
+/**
+ * /admin/audit-logs
+ *
+ * Admin — Audit Log viewer
+ * Append-only log of all staff actions. Search + filter by action type.
+ * Roles: super_admin only (sensitive — shows all staff actions)
+ */
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
@@ -5,102 +12,146 @@ import AdminLayout from '../../components/layout/AdminLayout'
 
 const fmtDate = d => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 
-const ACTION_COLORS = {
-  approve: '#22c55e', reject: '#ef4444', suspend: '#ef4444',
-  create: '#22c55e', update: '#fbbf24', delete: '#ef4444',
-  login: '#06b6d4', adjust: '#a855f7', verify: '#22c55e',
+const ACTION_COLOR = {
+  deposit_approved:      '#22c55e',
+  deposit_rejected:      '#f87171',
+  withdrawal_approved:   '#22c55e',
+  withdrawal_rejected:   '#f87171',
+  game_load_approved:    '#fbbf24',
+  game_load_rejected:    '#f87171',
+  redemption_approved:   '#a78bfa',
+  redemption_rejected:   '#f87171',
+  wallet_adjustment:     '#f59e0b',
+  player_status_changed: '#6366f1',
+  game_account_setup:    '#38bdf8',
+  level_config_updated:  '#fbbf24',
+  kyc_reviewed:          '#10b981',
 }
 
 export default function AdminAuditLogs() {
-  const [rows, setRows] = useState([])
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [items,    setItems]    = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [toast,    setToast]    = useState(null)
+  const [page,     setPage]     = useState(0)
+  const PAGE_SIZE = 100
 
-  const ACTION_TYPES = ['all', 'approve', 'reject', 'create', 'update', 'adjust', 'suspend', 'verify']
+  useEffect(() => { load() }, [page])
 
-  useEffect(() => { load() }, [filter])
+  function showToast(msg, type = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
 
   async function load() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ action: filter !== 'all' ? filter : '', limit: '200' })
-      const res = await fetch(`/api/admin/audit-logs/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || d.logs || [])
-    } catch (e) { console.error('Failed to load audit logs', e); setRows([]) }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); return }
+
+    const { data: actor } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    if (!actor || actor.role !== 'super_admin') {
+      showToast('super_admin only', 'error'); setLoading(false); return
+    }
+
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select(`
+        id, action, actor_role, target_type, target_id, description, created_at,
+        actor:profiles!audit_logs_actor_id_fkey ( full_name, email )
+      `)
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    if (error) { showToast(error.message, 'error'); setLoading(false); return }
+    setItems(data || [])
     setLoading(false)
   }
 
-  const filtered = rows.filter(r => {
+  const filtered = items.filter(item => {
     if (!search) return true
-    const s = search.toLowerCase()
-    return r.admin?.full_name?.toLowerCase().includes(s) || r.admin?.email?.toLowerCase().includes(s) || r.target?.full_name?.toLowerCase().includes(s) || r.entity_type?.toLowerCase().includes(s) || r.action?.toLowerCase().includes(s)
+    const q = search.toLowerCase()
+    return (
+      item.actor?.full_name?.toLowerCase().includes(q) ||
+      item.actor?.email?.toLowerCase().includes(q) ||
+      item.action?.toLowerCase().includes(q) ||
+      item.description?.toLowerCase().includes(q) ||
+      item.target_id?.toLowerCase().includes(q)
+    )
   })
 
   return (
     <AdminLayout>
       <Head><title>Audit Logs — Admin</title></Head>
 
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Audit Logs</h1>
-        <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Complete admin action history — read only</p>
-      </div>
-
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, flexWrap: 'wrap' }}>
-          {ACTION_TYPES.map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
-          ))}
+      {toast && (
+        <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999,
+          background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)',
+          borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600,
+          fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
+          {toast.msg}
         </div>
-        <input type="text" placeholder="Search admin, player, action…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }} />
+      )}
+
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', margin:0 }}>Audit Logs</h1>
+          <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Immutable record of all staff actions</p>
+        </div>
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search actor, action, description…"
+          style={{ padding:'9px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', width:260 }}
+        />
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Admin', 'Action', 'Entity', 'Target Player', 'Details', 'Time'].map(h => (
-                  <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No audit logs found</td></tr>
-              : filtered.map(r => {
-                const color = ACTION_COLORS[r.action] || '#fbbf24'
-                return (
-                  <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.admin?.full_name}</div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.admin?.email}</div>
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: color + '22', color, textTransform: 'uppercase', letterSpacing: '.05em' }}>{r.action}</span>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: '#a855f7', textTransform: 'capitalize' }}>{r.entity_type?.replace(/_/g, ' ')}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.6)' }}>{r.target?.full_name || '—'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.4)', maxWidth: 200 }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {r.notes || (r.metadata ? JSON.stringify(r.metadata).slice(0, 80) : '—')}
+      {loading ? (
+        <div style={{ padding:60, textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding:60, textAlign:'center', color:'rgba(255,255,255,.3)', fontSize:14 }}>No audit entries</div>
+      ) : (
+        <>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {filtered.map(item => {
+              const color = ACTION_COLOR[item.action] || '#94a3b8'
+              return (
+                <div key={item.id} style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.05)', borderRadius:10, padding:'12px 16px', display:'flex', gap:14, alignItems:'flex-start' }}>
+                  {/* Color dot */}
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:color, marginTop:5, flexShrink:0 }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                      <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:800, background:`${color}22`, color, letterSpacing:'.05em' }}>
+                        {item.action?.replace(/_/g,' ')}
+                      </span>
+                      <span style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>
+                        by <strong style={{ color:'rgba(255,255,255,.75)' }}>{item.actor?.full_name || '—'}</strong>
+                        <span style={{ marginLeft:6, color:'rgba(255,255,255,.3)' }}>({item.actor_role})</span>
+                      </span>
+                      <span style={{ fontSize:10, color:'rgba(255,255,255,.25)', marginLeft:'auto' }}>{fmtDate(item.created_at)}</span>
+                    </div>
+                    <div style={{ fontSize:12, color:'rgba(255,255,255,.45)', marginTop:5, lineHeight:1.5 }}>
+                      {item.description}
+                    </div>
+                    {item.target_id && (
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,.2)', marginTop:3 }}>
+                        {item.target_type} · {item.target_id}
                       </div>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ display:'flex', gap:10, justifyContent:'center', marginTop:20 }}>
+            {page > 0 && (
+              <button onClick={() => setPage(p => p-1)} style={{ padding:'8px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.6)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>← Prev</button>
+            )}
+            {items.length === PAGE_SIZE && (
+              <button onClick={() => setPage(p => p+1)} style={{ padding:'8px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.6)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Next →</button>
+            )}
+          </div>
+        </>
+      )}
     </AdminLayout>
   )
 }
