@@ -49,6 +49,7 @@ export default async function handler(req, res) {
   const [
     playersRes,
     newTodayRes,
+    new7dRes,
     new14dRes,
     signups14dRes,
     depositsRes,
@@ -61,111 +62,125 @@ export default async function handler(req, res) {
     openTicketsRes,
     deposits7dRes,
     withdrawals7dRes,
+    gameLoads7dRes,
+    pendingGameLoadsRes,
+    redemptions7dRes,
+    pendingRedemptionsRes,
     recentTxRes,
   ] = await Promise.all([
-    // Total players
-    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'player'),
-    // New today
-    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'player').gte('created_at', today),
-    // New last 14d
-    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'player').gte('created_at', ago14),
-    // Signups by day (14d) — raw select
-    supabaseAdmin.from('profiles').select('created_at').eq('role', 'player').gte('created_at', ago14).order('created_at'),
-    // Total deposits (approved/completed)
-    supabaseAdmin.from('deposits').select('amount_cents').in('status', ['approved', 'completed']),
-    // Total withdrawals (approved/completed)
-    supabaseAdmin.from('withdrawals').select('amount_cents').in('status', ['approved', 'completed']),
-    // Active game accounts
-    supabaseAdmin.from('game_accounts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-    // Pending game accounts
-    supabaseAdmin.from('game_accounts').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    // Pending deposits
-    supabaseAdmin.from('deposits').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    // Pending withdrawals
-    supabaseAdmin.from('withdrawals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    // Pending KYC
-    supabaseAdmin.from('kyc_records').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    // Open support tickets
-    supabaseAdmin.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'open'),
-    // Deposits last 7 days
-    supabaseAdmin.from('deposits').select('amount_cents, created_at').in('status', ['approved', 'completed']).gte('created_at', ago7),
-    // Withdrawals last 7 days
-    supabaseAdmin.from('withdrawals').select('amount_cents, created_at').in('status', ['approved', 'completed']).gte('created_at', ago7),
-    // Recent transactions (last 20)
+    // Players
+    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player'),
+    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player').gte('created_at', today),
+    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago7),
+    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago14),
+    supabaseAdmin.from('profiles').select('created_at').eq('role','player').gte('created_at', ago14).order('created_at'),
+
+    // Financial totals (all time approved)
+    supabaseAdmin.from('deposits').select('amount_cents').in('status',['approved','completed']),
+    supabaseAdmin.from('withdrawals').select('amount_cents').in('status',['approved','completed']),
+
+    // Game accounts
+    supabaseAdmin.from('game_accounts').select('id', { count:'exact', head:true }).eq('status','active'),
+    supabaseAdmin.from('game_accounts').select('id', { count:'exact', head:true }).eq('status','pending'),
+
+    // Pending queues
+    supabaseAdmin.from('deposits').select('id', { count:'exact', head:true }).eq('status','pending'),
+    supabaseAdmin.from('withdrawals').select('id', { count:'exact', head:true }).eq('status','pending'),
+    supabaseAdmin.from('kyc_records').select('id', { count:'exact', head:true }).eq('status','pending'),
+    supabaseAdmin.from('support_tickets').select('id', { count:'exact', head:true }).eq('status','open'),
+
+    // 7d charts
+    supabaseAdmin.from('deposits').select('amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
+    supabaseAdmin.from('withdrawals').select('amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
+
+    // Game loads (scores) — 7d count + pending
+    supabaseAdmin.from('game_loads').select('id', { count:'exact', head:true }).gte('created_at', ago7),
+    supabaseAdmin.from('game_loads').select('id', { count:'exact', head:true }).eq('status','pending'),
+
+    // Redemptions — 7d count + pending
+    supabaseAdmin.from('redemptions').select('id', { count:'exact', head:true }).gte('created_at', ago7),
+    supabaseAdmin.from('redemptions').select('id', { count:'exact', head:true }).eq('status','pending'),
+
+    // Recent ledger transactions
     supabaseAdmin.from('ledger')
       .select('reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(full_name)')
-      .in('type', ['deposit', 'withdrawal'])
-      .order('created_at', { ascending: false })
+      .in('type', ['deposit','withdrawal'])
+      .order('created_at', { ascending:false })
       .limit(20),
   ])
 
-  // Calculate totals
-  const totalDepositsCents = (depositsRes.data || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
-  const totalWithdrawalsCents = (withdrawalsRes.data || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
-  const deposits7dCents = (deposits7dRes.data || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
-  const withdrawals7dCents = (withdrawals7dRes.data || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
+  // Totals
+  const totalDepositsCents    = (depositsRes.data    || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
+  const totalWithdrawalsCents = (withdrawalsRes.data  || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
+  const deposits7dCents       = (deposits7dRes.data   || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
+  const withdrawals7dCents    = (withdrawals7dRes.data || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
 
-  // Build 7-day bar chart data (bucket by weekday)
+  // 7-day bucket helper
   const bucketByDay = (rows, field = 'amount_cents') => {
     const buckets = Array(7).fill(0)
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0)
     ;(rows || []).forEach(r => {
-      const d = new Date(r.created_at)
-      const idx = Math.floor((d - cutoff) / 86400000)
+      const idx = Math.floor((new Date(r.created_at) - cutoff) / 86400000)
       if (idx >= 0 && idx < 7) buckets[idx] += (r[field] || 0)
     })
     return last7DayLabels().map((label, i) => ({ label, value: buckets[i] }))
   }
 
-  const depositsByDay    = bucketByDay(deposits7dRes.data)
-  const withdrawalsByDay = bucketByDay(withdrawals7dRes.data)
-
-  // Build 14-day signup sparkline
+  // 14-day signup sparkline
   const signupBuckets = Array(14).fill(0)
   const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate() - 13); cutoff14.setHours(0,0,0,0)
   ;(signups14dRes.data || []).forEach(r => {
-    const d = new Date(r.created_at)
-    const idx = Math.floor((d - cutoff14) / 86400000)
+    const idx = Math.floor((new Date(r.created_at) - cutoff14) / 86400000)
     if (idx >= 0 && idx < 14) signupBuckets[idx]++
   })
-  const signupsByDay = signupBuckets.map((value, i) => ({ value }))
 
-  // Format recent transactions
+  // Recent transactions
   const recentTransactions = (recentTxRes.data || []).map(tx => ({
     reference_id: tx.reference_id,
-    player_name: tx.profiles?.full_name || tx.user_id?.slice(0, 8),
-    type: tx.direction === 'credit' ? 'deposit' : 'withdrawal',
+    player_name:  tx.profiles?.full_name || tx.user_id?.slice(0, 8),
+    type:         tx.direction === 'credit' ? 'deposit' : 'withdrawal',
     amount_cents: tx.amount_cents,
-    status: 'approved',
-    created_at: tx.created_at,
+    status:       'approved',
+    created_at:   tx.created_at,
   }))
 
   return res.status(200).json({
     // Players
-    total_players: playersRes.count || 0,
-    new_players_today: newTodayRes.count || 0,
-    new_players_14d: new14dRes.count || 0,
-    signups_by_day: signupsByDay,
+    total_players:      playersRes.count  || 0,
+    new_players_today:  newTodayRes.count || 0,
+    new_players_7d:     new7dRes.count    || 0,
+    new_players_14d:    new14dRes.count   || 0,
+    signups_by_day:     signupBuckets.map(value => ({ value })),
 
-    // Financials
-    total_deposits_cents: totalDepositsCents,
-    deposits_count: depositsRes.data?.length || 0,
+    // Financials (all time)
+    total_deposits_cents:    totalDepositsCents,
+    deposits_count:          depositsRes.data?.length || 0,
     total_withdrawals_cents: totalWithdrawalsCents,
-    withdrawals_count: withdrawalsRes.data?.length || 0,
+    withdrawals_count:       withdrawalsRes.data?.length || 0,
 
-    // 7-day
-    deposits_7d_cents: deposits7dCents,
+    // 7-day financials
+    deposits_7d_cents:    deposits7dCents,
     withdrawals_7d_cents: withdrawals7dCents,
-    deposits_by_day: depositsByDay,
-    withdrawals_by_day: withdrawalsByDay,
+    deposits_by_day:      bucketByDay(deposits7dRes.data),
+    withdrawals_by_day:   bucketByDay(withdrawals7dRes.data),
 
-    // Queue counts
-    pending_deposits: pendingDepRes.count || 0,
-    pending_withdrawals: pendingWdRes.count || 0,
-    pending_kyc: pendingKycRes.count || 0,
-    open_tickets: openTicketsRes.count || 0,
-    active_game_accounts: activeGARes.count || 0,
-    pending_game_accounts: pendingGARes.count || 0,
+    // Pending queues
+    pending_deposits:    pendingDepRes.count  || 0,
+    pending_withdrawals: pendingWdRes.count   || 0,
+    pending_kyc:         pendingKycRes.count  || 0,
+    open_tickets:        openTicketsRes.count || 0,
+
+    // Game accounts
+    active_game_accounts:  activeGARes.count  || 0,
+    pending_game_accounts: pendingGARes.count  || 0,
+
+    // Scores / Game loads
+    game_loads_7d:        gameLoads7dRes.count        || 0,
+    pending_game_loads:   pendingGameLoadsRes.count   || 0,
+
+    // Redemptions
+    redemptions_7d:       redemptions7dRes.count      || 0,
+    pending_redemptions:  pendingRedemptionsRes.count || 0,
 
     // Recent
     recent_transactions: recentTransactions,
