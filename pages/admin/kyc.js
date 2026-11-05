@@ -1,6 +1,8 @@
 /**
  * /admin/kyc  (sidebar label: KYC Review)
  * Design matches Deposits page exactly.
+ * DB columns: doc_type, doc_front_url, doc_back_url, selfie_url, admin_notes
+ * profiles: kyc_status (not kyc_verified)
  */
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
@@ -41,14 +43,22 @@ function ReviewModal({ item, onClose, onAction }) {
           <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>{item.profiles?.full_name}</div>
           <div style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>{item.profiles?.email}</div>
           <div style={{ fontSize:12, color:'rgba(255,255,255,.5)', marginTop:6 }}>
-            Document: {DOC_LABELS[item.document_type] || item.document_type}
+            Document: {DOC_LABELS[item.doc_type] || item.doc_type}
           </div>
-          {item.document_url && (
-            <a href={item.document_url} target="_blank" rel="noreferrer"
-              style={{ display:'inline-block', marginTop:8, fontSize:12, color:'#fbbf24', textDecoration:'none' }}>
-              View Document ↗
-            </a>
-          )}
+          <div style={{ display:'flex', gap:12, marginTop:8, flexWrap:'wrap' }}>
+            {item.doc_front_url && (
+              <a href={item.doc_front_url} target="_blank" rel="noreferrer"
+                style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Front ↗</a>
+            )}
+            {item.doc_back_url && (
+              <a href={item.doc_back_url} target="_blank" rel="noreferrer"
+                style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Back ↗</a>
+            )}
+            {item.selfie_url && (
+              <a href={item.selfie_url} target="_blank" rel="noreferrer"
+                style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Selfie ↗</a>
+            )}
+          </div>
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Rejection Reason (required if rejecting)</label>
@@ -112,7 +122,7 @@ export default function AdminKYC() {
     const s = search.toLowerCase()
     return r.profiles?.full_name?.toLowerCase().includes(s) ||
       r.profiles?.email?.toLowerCase().includes(s) ||
-      r.document_type?.toLowerCase().includes(s)
+      r.doc_type?.toLowerCase().includes(s)
   })
 
   return (
@@ -141,7 +151,7 @@ export default function AdminKYC() {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'rgba(255,255,255,.04)' }}>
-                {['Player','Document','KYC Verified','Status','Submitted','Actions'].map(h => (
+                {['Player','Document','KYC Status','Status','Submitted','Actions'].map(h => (
                   <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -162,15 +172,16 @@ export default function AdminKYC() {
                     <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
                   </td>
                   <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, color:'#fff' }}>{DOC_LABELS[r.document_type] || r.document_type || '—'}</div>
-                    {r.document_url && (
-                      <a href={r.document_url} target="_blank" rel="noreferrer"
-                        style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>View ↗</a>
-                    )}
+                    <div style={{ fontSize:13, color:'#fff' }}>{DOC_LABELS[r.doc_type] || r.doc_type || '—'}</div>
+                    <div style={{ display:'flex', gap:8, marginTop:2 }}>
+                      {r.doc_front_url && <a href={r.doc_front_url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Front ↗</a>}
+                      {r.doc_back_url  && <a href={r.doc_back_url}  target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Back ↗</a>}
+                      {r.selfie_url    && <a href={r.selfie_url}    target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Selfie ↗</a>}
+                    </div>
                   </td>
                   <td style={{ padding:'12px 14px' }}>
                     <span style={{ fontSize:11, fontWeight:700, color: r.profiles?.kyc_status === 'verified' ? '#22c55e' : 'rgba(255,255,255,.3)' }}>
-                      {r.profiles?.kyc_status === 'verified' ? '✅ Verified' : '—'}
+                      {r.profiles?.kyc_status === 'verified' ? '✅ Verified' : r.profiles?.kyc_status || '—'}
                     </span>
                   </td>
                   <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>

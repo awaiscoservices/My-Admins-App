@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   let q = supabaseAdmin
     .from('kyc_records')
     .select(`
-      id, status, document_type, document_url, submitted_at, reviewed_at, rejection_reason,
+      id, status, doc_type, doc_front_url, doc_back_url, selfie_url, submitted_at, reviewed_at, rejection_reason, admin_notes,
       profiles!kyc_records_user_id_fkey ( id, full_name, email, kyc_status )
     `)
     .order('submitted_at', { ascending: false })
