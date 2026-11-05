@@ -5,6 +5,12 @@
  *   <PlayerWalletModal playerId={id} playerName={name} onClose={() => setWalletOpen(false)} />
  *
  * Tabs: Summary | Deposits | Withdrawals | Scores | Redeems | Transactions | Player Level | Bonuses
+ *
+ * Fix notes:
+ *  - r.notes → r.description in Transactions and Bonuses tabs (ledger col renamed)
+ *  - Modal is now full-screen overlay, responsive on all devices
+ *  - Tab bar scrolls horizontally on mobile
+ *  - Tab content fills available viewport height
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
@@ -26,7 +32,7 @@ async function apiFetch(path) {
 // ─── stat tile ───────────────────────────────────────────────────────────────
 function Tile({ label, value, sub, color = '#fbbf24' }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '14px 16px', minWidth: 130 }}>
+    <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '14px 16px', minWidth: 130, flex: '1 1 130px' }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'Outfit',sans-serif" }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>{sub}</div>}
@@ -67,7 +73,7 @@ function Empty({ msg }) {
 function DataTable({ headers, rows }) {
   return (
     <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 12, overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'rgba(255,255,255,.04)' }}>
@@ -86,7 +92,7 @@ const tdS = { padding: '11px 14px', borderTop: '1px solid rgba(255,255,255,.04)'
 // ─── status filter bar ────────────────────────────────────────────────────────
 function FilterBar({ value, onChange, options = ['all','pending','approved','rejected'] }) {
   return (
-    <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, marginBottom: 14, width: 'fit-content' }}>
+    <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, marginBottom: 14, flexWrap: 'wrap' }}>
       {options.map(s => (
         <button key={s} onClick={() => onChange(s)} style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: value === s ? 'rgba(251,191,36,.7)' : 'transparent', color: value === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
       ))}
@@ -276,7 +282,7 @@ function TabWithdrawals({ playerId }) {
         <tr key={r.id || i} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
           <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{r.reference_id}</span></td>
           <td style={tdS}><span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>−{fmt(r.amount_cents)}</span></td>
-          <td style={tdS}><span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.payment_methods?.name || '—'}</span></td>
+          <td style={tdS}><span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.method || '—'}</span></td>
           <td style={tdS}><StatusBadge status={r.status} size="xs" /></td>
           <td style={{ ...tdS, fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDt(r.created_at)}</td>
           <td style={{ ...tdS, fontSize: 12, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.full_name || '—'}</td>
@@ -376,14 +382,15 @@ function TabTransactions({ playerId }) {
         <>
           {rows.length === 0 ? <Empty msg="No transactions found" /> : (
             <DataTable
-              headers={['Type', 'Amount', 'Balance After', 'Reference', 'Notes', 'Date']}
+              headers={['Type', 'Amount', 'Balance After', 'Reference', 'Description', 'Date']}
               rows={rows.map((r, i) => (
                 <tr key={r.id || i} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
                   <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${txColor(r.type)}22`, color: txColor(r.type), textTransform: 'capitalize' }}>{(r.type || '').replace(/_/g, ' ')}</span></td>
                   <td style={tdS}><span style={{ fontSize: 13, fontWeight: 700, color: r.amount_cents >= 0 ? '#22c55e' : '#ef4444' }}>{r.amount_cents >= 0 ? '+' : ''}{fmt(r.amount_cents)}</span></td>
                   <td style={{ ...tdS, fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>{fmt(r.balance_after_cents)}</td>
                   <td style={tdS}><span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{r.reference_id || '—'}</span></td>
-                  <td style={{ ...tdS, fontSize: 12, color: 'rgba(255,255,255,.35)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes || '—'}</td>
+                  {/* FIX: was r.notes — ledger column is `description` */}
+                  <td style={{ ...tdS, fontSize: 12, color: 'rgba(255,255,255,.35)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description || '—'}</td>
                   <td style={{ ...tdS, fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtTs(r.created_at)}</td>
                 </tr>
               ))}
@@ -497,14 +504,15 @@ function TabBonuses({ playerId }) {
         <>
           {rows.length === 0 ? <Empty msg="No bonus transactions" /> : (
             <DataTable
-              headers={['Type', 'Amount', 'Balance After', 'Reference', 'Notes', 'Date']}
+              headers={['Type', 'Amount', 'Balance After', 'Reference', 'Description', 'Date']}
               rows={rows.map((r, i) => (
                 <tr key={r.id || i} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
                   <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7', textTransform: 'capitalize' }}>{(r.type || '').replace(/_/g, ' ')}</span></td>
                   <td style={tdS}><span style={{ fontSize: 13, fontWeight: 700, color: r.amount_cents >= 0 ? '#a855f7' : '#ef4444' }}>{r.amount_cents >= 0 ? '+' : ''}{fmt(r.amount_cents)}</span></td>
                   <td style={{ ...tdS, fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>{fmt(r.balance_after_cents)}</td>
                   <td style={tdS}><span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{r.reference_id || '—'}</span></td>
-                  <td style={{ ...tdS, fontSize: 12, color: 'rgba(255,255,255,.35)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes || '—'}</td>
+                  {/* FIX: was r.notes — ledger column is `description` */}
+                  <td style={{ ...tdS, fontSize: 12, color: 'rgba(255,255,255,.35)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description || '—'}</td>
                   <td style={{ ...tdS, fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtTs(r.created_at)}</td>
                 </tr>
               ))}
@@ -518,7 +526,7 @@ function TabBonuses({ playerId }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  MAIN MODAL
+//  MAIN MODAL  —  full-screen, responsive
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const TABS = [
@@ -543,69 +551,152 @@ export default function PlayerWalletModal({ playerId, playerName, onClose }) {
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // Lock body scroll while open
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
   }, [onClose])
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={onOverlayClick}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 2000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }}
-    >
+    <>
+      {/* Inject responsive CSS once — avoids inline style limitations */}
+      <style>{`
+        .wallet-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,.88);
+          z-index: 2000;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          padding: 0;
+          overflow: hidden;
+        }
+        .wallet-modal-box {
+          background: #0a1628;
+          border: 1px solid rgba(251,191,36,.22);
+          border-radius: 0;
+          width: 100%;
+          height: 100dvh;
+          height: 100vh;
+          max-width: 100%;
+          box-shadow: none;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        @media (min-width: 700px) {
+          .wallet-modal-overlay {
+            padding: 20px 16px;
+            align-items: flex-start;
+            overflow-y: auto;
+          }
+          .wallet-modal-box {
+            border-radius: 20px;
+            height: auto;
+            min-height: calc(100vh - 40px);
+            max-width: 980px;
+            box-shadow: 0 32px 80px rgba(0,0,0,.7);
+          }
+        }
+        .wallet-tab-bar {
+          display: flex;
+          gap: 0;
+          padding: 0 16px;
+          overflow-x: auto;
+          border-bottom: 1px solid rgba(255,255,255,.07);
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          flex-shrink: 0;
+        }
+        .wallet-tab-bar::-webkit-scrollbar { display: none; }
+        @media (min-width: 700px) {
+          .wallet-tab-bar { padding: 0 24px; }
+        }
+        .wallet-tab-content {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+          -webkit-overflow-scrolling: touch;
+        }
+        @media (min-width: 700px) {
+          .wallet-tab-content { padding: 20px 24px; }
+        }
+        .wallet-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 16px 0;
+          border-bottom: 1px solid rgba(255,255,255,.07);
+          flex-shrink: 0;
+        }
+        @media (min-width: 700px) {
+          .wallet-header { padding: 20px 24px 0; }
+        }
+      `}</style>
+
       <div
-        style={{ background: '#0a1628', border: '1px solid rgba(251,191,36,.25)', borderRadius: 24, width: '100%', maxWidth: 900, boxShadow: '0 32px 80px rgba(0,0,0,.7)', position: 'relative', overflow: 'hidden' }}
-        onClick={e => e.stopPropagation()}
+        ref={overlayRef}
+        className="wallet-modal-overlay"
+        onClick={onOverlayClick}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 0', borderBottom: '1px solid rgba(255,255,255,.07)', marginBottom: 0 }}>
-          <div>
-            <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 20, fontWeight: 700, color: '#fff', margin: 0 }}>
-              💳 Wallet Overview
-            </h2>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.4)', marginTop: 3 }}>{playerName}</div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.5)', fontSize: 18, cursor: 'pointer', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, fontFamily: 'sans-serif' }}
-          >✕</button>
-        </div>
-
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 0, padding: '0 24px', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
-          {TABS.map(t => (
+        <div
+          className="wallet-modal-box"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="wallet-header">
+            <div style={{ paddingBottom: 14 }}>
+              <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
+                💳 Wallet Overview
+              </h2>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>{playerName}</div>
+            </div>
             <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              style={{
-                padding: '13px 16px',
-                border: 'none',
-                borderBottom: activeTab === t.key ? '2px solid #fbbf24' : '2px solid transparent',
-                background: 'transparent',
-                color: activeTab === t.key ? '#fbbf24' : 'rgba(255,255,255,.35)',
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: "'Outfit',sans-serif",
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'color .15s',
-              }}
-            >{t.label}</button>
-          ))}
-        </div>
+              onClick={onClose}
+              style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.5)', fontSize: 18, cursor: 'pointer', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, fontFamily: 'sans-serif', flexShrink: 0, marginBottom: 14 }}
+            >✕</button>
+          </div>
 
-        {/* Tab content */}
-        <div style={{ padding: '20px 24px', minHeight: 300 }}>
-          {activeTab === 'summary'      && <TabSummary      playerId={playerId} />}
-          {activeTab === 'deposits'     && <TabDeposits     playerId={playerId} />}
-          {activeTab === 'withdrawals'  && <TabWithdrawals  playerId={playerId} />}
-          {activeTab === 'scores'       && <TabScores       playerId={playerId} />}
-          {activeTab === 'redeems'      && <TabRedeems      playerId={playerId} />}
-          {activeTab === 'transactions' && <TabTransactions playerId={playerId} />}
-          {activeTab === 'player_level' && <TabPlayerLevel  playerId={playerId} />}
-          {activeTab === 'bonuses'      && <TabBonuses      playerId={playerId} />}
-        </div>
+          {/* Tab bar */}
+          <div className="wallet-tab-bar">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                style={{
+                  padding: '12px 14px',
+                  border: 'none',
+                  borderBottom: activeTab === t.key ? '2px solid #fbbf24' : '2px solid transparent',
+                  background: 'transparent',
+                  color: activeTab === t.key ? '#fbbf24' : 'rgba(255,255,255,.35)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: "'Outfit',sans-serif",
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'color .15s',
+                }}
+              >{t.label}</button>
+            ))}
+          </div>
 
+          {/* Tab content — scrollable */}
+          <div className="wallet-tab-content">
+            {activeTab === 'summary'      && <TabSummary      playerId={playerId} />}
+            {activeTab === 'deposits'     && <TabDeposits     playerId={playerId} />}
+            {activeTab === 'withdrawals'  && <TabWithdrawals  playerId={playerId} />}
+            {activeTab === 'scores'       && <TabScores       playerId={playerId} />}
+            {activeTab === 'redeems'      && <TabRedeems      playerId={playerId} />}
+            {activeTab === 'transactions' && <TabTransactions playerId={playerId} />}
+            {activeTab === 'player_level' && <TabPlayerLevel  playerId={playerId} />}
+            {activeTab === 'bonuses'      && <TabBonuses      playerId={playerId} />}
+          </div>
+
+        </div>
       </div>
-    </div>
+    </>
   )
 }

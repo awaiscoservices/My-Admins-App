@@ -5,6 +5,12 @@
  * Uses service role to bypass RLS.
  *
  * Tabs: summary | deposits | withdrawals | scores | redeems | transactions | player_level | bonuses
+ *
+ * Fix notes:
+ *  - deposits.notes → player_notes  (column was renamed)
+ *  - withdrawals/game_loads/redemptions: removed `notes` col (doesn't exist); explicit FK hint
+ *    on profiles join (multiple FKs to profiles → must name the constraint)
+ *  - ledger.notes → description  (column was renamed)
  */
 import { createClient } from '@supabase/supabase-js'
 
@@ -34,7 +40,7 @@ export default async function handler(req, res) {
   const limitNum = Math.min(100, parseInt(limit))
   const offset   = (pageNum - 1) * limitNum
 
-  // ── SUMMARY tab (or all-at-once initial load) ──────────────────────────────
+  // ── SUMMARY tab ─────────────────────────────────────────────────────────────
   if (tab === 'summary') {
     const [
       { data: wallet },
@@ -48,7 +54,7 @@ export default async function handler(req, res) {
       { data: levelHistory },
     ] = await Promise.all([
       supabaseAdmin.from('wallets').select('*').eq('user_id', player_id).single(),
-      supabaseAdmin.from('profiles').select('id, player_level_id, current_level_id, player_levels(id,name,accent_color,min_xp,deposit_threshold_cents)').eq('id', player_id).single(),
+      supabaseAdmin.from('profiles').select('id, player_level_id, current_level_id, player_levels(id,name,accent_color,min_xp,deposit_threshold_cents,display_order)').eq('id', player_id).single(),
       supabaseAdmin.from('deposits').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('withdrawals').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('game_loads').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
@@ -109,11 +115,18 @@ export default async function handler(req, res) {
     })
   }
 
-  // ── DEPOSITS tab ────────────────────────────────────────────────────────────
+  // ── DEPOSITS tab ─────────────────────────────────────────────────────────────
+  // FIX: `notes` → `player_notes` (column was renamed)
+  // The reviewed_by FK is unique for deposits, no ambiguity expected.
   if (tab === 'deposits') {
     const { from_date, to_date, status } = req.query
     let q = supabaseAdmin.from('deposits')
-      .select('id, reference_id, amount_cents, status, created_at, reviewed_at, notes, payment_methods(name), profiles!deposits_reviewed_by_fkey(full_name)', { count: 'exact' })
+      .select(
+        'id, reference_id, amount_cents, bonus_cents, total_credit_cents, status, created_at, reviewed_at, player_notes,' +
+        'payment_methods(name),' +
+        'profiles!deposits_reviewed_by_fkey(full_name)',
+        { count: 'exact' }
+      )
       .eq('user_id', player_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
@@ -125,11 +138,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
 
-  // ── WITHDRAWALS tab ─────────────────────────────────────────────────────────
+  // ── WITHDRAWALS tab ───────────────────────────────────────────────────────────
+  // FIX: removed `notes` (doesn't exist); explicit FK hint for profiles join
+  //      (withdrawals has user_id + reviewed_by + processed_by FKs → all point to profiles)
   if (tab === 'withdrawals') {
     const { from_date, to_date, status } = req.query
     let q = supabaseAdmin.from('withdrawals')
-      .select('id, reference_id, amount_cents, status, created_at, processed_at, notes, payment_methods(name), profiles!withdrawals_reviewed_by_fkey(full_name)', { count: 'exact' })
+      .select(
+        'id, reference_id, amount_cents, status, created_at, processed_at, method, destination,' +
+        'profiles!withdrawals_reviewed_by_fkey(full_name)',
+        { count: 'exact' }
+      )
       .eq('user_id', player_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
@@ -141,11 +160,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
 
-  // ── SCORES tab ─────────────────────────────────────────────────────────────
+  // ── SCORES tab ───────────────────────────────────────────────────────────────
+  // FIX: removed `notes` (doesn't exist); explicit FK hint for profiles join
+  //      (game_loads has user_id + reviewed_by + processed_by FKs → all point to profiles)
+  // Note: game_panel_name and game_account_username are denormalized columns — no join needed.
   if (tab === 'scores') {
     const { from_date, to_date, status } = req.query
     let q = supabaseAdmin.from('game_loads')
-      .select('id, reference_id, amount_cents, status, wallet_bucket, game_panel_name, game_account_username, created_at, reviewed_at, notes, profiles!game_loads_reviewed_by_fkey(full_name)', { count: 'exact' })
+      .select(
+        'id, reference_id, amount_cents, status, wallet_bucket, game_panel_name, game_account_username, created_at, reviewed_at,' +
+        'profiles!game_loads_reviewed_by_fkey(full_name)',
+        { count: 'exact' }
+      )
       .eq('user_id', player_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
@@ -157,11 +183,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
 
-  // ── REDEEMS tab ─────────────────────────────────────────────────────────────
+  // ── REDEEMS tab ───────────────────────────────────────────────────────────────
+  // FIX: removed `notes` (doesn't exist); explicit FK hint for profiles join
+  //      (redemptions has user_id + reviewed_by + processed_by FKs → all point to profiles)
+  // Note: game_panel_name and game_account_username are denormalized columns — no join needed.
   if (tab === 'redeems') {
     const { from_date, to_date, status } = req.query
     let q = supabaseAdmin.from('redemptions')
-      .select('id, reference_id, amount_cents, excess_cents, status, game_panel_name, game_account_username, rule_snapshot, created_at, reviewed_at, notes, profiles!redemptions_reviewed_by_fkey(full_name)', { count: 'exact' })
+      .select(
+        'id, reference_id, amount_cents, excess_cents, approved_cents, status, game_panel_name, game_account_username, created_at, reviewed_at,' +
+        'profiles!redemptions_reviewed_by_fkey(full_name)',
+        { count: 'exact' }
+      )
       .eq('user_id', player_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
@@ -173,11 +206,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
 
-  // ── TRANSACTIONS tab ────────────────────────────────────────────────────────
+  // ── TRANSACTIONS tab ──────────────────────────────────────────────────────────
+  // FIX: `notes` → `description` (ledger column was renamed)
   if (tab === 'transactions') {
     const { from_date, to_date, type } = req.query
     let q = supabaseAdmin.from('ledger')
-      .select('id, type, amount_cents, balance_after_cents, reference_id, notes, created_at', { count: 'exact' })
+      .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at', { count: 'exact' })
       .eq('user_id', player_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
@@ -189,7 +223,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
 
-  // ── PLAYER LEVEL tab ────────────────────────────────────────────────────────
+  // ── PLAYER LEVEL tab ──────────────────────────────────────────────────────────
   if (tab === 'player_level') {
     const [
       { data: history, count: hCount },
@@ -213,11 +247,12 @@ export default async function handler(req, res) {
     })
   }
 
-  // ── BONUSES tab ─────────────────────────────────────────────────────────────
+  // ── BONUSES tab ───────────────────────────────────────────────────────────────
+  // FIX: `notes` → `description` (ledger column was renamed)
   if (tab === 'bonuses') {
     const { from_date, to_date } = req.query
     let q = supabaseAdmin.from('ledger')
-      .select('id, type, amount_cents, balance_after_cents, reference_id, notes, created_at', { count: 'exact' })
+      .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at', { count: 'exact' })
       .eq('user_id', player_id)
       .in('type', ['bonus', 'bonus_deposit', 'bonus_referral', 'bonus_adjustment', 'bonus_conversion'])
       .order('created_at', { ascending: false })
