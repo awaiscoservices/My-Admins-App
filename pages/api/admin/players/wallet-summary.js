@@ -146,7 +146,7 @@ export default async function handler(req, res) {
     let q = supabaseAdmin.from('withdrawals')
       .select(
         'id, reference_id, amount_cents, status, created_at, processed_at, method, destination,' +
-        'profiles!withdrawals_reviewed_by_fkey(full_name)',
+        'profiles!withdrawals_processed_by_fkey(full_name)',
         { count: 'exact' }
       )
       .eq('user_id', player_id)
@@ -169,7 +169,7 @@ export default async function handler(req, res) {
     let q = supabaseAdmin.from('game_loads')
       .select(
         'id, reference_id, amount_cents, status, wallet_bucket, game_panel_name, game_account_username, created_at, reviewed_at,' +
-        'profiles!game_loads_reviewed_by_fkey(full_name)',
+        'profiles!game_loads_processed_by_fkey(full_name)',
         { count: 'exact' }
       )
       .eq('user_id', player_id)
@@ -192,7 +192,7 @@ export default async function handler(req, res) {
     let q = supabaseAdmin.from('redemptions')
       .select(
         'id, reference_id, amount_cents, excess_cents, approved_cents, status, game_panel_name, game_account_username, created_at, reviewed_at,' +
-        'profiles!redemptions_reviewed_by_fkey(full_name)',
+        'profiles!redemptions_processed_by_fkey(full_name)',
         { count: 'exact' }
       )
       .eq('user_id', player_id)
