@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabase'
 import AdminLayout from '../../../components/layout/AdminLayout'
 import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
-import PlayerWalletModal from '../../../components/PlayerWalletModal'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -115,17 +114,16 @@ export default function AdminPlayerDetail() {
   const router = useRouter()
   const { id } = router.query
 
-  const [player, setPlayer]           = useState(null)
-  const [wallet, setWallet]           = useState(null)
-  const [deposits, setDeposits]       = useState([])
+  const [player, setPlayer] = useState(null)
+  const [wallet, setWallet] = useState(null)
+  const [deposits, setDeposits] = useState([])
   const [gameAccounts, setGameAccounts] = useState([])
   const [transactions, setTransactions] = useState([])
-  const [kyc, setKyc]                 = useState(null)
-  const [loading, setLoading]         = useState(true)
-  const [activeTab, setActiveTab]     = useState('overview')
+  const [kyc, setKyc] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('overview')
   const [showAdjModal, setShowAdjModal] = useState(false)
-  const [showWallet, setShowWallet]   = useState(false)   // ← NEW: wallet modal
-  const [toast, setToast]             = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => { if (id) loadPlayer() }, [id])
 
@@ -221,15 +219,6 @@ export default function AdminPlayerDetail() {
 
       {showAdjModal && <AdjustmentModal playerId={id} onClose={() => setShowAdjModal(false)} onSave={handleAdjustment} />}
 
-      {/* ── WALLET MODAL (Phase B) ── */}
-      {showWallet && (
-        <PlayerWalletModal
-          playerId={id}
-          playerName={player.full_name}
-          onClose={() => setShowWallet(false)}
-        />
-      )}
-
       {/* Back + header */}
       <div style={{ marginBottom: 20 }}>
         <Link href="/admin/players" style={{ color: '#fbbf24', textDecoration: 'none', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>← Players</Link>
@@ -247,13 +236,6 @@ export default function AdminPlayerDetail() {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {/* ── Wallet Overview button (Phase B) ── */}
-            <button
-              onClick={() => setShowWallet(true)}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,rgba(59,130,246,.25),rgba(99,102,241,.25))', border: '1px solid rgba(99,102,241,.5)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
-              💳 Wallet Overview
-            </button>
-
             <button onClick={() => setShowAdjModal(true)} style={{ padding: '9px 16px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
               ⚖️ Adjust Wallet
             </button>
@@ -335,13 +317,6 @@ export default function AdminPlayerDetail() {
             <InfoRow label="Total Loaded"       value={<MoneyDisplay cents={wallet?.total_loaded_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Redeemed"     value={<MoneyDisplay cents={wallet?.total_redeemed_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Withdrawn"    value={<MoneyDisplay cents={wallet?.total_withdrawn_cents || 0} size="sm" color="#fff" />} />
-            <div style={{ marginTop: 16 }}>
-              <button
-                onClick={() => setShowWallet(true)}
-                style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg,rgba(59,130,246,.2),rgba(99,102,241,.2))', border: '1px solid rgba(99,102,241,.4)', borderRadius: 10, color: '#818cf8', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-                💳 Open Full Wallet Overview →
-              </button>
-            </div>
           </div>
         </div>
       )}

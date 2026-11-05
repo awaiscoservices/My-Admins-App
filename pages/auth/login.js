@@ -3,8 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { signInWithEmail, signInWithGoogle } from '../../lib/auth';
-import Logo from '../../components/ui/Logo';
-import AuthBackdrop from '../../components/site/AuthBackdrop'
+import Logo from '../../components/ui/Logo'
 
 const PARTICLES = ['♠', '♥', '♦', '♣'];
 
@@ -19,9 +18,6 @@ function Particle({ symbol, style }) {
     }}>{symbol}</div>
   );
 }
-
-// All roles that belong to admin panel — add 'admin' to the list
-const ADMIN_ROLES = ['super_admin', 'admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
 
 export default function Login() {
   const router = useRouter();
@@ -69,10 +65,11 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await signInWithEmail({ email, password });
-      // Fetch role and redirect: admin roles → /admin, players → /dashboard
+      // Check role and redirect accordingly
       const { supabase: sb } = await import('../../lib/supabase');
       const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single();
-      if (prof?.role && ADMIN_ROLES.includes(prof.role)) {
+      const adminRoles = ['super_admin','finance','game_ops','support','kyc_agent','risk','reporting','marketing'];
+      if (prof?.role && adminRoles.includes(prof.role)) {
         router.push('/admin');
       } else {
         router.push('/dashboard');
@@ -113,7 +110,7 @@ export default function Login() {
     <>
       <Head>
         <title>Login — Casinoze Room</title>
-        <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500;1,9..144,700&family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
           body{background:var(--bg-gradient);background-attachment:fixed;overflow-x:hidden}
@@ -146,7 +143,14 @@ export default function Login() {
         </div>
       )}
 
-      <AuthBackdrop />
+      {/* Background */}
+      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-gradient)', overflow: 'hidden', zIndex: 0 }}>
+        <div style={{ position: 'absolute', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%)', top: -200, left: -200, animation: 'orb-float 9s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,158,11,0.09) 0%, transparent 70%)', bottom: -150, right: -100, animation: 'orb-float 12s ease-in-out infinite reverse' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `linear-gradient(rgba(251,191,36,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(251,191,36,0.04) 1px, transparent 1px)`, backgroundSize: '60px 60px' }} />
+      </div>
+
+      {particles.map(p => <Particle key={p.id} symbol={p.symbol} style={p.style} />)}
 
       <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', fontFamily: 'Outfit, sans-serif' }}>
 

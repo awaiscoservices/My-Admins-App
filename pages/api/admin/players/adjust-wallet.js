@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const { data: admin } = await supabaseAdmin
     .from('profiles').select('id, role, full_name').eq('id', user.id).single()
 
-  const allowedRoles = ['super_admin', 'admin', 'finance']
+  const allowedRoles = ['super_admin', 'finance']
   if (!admin || !allowedRoles.includes(admin.role))
     return res.status(403).json({ error: 'Insufficient permissions. Finance role required.' })
 
@@ -53,16 +53,8 @@ export default async function handler(req, res) {
     ? currentBalance + amount_cents
     : currentBalance - amount_cents
 
-  // For cash adjustments, keep withdrawable_cents in sync
+  // Update wallet with optimistic lock
   const updates = { [balanceField]: newBalance, version: wallet.version + 1 }
-  if (wallet_bucket === 'cash') {
-    const currentWithdrawable = wallet.withdrawable_cents || 0
-    if (direction === 'credit') {
-      updates.withdrawable_cents = currentWithdrawable + amount_cents
-    } else {
-      updates.withdrawable_cents = Math.max(0, currentWithdrawable - amount_cents)
-    }
-  }
   const { data: updatedWallet, error: updateErr } = await supabaseAdmin
     .from('wallets')
     .update(updates)
@@ -107,8 +99,10 @@ export default async function handler(req, res) {
   // Notify player
   await supabaseAdmin.from('notifications').insert({
     user_id: player_id,
+    type: 'general',
     title: `Wallet ${direction === 'credit' ? 'Credited' : 'Adjusted'}`,
     message: `Your ${wallet_bucket} wallet has been ${direction === 'credit' ? 'credited' : 'debited'} $${(amount_cents / 100).toFixed(2)}. Reference: ${refId}.`,
+    reference_id: refId,
   })
 
   // Audit log

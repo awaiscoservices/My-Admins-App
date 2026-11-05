@@ -5,7 +5,6 @@ import { useRouter } from 'next/router'
 import { supabase } from '../../lib/supabase'
 import PlayerLayout from '../../components/layout/PlayerLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
-import GameIcon from '../../components/ui/GameIcon'
 
 function AccountCard({ account }) {
   const [showPassword, setShowPassword] = useState(false)
@@ -32,7 +31,7 @@ function AccountCard({ account }) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}22`, border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}><GameIcon name={account.game_panels?.name} slug={account.game_panels?.slug} logoUrl={account.game_panels?.logo_url} size={34} /></div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}22`, border: `1px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🎮</div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: "'Cinzel',serif" }}>{account.game_panels?.name}</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>{account.reference_id}</div>
@@ -128,7 +127,7 @@ export default function GameAccountsPage() {
 
     const { data } = await supabase
       .from('game_accounts')
-      .select('*, game_panels(name, accent_color, slug, logo_url, redeem_multiplier)')
+      .select('*, game_panels(name, accent_color, slug, redeem_multiplier)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -149,7 +148,7 @@ export default function GameAccountsPage() {
       <Head><title>My Game Accounts — Casinoze Room</title></Head>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>My Game Accounts</h1>
+        <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>My Game Accounts</h1>
         <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>View your credentials and manage your game room accounts.</p>
       </div>
 

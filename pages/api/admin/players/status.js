@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const { data: admin } = await supabaseAdmin
     .from('profiles').select('id, role, full_name').eq('id', user.id).single()
 
-  const allowedRoles = ['super_admin', 'admin', 'support', 'risk']
+  const allowedRoles = ['super_admin', 'support', 'risk']
   if (!admin || !allowedRoles.includes(admin.role))
     return res.status(403).json({ error: 'Insufficient permissions' })
 
@@ -57,6 +57,7 @@ export default async function handler(req, res) {
   }
   await supabaseAdmin.from('notifications').insert({
     user_id: player_id,
+    type: 'general',
     title: status === 'active' ? 'Account Reactivated' : `Account ${status.charAt(0).toUpperCase() + status.slice(1)}`,
     message: messages[status],
   })

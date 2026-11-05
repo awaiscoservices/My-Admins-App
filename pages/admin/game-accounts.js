@@ -99,18 +99,15 @@ export default function AdminGameAccounts() {
 
   async function loadAccounts() {
     setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ status: filter })
-      const res = await fetch(`/api/admin/game-accounts/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setAccounts(d.accounts || [])
-    } catch (e) {
-      console.error('Failed to load game accounts', e)
-      setAccounts([])
-    }
+    let query = supabase
+      .from('game_accounts')
+      .select('*, profiles(full_name, email, kyc_status, status), game_panels(name, accent_color)')
+      .order('created_at', { ascending: true }) // oldest first for pending
+      .limit(50)
+
+    if (filter !== 'all') query = query.eq('status', filter)
+    const { data } = await query
+    setAccounts(data || [])
     setLoading(false)
   }
 

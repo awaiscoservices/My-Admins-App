@@ -1,183 +1,194 @@
-/**
- * /admin/withdrawals
- * Design matches Deposits page exactly.
- */
-import { useEffect, useState } from 'react'
-import Head from 'next/head'
-import { supabase } from '../../lib/supabase'
-import AdminLayout from '../../components/layout/AdminLayout'
-import StatusBadge from '../../components/ui/StatusBadge'
+import { useState, useEffect, useCallback } from 'react';
+import AdminLayout from '../../components/layout/AdminLayout';
+import { supabase } from '../../lib/supabase';
 
-const fmt     = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
-
-function ReviewModal({ item, onClose, onAction }) {
-  const [notes, setNotes]   = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError]   = useState('')
-
-  async function submit(action) {
-    setSaving(true); setError('')
-    const result = await onAction(item.id, action, notes)
-    if (result?.error) { setError(result.error); setSaving(false) }
-    else onClose()
-  }
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
-      <div style={{ background:'#0e1a2e', border:'1px solid rgba(251,191,36,.3)', borderRadius:20, padding:32, width:'100%', maxWidth:480 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:18, fontWeight:700, color:'#fff' }}>Review Withdrawal</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', fontSize:20, cursor:'pointer' }}>✕</button>
-        </div>
-        <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>{item.profiles?.full_name}</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>{item.profiles?.email}</div>
-          <div style={{ fontSize:13, color:'#3b82f6', fontWeight:700, marginTop:8 }}>{fmt(item.amount_cents)}</div>
-          {item.player_levels && (
-            <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:4 }}>
-              Level: {item.player_levels.name} · Daily limit: {fmt(item.player_levels.daily_withdrawal_limit_cents)}
-            </div>
-          )}
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>Ref: {item.reference_id}</div>
-        </div>
-        <div style={{ marginBottom:20 }}>
-          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Notes (optional)</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Internal note or rejection reason…"
-            style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', resize:'none', boxSizing:'border-box' }} />
-        </div>
-        {error && <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13 }}>⚠ {error}</div>}
-        <div style={{ display:'flex', gap:10 }}>
-          <button onClick={() => submit('approve')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>✅ Approve</button>
-          <button onClick={() => submit('reject')}  disabled={saving} style={{ flex:1, padding:'11px', background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>❌ Reject</button>
-          <button onClick={onClose} style={{ padding:'11px 16px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.4)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function AdminWithdrawals() {
-  const [items,    setItems]    = useState([])
-  const [filter,   setFilter]   = useState('pending')
-  const [search,   setSearch]   = useState('')
-  const [loading,  setLoading]  = useState(true)
-  const [selected, setSelected] = useState(null)
-  const [toast,    setToast]    = useState(null)
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [filter, setFilter] = useState('pending');
 
-  useEffect(() => { load() }, [filter])
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('withdrawals')
+      .select(`
+        id, status, amount_cents, reserved_cents,
+        payment_method, payment_details, idempotency_key,
+        created_at, updated_at,
+        players:player_id (id, display_name, email)
+      `)
+      .eq('status', filter)
+      .order('created_at', { ascending: true })
+      .limit(100);
+    if (!error) setItems(data || []);
+    setLoading(false);
+  }, [filter]);
 
-  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
+  useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  async function load() {
-    setLoading(true)
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const openModal = (item, action) => { setModal({ item, action }); setReason(''); };
+  const closeModal = () => { setModal(null); setReason(''); };
+
+  const handleSubmit = async () => {
+    if (!modal) return;
+    if (!reason.trim()) { showToast('Reason required', 'error'); return; }
+    setSubmitting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { setItems([]); setLoading(false); return }
-      const res = await fetch(`/api/admin/withdrawals/list?status=${filter}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      if (!res.ok) { showToast(d.error || 'Failed to load withdrawals', 'error'); setItems([]) }
-      else setItems(d.data || [])
-    } catch (e) { console.error(e); setItems([]) }
-    setLoading(false)
-  }
+      const res = await fetch('/api/admin/withdrawals/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withdrawal_id: modal.item.id, action: modal.action, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      showToast(`Withdrawal ${modal.action}d`);
+      closeModal();
+      fetchItems();
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  async function handleAction(id, action, notes) {
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/admin/withdrawals/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ withdrawal_id: id, action, notes }),
-    })
-    const d = await res.json()
-    if (!res.ok) return { error: d.error }
-    showToast(`Withdrawal ${action}d`)
-    load()
-    return {}
-  }
+  const fmt = (cents) => cents != null ? `$${(cents / 100).toFixed(2)}` : '—';
+  const fmtDate = (d) => d ? new Date(d).toLocaleString() : '—';
 
-  const rows = items.filter(r => {
-    if (!search) return true
-    const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) ||
-      r.profiles?.email?.toLowerCase().includes(s) ||
-      r.reference_id?.toLowerCase().includes(s)
-  })
+  const maskPayment = (method, details) => {
+    if (!details) return method || '—';
+    try {
+      const d = typeof details === 'string' ? JSON.parse(details) : details;
+      if (method === 'bank') return `Bank ****${d.account_last4 || '????'}`;
+      if (method === 'crypto') return `${d.coin || 'Crypto'} …${String(d.address || '').slice(-6)}`;
+      return method;
+    } catch { return method; }
+  };
 
   return (
     <AdminLayout>
-      <Head><title>Withdraw — Admin</title></Head>
-      {toast && <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999, background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600, fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
-      {selected && <ReviewModal item={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
-
-      <div style={{ marginBottom:20 }}>
-        <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', marginBottom:4 }}>Withdraw</h1>
-        <p style={{ color:'rgba(255,255,255,.35)', fontSize:13 }}>Review and approve player withdrawal requests</p>
-      </div>
-
-      <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
-        <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
-          {['all','pending','approved','rejected'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
-          ))}
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: 26, color: '#fbbf24', margin: 0 }}>Withdrawal Requests</h1>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['pending', 'approved', 'rejected'].map(f => (
+              <button key={f} onClick={() => setFilter(f)} style={{
+                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: filter === f ? '#fbbf24' : 'rgba(255,255,255,0.08)',
+                color: filter === f ? '#0f172a' : '#e2e8f0', fontWeight: 600, textTransform: 'capitalize',
+              }}>{f}</button>
+            ))}
+            <button onClick={fetchItems} style={{
+              padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.3)',
+              background: 'transparent', color: '#fbbf24', cursor: 'pointer', fontWeight: 600,
+            }}>↻ Refresh</button>
+          </div>
         </div>
-        <input type="text" placeholder="Search player, email, reference…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding:'9px 14px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', minWidth:240 }} />
-      </div>
 
-      <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, overflow:'hidden' }}>
-        <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ background:'rgba(255,255,255,.04)' }}>
-                {['Reference','Player','Amount','Level','Status','Date','Actions'].map(h => (
-                  <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
-                  {filter === 'pending' ? '✅ No pending withdrawals!' : 'No withdrawals found'}
-                </td></tr>
-              ) : rows.map(r => (
-                <tr key={r.id} style={{ borderTop:'1px solid rgba(255,255,255,.04)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', fontFamily:'monospace' }}>{r.reference_id}</div>
-                  </td>
-                  <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{r.profiles?.full_name || '—'}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
-                  </td>
-                  <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#3b82f6' }}>{fmt(r.amount_cents)}</div>
-                  </td>
-                  <td style={{ padding:'12px 14px', fontSize:12, color:'rgba(255,255,255,.4)' }}>
-                    {r.player_levels?.name || '—'}
-                  </td>
-                  <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
-                  <td style={{ padding:'12px 14px', fontSize:11, color:'rgba(255,255,255,.3)', whiteSpace:'nowrap' }}>{fmtDate(r.created_at)}</td>
-                  <td style={{ padding:'12px 14px' }}>
-                    {r.status === 'pending' ? (
-                      <button onClick={() => setSelected(r)} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:8, color:'#050505', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
-                        ⚡ Review
-                      </button>
-                    ) : (
-                      <span style={{ fontSize:11, color:'rgba(255,255,255,.25)' }}>Done</span>
-                    )}
-                  </td>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>Loading…</div>
+        ) : items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>No {filter} withdrawals</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(251,191,36,0.2)' }}>
+                  {['Player','Amount','Reserved','Payment Method','Status','Submitted','Actions'].map(h => (
+                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                    <td style={{ padding: '12px', color: '#e2e8f0' }}>
+                      <div style={{ fontWeight: 600 }}>{item.players?.display_name || '—'}</div>
+                      <div style={{ fontSize: 12, color: '#64748b' }}>{item.players?.email}</div>
+                    </td>
+                    <td style={{ padding: '12px', color: '#fbbf24', fontWeight: 700 }}>{fmt(item.amount_cents)}</td>
+                    <td style={{ padding: '12px', color: '#94a3b8' }}>{fmt(item.reserved_cents)}</td>
+                    <td style={{ padding: '12px', color: '#e2e8f0' }}>{maskPayment(item.payment_method, item.payment_details)}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{
+                        padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                        background: item.status === 'pending' ? 'rgba(251,191,36,0.15)' : item.status === 'approved' ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)',
+                        color: item.status === 'pending' ? '#fbbf24' : item.status === 'approved' ? '#4ade80' : '#f87171',
+                      }}>{item.status}</span>
+                    </td>
+                    <td style={{ padding: '12px', color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(item.created_at)}</td>
+                    <td style={{ padding: '12px' }}>
+                      {item.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => openModal(item, 'approve')} style={{
+                            padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600, fontSize: 12,
+                          }}>Approve</button>
+                          <button onClick={() => openModal(item, 'reject')} style={{
+                            padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: 'rgba(248,113,113,0.15)', color: '#f87171', fontWeight: 600, fontSize: 12,
+                          }}>Reject</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {modal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#1e293b', borderRadius: 16, padding: 32, width: 420, border: '1px solid rgba(251,191,36,0.2)' }}>
+            <h2 style={{ fontFamily: 'Cinzel, serif', color: '#fbbf24', margin: '0 0 20px', fontSize: 20, textTransform: 'capitalize' }}>
+              {modal.action} Withdrawal
+            </h2>
+            <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8 }}>
+              <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{modal.item.players?.display_name}</div>
+              <div style={{ color: '#fbbf24', fontWeight: 700, marginTop: 6 }}>{fmt(modal.item.amount_cents)}</div>
+              <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>{maskPayment(modal.item.payment_method, modal.item.payment_details)}</div>
+              {modal.action === 'reject' && (
+                <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>⚠ Rejection will release reserved funds back to player wallet</div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>Reason (required)</label>
+              <textarea
+                value={reason} onChange={e => setReason(e.target.value)}
+                rows={3} placeholder={modal.action === 'approve' ? 'e.g. Verified, processed via bank transfer' : 'Enter rejection reason…'}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button onClick={closeModal} disabled={submitting} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+              <button onClick={handleSubmit} disabled={submitting} style={{
+                padding: '10px 24px', borderRadius: 8, border: 'none', cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 700,
+                background: modal.action === 'approve' ? '#4ade80' : '#f87171',
+                color: '#0f172a', opacity: submitting ? 0.7 : 1, textTransform: 'capitalize',
+              }}>{submitting ? 'Processing…' : modal.action}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '12px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 2000, background: toast.type === 'error' ? '#f87171' : '#4ade80', color: '#0f172a' }}>
+          {toast.msg}
+        </div>
+      )}
     </AdminLayout>
-  )
+  );
 }
