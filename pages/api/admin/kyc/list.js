@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     .from('kyc_records')
     .select(`
       id, status, document_type, document_url, submitted_at, reviewed_at, rejection_reason,
-      profiles!kyc_records_user_id_fkey ( id, full_name, email, kyc_verified )
+      profiles!kyc_records_user_id_fkey ( id, full_name, email, kyc_status )
     `)
     .order('submitted_at', { ascending: false })
     .limit(100)

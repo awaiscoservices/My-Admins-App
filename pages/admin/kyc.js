@@ -169,8 +169,8 @@ export default function AdminKYC() {
                     )}
                   </td>
                   <td style={{ padding:'12px 14px' }}>
-                    <span style={{ fontSize:11, fontWeight:700, color: r.profiles?.kyc_verified ? '#22c55e' : 'rgba(255,255,255,.3)' }}>
-                      {r.profiles?.kyc_verified ? '✅ Verified' : '—'}
+                    <span style={{ fontSize:11, fontWeight:700, color: r.profiles?.kyc_status === 'verified' ? '#22c55e' : 'rgba(255,255,255,.3)' }}>
+                      {r.profiles?.kyc_status === 'verified' ? '✅ Verified' : '—'}
                     </span>
                   </td>
                   <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>

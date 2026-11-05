@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   let q = supabaseAdmin
     .from('withdrawals')
     .select(`
-      id, reference_id, amount_cents, status, created_at, notes, reviewed_at,
+      id, reference_id, amount_cents, status, created_at, admin_notes, reviewed_at,
       payment_method_id,
       profiles!withdrawals_user_id_fkey ( id, full_name, email ),
       player_levels ( name, daily_withdrawal_limit_cents )
