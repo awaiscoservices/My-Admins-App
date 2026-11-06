@@ -1,212 +1,340 @@
-import { useEffect, useState } from 'react'
-import Head from 'next/head'
-import { supabase } from '../../lib/supabase'
+import { useState, useEffect, useCallback } from 'react'
 import AdminLayout from '../../components/layout/AdminLayout'
-import StatusBadge from '../../components/ui/StatusBadge'
+import { supabase } from '../../lib/supabase'
 
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
-const fmt = c => c != null ? '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function PromoModal({ promo, onClose, onSave }) {
-  const isNew = !promo
-  const [form, setForm] = useState({
-    name: promo?.name || '',
-    type: promo?.type || 'deposit_bonus',
-    bonus_percent: promo?.bonus_percent || '',
-    max_bonus_cents: promo?.max_bonus_cents ? (promo.max_bonus_cents / 100).toFixed(2) : '',
-    min_deposit_cents: promo?.min_deposit_cents ? (promo.min_deposit_cents / 100).toFixed(2) : '',
-    wagering_requirement: promo?.wagering_requirement || '',
-    starts_at: promo?.starts_at ? promo.starts_at.slice(0, 10) : '',
-    ends_at: promo?.ends_at ? promo.ends_at.slice(0, 10) : '',
-    is_active: promo?.is_active ?? true,
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+const gold = '#fbbf24'
+const dim = 'rgba(255,255,255,.45)'
+const panelBg = 'rgba(255,255,255,.03)'
+const border = '1px solid rgba(255,255,255,.08)'
 
-  async function submit() {
-    if (!form.name.trim()) { setError('Name is required'); return }
-    setSaving(true); setError('')
-    const body = {
-      ...form,
-      max_bonus_cents: form.max_bonus_cents ? Math.round(parseFloat(form.max_bonus_cents) * 100) : null,
-      min_deposit_cents: form.min_deposit_cents ? Math.round(parseFloat(form.min_deposit_cents) * 100) : null,
-      bonus_percent: form.bonus_percent ? parseFloat(form.bonus_percent) : null,
-      wagering_requirement: form.wagering_requirement ? parseFloat(form.wagering_requirement) : null,
-    }
-    const result = await onSave(promo?.id, body)
-    if (result?.error) { setError(result.error); setSaving(false) }
-    else onClose()
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>{isNew ? 'Create Promotion' : 'Edit Promotion'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Promotion Name</label>
-            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Welcome Bonus 100%"
-              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }} />
-          </div>
-          <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Type</label>
-            <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
-              {['deposit_bonus', 'free_credit', 'cashback', 'reload'].map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
-            </select>
-          </div>
-          {[['bonus_percent', 'Bonus %', '%'], ['wagering_requirement', 'Wagering Req.', 'x']].map(([key, label, suffix]) => (
-            <div key={key}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="number" min="0" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder="0"
-                  style={{ flex: 1, padding: '11px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }} />
-                <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>{suffix}</span>
-              </div>
-            </div>
-          ))}
-          {[['max_bonus_cents', 'Max Bonus ($)'], ['min_deposit_cents', 'Min Deposit ($)']].map(([key, label]) => (
-            <div key={key}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>$</span>
-                <input type="number" min="0" step="0.01" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder="0.00"
-                  style={{ flex: 1, padding: '11px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }} />
-              </div>
-            </div>
-          ))}
-          {[['starts_at', 'Start Date'], ['ends_at', 'End Date']].map(([key, label]) => (
-            <div key={key}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
-              <input type="date" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }} />
-            </div>
-          ))}
-          <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={() => setForm(p => ({ ...p, is_active: !p.is_active }))} style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: 'pointer', background: form.is_active ? '#22c55e' : 'rgba(255,255,255,.15)', position: 'relative', transition: 'background .2s' }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: form.is_active ? 21 : 3, transition: 'left .2s' }} />
-            </button>
-            <span style={{ fontSize: 13, color: form.is_active ? '#22c55e' : 'rgba(255,255,255,.35)' }}>{form.is_active ? 'Active' : 'Inactive'}</span>
-          </div>
-        </div>
-        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>{saving ? 'Saving…' : isNew ? 'Create' : 'Save'}</button>
-          <button onClick={onClose} style={{ padding: '11px 16px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.4)', fontSize: 13, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  )
+function fmt(cents) {
+  if (cents == null) return '—'
+  return '$' + (cents / 100).toFixed(2)
 }
 
-export default function AdminPromotions() {
-  const [rows, setRows] = useState([])
-  const [filter, setFilter] = useState('all')
-  const [search, setSearch] = useState('')
+function pct(v) {
+  if (v == null) return '—'
+  return parseFloat(v).toFixed(2) + '%'
+}
+
+const emptyForm = {
+  name: '', payment_method_id: '', player_level_id: '',
+  day_number: 1, min_deposit_cents: '', max_deposit_cents: '',
+  bonus_percent: '', bonus_to_cash_percent: '', is_active: true,
+}
+
+export default function PlayerBonuses() {
+  const [tab, setTab] = useState('deposit')
+  const [bonuses, setBonuses] = useState([])
+  const [referralTiers, setReferralTiers] = useState([])
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [levels, setLevels] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(undefined)
+  const [drawer, setDrawer] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
+  const [referralForm, setReferralForm] = useState({})
+  const [savingReferral, setSavingReferral] = useState(null)
 
-  useEffect(() => { load() }, [filter])
-
-  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
-
-  async function load() {
-    setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const params = new URLSearchParams({ is_active: filter === 'active' ? 'true' : filter === 'inactive' ? 'false' : '' })
-      const res = await fetch(`/api/admin/promotions/list?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const d = await res.json()
-      setRows(d.rows || d.promotions || [])
-    } catch (e) { console.error('Failed to load promotions', e); setRows([]) }
-    setLoading(false)
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 4000)
   }
 
-  async function handleSave(id, form) {
+  const load = useCallback(async () => {
+    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/admin/promotions/upsert', {
+    if (!session) return
+    const r = await fetch('/api/admin/bonuses/list', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const d = await r.json()
+    if (!r.ok) { showToast(d.error || 'Load failed', 'error'); setLoading(false); return }
+    setBonuses(d.bonuses || [])
+    setReferralTiers(d.referralTiers || [])
+    setPaymentMethods(d.paymentMethods || [])
+    setLevels(d.levels || [])
+    const rf = {}
+    for (const t of (d.referralTiers || [])) rf[t.deposit_number] = t
+    setReferralForm(rf)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDrawer(true) }
+  const openEdit = (b) => {
+    setEditing(b.id)
+    setForm({
+      name: b.name,
+      payment_method_id: b.payment_method_id || '',
+      player_level_id: b.player_level_id || '',
+      day_number: b.day_number,
+      min_deposit_cents: b.min_deposit_cents != null ? b.min_deposit_cents / 100 : '',
+      max_deposit_cents: b.max_deposit_cents != null ? b.max_deposit_cents / 100 : '',
+      bonus_percent: b.bonus_percent,
+      bonus_to_cash_percent: b.bonus_to_cash_percent,
+      is_active: b.is_active,
+    })
+    setDrawer(true)
+  }
+  const closeDrawer = () => { setDrawer(false); setEditing(null); setForm(emptyForm) }
+
+  const handleSave = async () => {
+    if (!form.name || !form.day_number) return showToast('Name and day are required', 'error')
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const payload = {
+      ...(editing ? { id: editing } : {}),
+      name: form.name,
+      payment_method_id: form.payment_method_id || null,
+      player_level_id: form.player_level_id ? parseInt(form.player_level_id) : null,
+      day_number: parseInt(form.day_number),
+      min_deposit_cents: form.min_deposit_cents !== '' ? Math.round(parseFloat(form.min_deposit_cents) * 100) : 0,
+      max_deposit_cents: form.max_deposit_cents !== '' ? Math.round(parseFloat(form.max_deposit_cents) * 100) : null,
+      bonus_percent: parseFloat(form.bonus_percent) || 0,
+      bonus_to_cash_percent: parseFloat(form.bonus_to_cash_percent) || 0,
+      is_active: form.is_active,
+    }
+    const r = await fetch('/api/admin/bonuses/upsert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(id ? { promo_id: id, ...form } : form),
+      body: JSON.stringify(payload),
     })
-    const d = await res.json()
-    if (!res.ok) return { error: d.error }
-    showToast(id ? 'Promotion updated' : 'Promotion created')
+    const d = await r.json()
+    setSaving(false)
+    if (!r.ok) return showToast(d.error || 'Save failed', 'error')
+    showToast(editing ? 'Bonus tier updated' : 'Bonus tier created')
+    closeDrawer()
     load()
-    return {}
   }
 
-  const filtered = rows.filter(r => {
-    if (!search) return true
-    return r.name?.toLowerCase().includes(search.toLowerCase())
-  })
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this bonus tier?')) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const r = await fetch('/api/admin/bonuses/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ id }),
+    })
+    const d = await r.json()
+    if (!r.ok) return showToast(d.error || 'Delete failed', 'error')
+    showToast('Deleted')
+    load()
+  }
+
+  const handleReferralSave = async (depositNumber) => {
+    setSavingReferral(depositNumber)
+    const { data: { session } } = await supabase.auth.getSession()
+    const tier = referralForm[depositNumber] || {}
+    const r = await fetch('/api/admin/bonuses/referral-upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        deposit_number: depositNumber,
+        bonus_percent: parseFloat(tier.bonus_percent) || 0,
+        is_active: tier.is_active ?? true,
+      }),
+    })
+    const d = await r.json()
+    setSavingReferral(null)
+    if (!r.ok) return showToast(d.error || 'Save failed', 'error')
+    showToast(`Referral deposit ${depositNumber} saved`)
+    load()
+  }
+
+  const field = (k, label, type = 'text', opts = {}) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: dim, marginBottom: 5 }}>{label}</div>
+      <input
+        type={type}
+        value={form[k]}
+        onChange={e => setForm(f => ({ ...f, [k]: type === 'checkbox' ? e.target.checked : e.target.value }))}
+        style={{ width: '100%', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+        {...opts}
+      />
+    </div>
+  )
+
+  const select = (k, label, options) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: dim, marginBottom: 5 }}>{label}</div>
+      <select
+        value={form[k]}
+        onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+        style={{ width: '100%', background: '#1e293b', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+      >
+        <option value="">— Any —</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  )
 
   return (
     <AdminLayout>
-      <Head><title>Promotions — Admin</title></Head>
-      {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
-      {selected !== undefined && <PromoModal promo={selected || null} onClose={() => setSelected(undefined)} onSave={handleSave} />}
+      <div style={{ padding: '28px 24px', maxWidth: 1100, margin: '0 auto' }}>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Promotions</h1>
-          <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Manage deposit bonuses and promotional offers</p>
+        {/* Toast */}
+        {toast && (
+          <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, padding: '12px 20px', borderRadius: 10, background: toast.type === 'error' ? '#dc2626' : '#10b981', color: '#fff', fontWeight: 700, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>
+            {toast.msg}
+          </div>
+        )}
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <div>
+            <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: 22, fontWeight: 700, color: gold, margin: 0 }}>Player Bonuses</h1>
+            <p style={{ color: dim, fontSize: 13, margin: '4px 0 0' }}>Manage deposit bonus tiers and referral rewards</p>
+          </div>
+          {tab === 'deposit' && (
+            <button onClick={openCreate} style={{ background: gold, color: '#0f172a', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              + Add Bonus Tier
+            </button>
+          )}
         </div>
-        <button onClick={() => setSelected(null)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>+ Create Promo</button>
-      </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10 }}>
-          {['all', 'active', 'inactive'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: 24 }}>
+          {[{ key: 'deposit', label: 'Deposit Bonuses' }, { key: 'referral', label: 'Referral Bonuses' }].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: tab === t.key ? gold : dim, borderBottom: tab === t.key ? `2px solid ${gold}` : '2px solid transparent', marginBottom: -1 }}>
+              {t.label}
+            </button>
           ))}
         </div>
-        <input type="text" placeholder="Search promotion…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 220 }} />
+
+        {loading ? (
+          <div style={{ color: dim, padding: 40, textAlign: 'center' }}>Loading...</div>
+        ) : tab === 'deposit' ? (
+          /* ── DEPOSIT BONUSES TAB ── */
+          bonuses.length === 0 ? (
+            <div style={{ textAlign: 'center', color: dim, padding: 60 }}>No bonus tiers yet. Click "+ Add Bonus Tier" to create one.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+                    {['Name', 'Day', 'Level', 'Payment Method', 'Min Deposit', 'Max Deposit', 'Bonus %', 'Cash Conv. %', 'Status', ''].map(h => (
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: dim, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bonuses.map(b => (
+                    <tr key={b.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+                      <td style={{ padding: '12px', color: '#fff', fontWeight: 600 }}>{b.name}</td>
+                      <td style={{ padding: '12px', color: gold }}>{DAYS[(b.day_number - 1)]}</td>
+                      <td style={{ padding: '12px', color: dim }}>{b.player_levels?.name || '—'}</td>
+                      <td style={{ padding: '12px', color: dim }}>{b.payment_methods?.name || '—'}</td>
+                      <td style={{ padding: '12px', color: dim }}>{fmt(b.min_deposit_cents)}</td>
+                      <td style={{ padding: '12px', color: dim }}>{fmt(b.max_deposit_cents)}</td>
+                      <td style={{ padding: '12px', color: '#10b981', fontWeight: 700 }}>{pct(b.bonus_percent)}</td>
+                      <td style={{ padding: '12px', color: '#60a5fa', fontWeight: 700 }}>{pct(b.bonus_to_cash_percent)}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: b.is_active ? 'rgba(16,185,129,.15)' : 'rgba(100,116,139,.15)', color: b.is_active ? '#10b981' : '#94a3b8' }}>
+                          {b.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => openEdit(b)} style={{ background: 'rgba(251,191,36,.1)', color: gold, border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginRight: 6 }}>Edit</button>
+                        <button onClick={() => handleDelete(b.id)} style={{ background: 'rgba(239,68,68,.1)', color: '#f87171', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          /* ── REFERRAL BONUSES TAB ── */
+          <div style={{ maxWidth: 500 }}>
+            <p style={{ color: dim, fontSize: 13, marginBottom: 20 }}>
+              Set the bonus % a referrer receives on their referee's first 3 deposits.
+            </p>
+            {[1, 2, 3].map(n => {
+              const tier = referralForm[n] || {}
+              return (
+                <div key={n} style={{ background: panelBg, border, borderRadius: 12, padding: '20px', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ fontWeight: 700, color: '#fff', fontSize: 14 }}>Deposit #{n}</div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: dim, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={tier.is_active ?? true}
+                        onChange={e => setReferralForm(f => ({ ...f, [n]: { ...f[n], is_active: e.target.checked } }))}
+                      />
+                      Active
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: dim, marginBottom: 5 }}>Bonus %</div>
+                      <input
+                        type="number" min="0" max="100" step="0.01"
+                        value={tier.bonus_percent ?? 0}
+                        onChange={e => setReferralForm(f => ({ ...f, [n]: { ...f[n], bonus_percent: e.target.value } }))}
+                        style={{ width: '100%', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleReferralSave(n)}
+                      disabled={savingReferral === n}
+                      style={{ background: gold, color: '#0f172a', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      {savingReferral === n ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Name', 'Type', 'Bonus', 'Max Bonus', 'Min Deposit', 'Wagering', 'Period', 'Status', 'Actions'].map(h => (
-                  <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No promotions found</td></tr>
-              : filtered.map(r => (
-                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.name}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7', textTransform: 'capitalize' }}>{r.type?.replace(/_/g, ' ')}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fbbf24' }}>{r.bonus_percent ? r.bonus_percent + '%' : '—'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: '#22c55e' }}>{fmt(r.max_bonus_cents)}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{fmt(r.min_deposit_cents)}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.wagering_requirement ? r.wagering_requirement + 'x' : '—'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.starts_at)} → {fmtDate(r.ends_at)}</td>
-                  <td style={{ padding: '12px 14px' }}><StatusBadge status={r.is_active ? 'active' : 'inactive'} size="xs" /></td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Edit</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* ── SLIDE-IN DRAWER ── */}
+      {drawer && (
+        <>
+          <div onClick={closeDrawer} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 100 }} />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: '#0f172a', borderLeft: '1px solid rgba(255,255,255,.1)', zIndex: 101, overflowY: 'auto', padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontFamily: 'Cinzel, serif', color: gold, fontSize: 18, margin: 0 }}>{editing ? 'Edit Bonus Tier' : 'New Bonus Tier'}</h2>
+              <button onClick={closeDrawer} style={{ background: 'none', border: 'none', color: dim, fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+
+            {field('name', 'Name')}
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: dim, marginBottom: 5 }}>Day of Week</div>
+              <select value={form.day_number} onChange={e => setForm(f => ({ ...f, day_number: e.target.value }))}
+                style={{ width: '100%', background: '#1e293b', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}>
+                {DAYS.map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
+              </select>
+            </div>
+
+            {select('player_level_id', 'Player Level (optional)', levels.map(l => ({ value: l.id, label: l.name })))}
+            {select('payment_method_id', 'Payment Method (optional)', paymentMethods.map(m => ({ value: m.id, label: m.name })))}
+
+            {field('min_deposit_cents', 'Min Deposit ($)', 'number', { min: 0, step: '0.01', placeholder: '0.00' })}
+            {field('max_deposit_cents', 'Max Deposit ($) — leave blank for no limit', 'number', { min: 0, step: '0.01', placeholder: 'No limit' })}
+            {field('bonus_percent', 'Bonus % (of deposit)', 'number', { min: 0, max: 100, step: '0.01', placeholder: '0.00' })}
+            {field('bonus_to_cash_percent', 'Bonus → Cash Conversion % (auto on withdraw)', 'number', { min: 0, max: 100, step: '0.01', placeholder: '0.00' })}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <input type="checkbox" id="is_active" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
+              <label htmlFor="is_active" style={{ color: dim, fontSize: 13, cursor: 'pointer' }}>Active</label>
+            </div>
+
+            <button onClick={handleSave} disabled={saving}
+              style={{ width: '100%', background: gold, color: '#0f172a', border: 'none', borderRadius: 10, padding: '13px', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
+              {saving ? 'Saving...' : editing ? 'Update Tier' : 'Create Tier'}
+            </button>
+          </div>
+        </>
+      )}
     </AdminLayout>
   )
 }
