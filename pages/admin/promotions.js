@@ -236,7 +236,7 @@ function ReferralTab({ tiers, onSave, saving }) {
   const DEPOSIT_LABELS = { 1: '1st Deposit', 2: '2nd Deposit', 3: '3rd Deposit' }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 540 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 13, color: DIM, marginBottom: 6 }}>
         Referrer earns a % of each referee's first 3 deposits as bonus credit.
       </div>
