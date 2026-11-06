@@ -275,10 +275,10 @@ export default function AdminPlayerDetail() {
         const balance = scr - red;
         const cards = [
           { label: 'Total Deposit',  cents: dep,     color: '#60a5fa' },
-          { label: 'Total Withdraw', cents: with_,   color: '#f59e0b' },
+          { label: 'Total Redeem',   cents: red,     color: '#a78bfa' },
           { label: 'Total Profit',   cents: profit,  color: profit >= 0 ? '#10b981' : '#f87171' },
           { label: 'Total Scores',   cents: scr,     color: '#60a5fa' },
-          { label: 'Total Redeem',   cents: red,     color: '#a78bfa' },
+          { label: 'Total Withdraw', cents: with_,   color: '#f59e0b' },
           { label: 'Total Balance',  cents: balance, color: balance >= 0 ? '#10b981' : '#f87171' },
         ];
         return (
