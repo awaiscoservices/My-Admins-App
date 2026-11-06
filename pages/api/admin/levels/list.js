@@ -1,7 +1,6 @@
 /**
  * GET /api/admin/levels/list
  * Returns all player levels ordered by sort_order.
- * Returns only the simplified fields — bonus columns excluded.
  */
 import { createClient } from '@supabase/supabase-js'
 
