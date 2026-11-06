@@ -1,8 +1,23 @@
 /**
  * POST /api/admin/deposits/action
- * Approve or reject a deposit.
- * On approval: creates ledger entries + updates wallet balance.
- * All financial math is server-side only.
+ *
+ * Approves or rejects a Deposit request.
+ *
+ * Body: { deposit_id, action: 'approve'|'reject', rejection_reason? }
+ *
+ * On approve:
+ *   1. Validate deposit exists + is pending
+ *   2. Credit cash_balance_cents on wallet
+ *   3. Write ledger entry (idempotent)
+ *   4. Mark deposit approved
+ *   5. Call apply_deposit_bonus() RPC → bonus credited automatically
+ *   6. Award XP (from deposit amount)
+ *   7. Audit log
+ *
+ * On reject:
+ *   1. Mark rejected with reason
+ *   2. Recalculate player level downward if needed
+ *   3. Audit log
  */
 import { createClient } from '@supabase/supabase-js'
 
@@ -11,35 +26,30 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+const ALLOWED_ROLES = ['super_admin', 'admin', 'finance']
+// 1 XP per $10 deposited
+const XP_PER_10_DOLLARS = 1
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // ── Auth: must be staff ────────────────────────────────────
   const token = req.headers.authorization?.replace('Bearer ', '')
   if (!token) return res.status(401).json({ error: 'Unauthorized' })
 
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { data: admin } = await supabaseAdmin
-    .from('profiles')
-    .select('id, role, full_name')
-    .eq('id', user.id)
-    .single()
-
-  const allowedRoles = ['super_admin', 'finance']
-  if (!admin || !allowedRoles.includes(admin.role))
-    return res.status(403).json({ error: 'Insufficient permissions' })
+  const { data: actor } = await supabaseAdmin
+    .from('profiles').select('role, full_name').eq('id', user.id).single()
+  if (!actor || !ALLOWED_ROLES.includes(actor.role))
+    return res.status(403).json({ error: 'Forbidden' })
 
   const { deposit_id, action, rejection_reason } = req.body
+  if (!deposit_id) return res.status(400).json({ error: 'deposit_id required' })
+  if (!['approve', 'reject'].includes(action))
+    return res.status(400).json({ error: 'action must be approve or reject' })
 
-  if (!deposit_id || !action) return res.status(400).json({ error: 'deposit_id and action required' })
-  if (!['approved', 'rejected', 'under_review'].includes(action))
-    return res.status(400).json({ error: 'Invalid action' })
-  if (action === 'rejected' && !rejection_reason?.trim())
-    return res.status(400).json({ error: 'Rejection reason is required' })
-
-  // ── Load deposit ───────────────────────────────────────────
+  // Fetch deposit
   const { data: deposit, error: depErr } = await supabaseAdmin
     .from('deposits')
     .select('*')
@@ -47,159 +57,157 @@ export default async function handler(req, res) {
     .single()
 
   if (depErr || !deposit) return res.status(404).json({ error: 'Deposit not found' })
-  if (!['pending', 'under_review'].includes(deposit.status))
+  if (!['pending', 'under_review'].includes(deposit.status)) {
     return res.status(409).json({ error: `Deposit is already ${deposit.status}` })
-
-  // ── Under review — just update status ─────────────────────
-  if (action === 'under_review') {
-    await supabaseAdmin.from('deposits').update({
-      status: 'under_review',
-      reviewed_by: admin.id,
-      reviewed_at: new Date().toISOString(),
-    }).eq('id', deposit_id)
-
-    await logAudit(supabaseAdmin, admin, 'deposit_marked_under_review', 'deposit', deposit_id, deposit, { status: 'under_review' })
-    return res.status(200).json({ message: 'Marked under review' })
   }
 
-  // ── Reject ─────────────────────────────────────────────────
-  if (action === 'rejected') {
-    await supabaseAdmin.from('deposits').update({
-      status: 'rejected',
-      reviewed_by: admin.id,
-      reviewed_at: new Date().toISOString(),
-      rejection_reason,
-    }).eq('id', deposit_id)
+  const playerId    = deposit.user_id
+  const amountCents = deposit.amount_cents
+  const now         = new Date().toISOString()
 
-    // Notify player
-    await supabaseAdmin.from('notifications').insert({
-      user_id: deposit.user_id,
-      type: 'deposit_rejected',
-      title: 'Deposit Rejected',
-      message: `Your deposit ${deposit.reference_id} was rejected. Reason: ${rejection_reason}`,
-      reference_id: deposit.reference_id,
+  // ── REJECT ───────────────────────────────────────────────────
+  if (action === 'reject') {
+    const { error: rejErr } = await supabaseAdmin
+      .from('deposits')
+      .update({
+        status:           'rejected',
+        rejection_reason: rejection_reason || 'Rejected by admin',
+        reviewed_by:      user.id,
+        reviewed_at:      now,
+        updated_at:       now,
+      })
+      .eq('id', deposit_id)
+
+    if (rejErr) return res.status(500).json({ error: rejErr.message })
+
+    // Level recalc on deposit rejection
+    await _recalculateLevelOnDepositReject(playerId)
+
+    await supabaseAdmin.from('audit_logs').insert({
+      actor_id:    user.id,
+      actor_role:  actor.role,
+      action:      'deposit_rejected',
+      target_type: 'deposit',
+      target_id:   deposit_id,
+      description: `Deposit ${deposit.reference_id} rejected`,
+      reason:      rejection_reason || null,
     })
 
-    await logAudit(supabaseAdmin, admin, 'deposit_rejected', 'deposit', deposit_id, deposit, { status: 'rejected', rejection_reason })
-    return res.status(200).json({ message: 'Deposit rejected' })
+    return res.status(200).json({ ok: true, status: 'rejected' })
   }
 
-  // ── Approve — create ledger entries + update wallet ────────
-  // Load current wallet with version for optimistic lock
+  // ── APPROVE ──────────────────────────────────────────────────
+
+  // Idempotency check
+  const idempKey = `dep-approve-${deposit_id}`
+  const { data: existing } = await supabaseAdmin
+    .from('ledger').select('id').eq('idempotency_key', idempKey).maybeSingle()
+  if (existing) return res.status(200).json({ ok: true, status: 'approved', idempotent: true })
+
+  // Fetch wallet
   const { data: wallet, error: walletErr } = await supabaseAdmin
-    .from('wallets')
-    .select('*')
-    .eq('user_id', deposit.user_id)
-    .single()
+    .from('wallets').select('*').eq('user_id', playerId).single()
+  if (walletErr || !wallet) return res.status(400).json({ error: 'Wallet not found' })
 
-  if (walletErr || !wallet) return res.status(500).json({ error: 'Wallet not found' })
+  const newCashBalance = wallet.cash_balance_cents + amountCents
 
-  const newCashBalance = wallet.cash_balance_cents + deposit.amount_cents
-  const newBonusBalance = wallet.bonus_balance_cents + deposit.bonus_cents
-  const newWithdrawable = wallet.withdrawable_cents + deposit.amount_cents
-  const newTotalDeposited = wallet.total_deposited_cents + deposit.amount_cents
-  const newTotalBonus = wallet.total_bonus_cents + deposit.bonus_cents
+  // Write wallet + ledger + deposit update in parallel
+  const [walletRes, ledgerRes, depositRes] = await Promise.all([
+    supabaseAdmin.from('wallets').update({
+      cash_balance_cents:   newCashBalance,
+      total_deposited_cents: (wallet.total_deposited_cents || 0) + amountCents,
+      updated_at:           now,
+      version:              wallet.version + 1,
+    }).eq('user_id', playerId).eq('version', wallet.version),
 
-  // Update wallet with optimistic lock (version check)
-  const { data: updatedWallet, error: updateErr } = await supabaseAdmin
-    .from('wallets')
-    .update({
-      cash_balance_cents:    newCashBalance,
-      bonus_balance_cents:   newBonusBalance,
-      withdrawable_cents:    newWithdrawable,
-      total_deposited_cents: newTotalDeposited,
-      total_bonus_cents:     newTotalBonus,
-      version:               wallet.version + 1,
-    })
-    .eq('id', wallet.id)
-    .eq('version', wallet.version) // optimistic lock
-    .select()
-    .single()
-
-  if (updateErr || !updatedWallet) {
-    return res.status(409).json({ error: 'Wallet was modified concurrently. Please try again.' })
-  }
-
-  // Create ledger entry: deposit (cash)
-  const depositLedgerRef = `${deposit.reference_id}-CASH`
-  await supabaseAdmin.from('ledger').insert({
-    reference_id:        depositLedgerRef,
-    user_id:             deposit.user_id,
-    type:                'deposit',
-    wallet_bucket:       'cash',
-    amount_cents:        deposit.amount_cents,
-    direction:           'credit',
-    balance_after_cents: newCashBalance,
-    deposit_id:          deposit.id,
-    description:         `Deposit approved via ${deposit.reference_id}`,
-    created_by:          admin.id,
-    idempotency_key:     `${deposit.id}-cash-credit`,
-  })
-
-  // Create ledger entry: bonus (if any)
-  if (deposit.bonus_cents > 0) {
-    const bonusLedgerRef = `${deposit.reference_id}-BONUS`
-    await supabaseAdmin.from('ledger').insert({
-      reference_id:        bonusLedgerRef,
-      user_id:             deposit.user_id,
-      type:                'deposit_bonus',
-      wallet_bucket:       'bonus',
-      amount_cents:        deposit.bonus_cents,
+    supabaseAdmin.from('ledger').insert({
+      reference_id:        idempKey,
+      user_id:             playerId,
+      type:                'deposit',
+      wallet_bucket:       'cash',
+      amount_cents:        amountCents,
       direction:           'credit',
-      balance_after_cents: newBonusBalance,
-      deposit_id:          deposit.id,
-      description:         `${deposit.bonus_pct_applied}% deposit bonus for ${deposit.reference_id}`,
-      created_by:          admin.id,
-      idempotency_key:     `${deposit.id}-bonus-credit`,
+      balance_after_cents: newCashBalance,
+      deposit_id:          deposit_id,
+      description:         `Deposit ${deposit.reference_id} approved`,
+      created_by:          user.id,
+      idempotency_key:     idempKey,
+    }),
+
+    supabaseAdmin.from('deposits').update({
+      status:      'approved',
+      reviewed_by: user.id,
+      reviewed_at: now,
+      updated_at:  now,
+    }).eq('id', deposit_id),
+  ])
+
+  if (walletRes.error)  return res.status(500).json({ error: 'Wallet update failed: ' + walletRes.error.message })
+  if (ledgerRes.error)  return res.status(500).json({ error: 'Ledger write failed: ' + ledgerRes.error.message })
+  if (depositRes.error) return res.status(500).json({ error: 'Deposit update failed: ' + depositRes.error.message })
+
+  // Apply deposit bonus via RPC (handles level-based bonus + custom rules)
+  let bonusCents = 0
+  const { data: bonusResult } = await supabaseAdmin
+    .rpc('apply_deposit_bonus', { p_deposit_id: deposit_id })
+  if (bonusResult?.ok) bonusCents = bonusResult.bonus_cents || 0
+
+  // Award XP for deposit (1 XP per $10)
+  const xpAwarded = Math.floor(amountCents / 1000) * XP_PER_10_DOLLARS
+  if (xpAwarded > 0) {
+    await supabaseAdmin.rpc('award_xp', {
+      p_user_id:      playerId,
+      p_amount:       xpAwarded,
+      p_source:       'deposit',
+      p_reference_id: deposit.reference_id,
+      p_notes:        `Deposit $${(amountCents / 100).toFixed(2)} → ${xpAwarded} XP`,
     })
   }
 
-  // Update deposit status
-  await supabaseAdmin.from('deposits').update({
-    status:      'approved',
-    reviewed_by: admin.id,
-    reviewed_at: new Date().toISOString(),
-    xp_earned:   Math.floor(deposit.amount_cents / 100), // 1 XP per dollar
-  }).eq('id', deposit_id)
-
-  // Award XP to player (non-critical: never blocks the approval)
-  const xpEarned = Math.floor(deposit.amount_cents / 100)
-  await Promise.resolve(
-    supabaseAdmin.rpc('increment_player_xp', { p_user_id: deposit.user_id, p_xp: xpEarned })
-  ).then(() => {}, () => {})
-
-  // Notify player
-  await supabaseAdmin.from('notifications').insert({
-    user_id:      deposit.user_id,
-    type:         'deposit_approved',
-    title:        'Deposit Approved! 🎉',
-    message:      `Your deposit of $${(deposit.amount_cents / 100).toFixed(2)} (${deposit.reference_id}) has been approved. ${deposit.bonus_cents > 0 ? `+$${(deposit.bonus_cents / 100).toFixed(2)} bonus added!` : ''} Your wallet has been credited.`,
-    reference_id: deposit.reference_id,
+  await supabaseAdmin.from('audit_logs').insert({
+    actor_id:    user.id,
+    actor_role:  actor.role,
+    action:      'deposit_approved',
+    target_type: 'deposit',
+    target_id:   deposit_id,
+    description: `Deposit ${deposit.reference_id} approved — $${(amountCents / 100).toFixed(2)} cash + $${(bonusCents / 100).toFixed(2)} bonus, XP: +${xpAwarded}`,
   })
-
-  await logAudit(supabaseAdmin, admin, 'deposit_approved', 'deposit', deposit_id,
-    { status: deposit.status },
-    { status: 'approved', amount_cents: deposit.amount_cents, bonus_cents: deposit.bonus_cents }
-  )
 
   return res.status(200).json({
-    message: 'Deposit approved and wallet credited',
-    credited: {
-      cash_cents:  deposit.amount_cents,
-      bonus_cents: deposit.bonus_cents,
-      total_cents: deposit.total_credit_cents,
-    },
+    ok:           true,
+    status:       'approved',
+    amount_cents: amountCents,
+    bonus_cents:  bonusCents,
+    xp_awarded:   xpAwarded,
   })
 }
 
-async function logAudit(client, actor, action, targetType, targetId, before, after) {
-  await client.from('audit_logs').insert({
-    actor_id:    actor.id,
-    actor_role:  actor.role,
-    action,
-    target_type: targetType,
-    target_id:   targetId,
-    before_state: before,
-    after_state:  after,
-  }).then(() => {}, () => {})
+// Recalculate level downward when a deposit is rejected
+async function _recalculateLevelOnDepositReject(playerId) {
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles').select('total_xp, player_level_id').eq('id', playerId).single()
+    if (!profile) return
+
+    const { data: correctLevel } = await supabaseAdmin
+      .from('player_levels').select('id')
+      .lte('min_xp', profile.total_xp)
+      .eq('is_active', true)
+      .order('min_xp', { ascending: false })
+      .limit(1).maybeSingle()
+
+    if (!correctLevel || correctLevel.id === profile.player_level_id) return
+
+    const oldLevelId = profile.player_level_id
+    await supabaseAdmin.from('profiles')
+      .update({ player_level_id: correctLevel.id }).eq('id', playerId)
+    await supabaseAdmin.from('player_level_history').insert({
+      user_id:       playerId,
+      from_level_id: oldLevelId,
+      to_level_id:   correctLevel.id,
+      trigger:       'deposit_rejected',
+    })
+  } catch (e) {
+    console.error('Level recalc on deposit reject failed:', e)
+  }
 }

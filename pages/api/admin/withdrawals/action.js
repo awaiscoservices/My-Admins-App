@@ -1,9 +1,23 @@
 /**
  * POST /api/admin/withdrawals/action
- * Approve or reject a withdrawal.
- * Approve: debit withdrawable_cents + reserved_cents.
- * Reject: release reserved_cents back to cash + withdrawable.
- * Roles: super_admin, finance
+ *
+ * Approves or rejects a Withdrawal request.
+ *
+ * Body: { withdrawal_id, action: 'approve'|'reject', rejection_reason?, proof_screenshot_url? }
+ *
+ * On approve:
+ *   1. Validate withdrawal exists + is pending
+ *   2. Check 24-hr rolling window against player's level daily_withdrawal_limit_cents
+ *   3. Idempotency check
+ *   4. Debit cash_balance_cents
+ *   5. Write ledger entry
+ *   6. Update daily_withdrawal_tracking
+ *   7. Mark withdrawal approved + stamp level snapshot
+ *   8. Audit log
+ *
+ * On reject:
+ *   1. Mark rejected with reason
+ *   2. Audit log
  */
 import { createClient } from '@supabase/supabase-js'
 
@@ -11,6 +25,8 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
+const ALLOWED_ROLES = ['super_admin', 'admin', 'finance']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -21,126 +37,187 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { data: admin } = await supabaseAdmin
-    .from('profiles').select('id, role, full_name').eq('id', user.id).single()
+  const { data: actor } = await supabaseAdmin
+    .from('profiles').select('role, full_name').eq('id', user.id).single()
+  if (!actor || !ALLOWED_ROLES.includes(actor.role))
+    return res.status(403).json({ error: 'Forbidden' })
 
-  if (!admin || !['super_admin', 'finance'].includes(admin.role))
-    return res.status(403).json({ error: 'Insufficient permissions. Finance role required.' })
+  const { withdrawal_id, action, rejection_reason, proof_screenshot_url } = req.body
+  if (!withdrawal_id) return res.status(400).json({ error: 'withdrawal_id required' })
+  if (!['approve', 'reject'].includes(action))
+    return res.status(400).json({ error: 'action must be approve or reject' })
 
-  const { withdrawal_id, action, reason } = req.body
-
-  if (!withdrawal_id || !['approve', 'reject'].includes(action))
-    return res.status(400).json({ error: 'withdrawal_id and action required' })
-  if (action === 'reject' && !reason?.trim())
-    return res.status(400).json({ error: 'Reason required for rejection' })
-
-  const { data: withdrawal } = await supabaseAdmin
+  // Fetch withdrawal
+  const { data: withdrawal, error: wErr } = await supabaseAdmin
     .from('withdrawals').select('*').eq('id', withdrawal_id).single()
-
-  if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' })
-  if (withdrawal.status !== 'pending') return res.status(409).json({ error: `Already ${withdrawal.status}` })
-
-  const playerId    = withdrawal.user_id
-  const amtCents    = withdrawal.amount_cents
-  const method      = withdrawal.method || 'Unknown'
-  const destination = withdrawal.destination || ''
-
-  const { data: wallet } = await supabaseAdmin
-    .from('wallets').select('*').eq('user_id', playerId).single()
-
-  if (!wallet) return res.status(404).json({ error: 'Player wallet not found' })
-
-  if (action === 'reject') {
-    // Release reserved → return to cash + withdrawable
-    const newReserved     = Math.max(0, (wallet.reserved_cents || 0) - amtCents)
-    const newCash         = (wallet.cash_balance_cents || 0) + amtCents
-    const newWithdrawable = (wallet.withdrawable_cents  || 0) + amtCents
-
-    const { data: updatedWallet, error: updateErr } = await supabaseAdmin
-      .from('wallets')
-      .update({ reserved_cents: newReserved, cash_balance_cents: newCash, withdrawable_cents: newWithdrawable, version: wallet.version + 1 })
-      .eq('id', wallet.id).eq('version', wallet.version)
-      .select().single()
-
-    if (updateErr || !updatedWallet)
-      return res.status(409).json({ error: 'Wallet modified concurrently. Please retry.' })
-
-    await supabaseAdmin.from('withdrawals').update({
-      status: 'rejected', reviewed_by: admin.id,
-      reviewed_at: new Date().toISOString(), notes: reason,
-    }).eq('id', withdrawal_id)
-
-    await supabaseAdmin.from('ledger').insert({
-      reference_id: `${withdrawal.reference_id}-REVERSAL`,
-      user_id: playerId, type: 'withdrawal_reversal',
-      wallet_bucket: 'cash', amount_cents: amtCents,
-      direction: 'credit', balance_after_cents: newCash,
-      description: `Withdrawal rejected — funds returned. Reason: ${reason}`,
-      created_by: admin.id,
-      idempotency_key: `wd_reject_${withdrawal_id}`,
-    })
-
-    await supabaseAdmin.from('notifications').insert({
-      user_id: playerId, type: 'general',
-      title: 'Withdrawal Rejected',
-      message: `Your withdrawal of $${(amtCents / 100).toFixed(2)} via ${method} was rejected. Funds returned to your wallet. Reason: ${reason}`,
-    })
-
-    await supabaseAdmin.from('audit_logs').insert({
-      actor_id: admin.id, actor_role: admin.role,
-      action: 'withdrawal_rejected',
-      target_type: 'withdrawal', target_id: withdrawal_id,
-      before_state: { status: 'pending' }, after_state: { status: 'rejected' }, reason,
-    }).catch(() => {})
-
-    return res.status(200).json({ message: 'Withdrawal rejected, funds returned to player' })
+  if (wErr || !withdrawal) return res.status(404).json({ error: 'Withdrawal not found' })
+  if (!['pending', 'under_review'].includes(withdrawal.status)) {
+    return res.status(409).json({ error: `Withdrawal is already ${withdrawal.status}` })
   }
 
-  // APPROVE — debit withdrawable
-  if ((wallet.withdrawable_cents || 0) < amtCents)
-    return res.status(400).json({ error: `Insufficient withdrawable balance. Has: $${((wallet.withdrawable_cents||0)/100).toFixed(2)}, needs: $${(amtCents/100).toFixed(2)}` })
+  const playerId    = withdrawal.user_id
+  const amountCents = withdrawal.amount_cents
+  const now         = new Date().toISOString()
 
-  const newWithdrawable = wallet.withdrawable_cents - amtCents
-  const newReserved     = Math.max(0, (wallet.reserved_cents || 0) - amtCents)
+  // ── REJECT ───────────────────────────────────────────────────
+  if (action === 'reject') {
+    const { error: rejErr } = await supabaseAdmin
+      .from('withdrawals')
+      .update({
+        status:           'rejected',
+        rejection_reason: rejection_reason || 'Rejected by admin',
+        reviewed_by:      user.id,
+        reviewed_at:      now,
+        updated_at:       now,
+      })
+      .eq('id', withdrawal_id)
 
-  const { data: updatedWallet, error: updateErr } = await supabaseAdmin
-    .from('wallets')
-    .update({ withdrawable_cents: newWithdrawable, reserved_cents: newReserved, version: wallet.version + 1 })
-    .eq('id', wallet.id).eq('version', wallet.version)
-    .select().single()
+    if (rejErr) return res.status(500).json({ error: rejErr.message })
 
-  if (updateErr || !updatedWallet)
-    return res.status(409).json({ error: 'Wallet modified concurrently. Please retry.' })
+    await supabaseAdmin.from('audit_logs').insert({
+      actor_id:    user.id,
+      actor_role:  actor.role,
+      action:      'withdrawal_rejected',
+      target_type: 'withdrawal',
+      target_id:   withdrawal_id,
+      description: `Withdrawal ${withdrawal.reference_id} rejected`,
+      reason:      rejection_reason || null,
+    })
 
-  await supabaseAdmin.from('withdrawals').update({
-    status: 'approved', reviewed_by: admin.id,
-    reviewed_at: new Date().toISOString(),
-  }).eq('id', withdrawal_id)
+    return res.status(200).json({ ok: true, status: 'rejected' })
+  }
 
-  await supabaseAdmin.from('ledger').insert({
-    reference_id: `${withdrawal.reference_id}-DEBIT`,
-    user_id: playerId, type: 'withdrawal',
-    wallet_bucket: 'cash', amount_cents: amtCents,
-    direction: 'debit', balance_after_cents: newWithdrawable,
-    description: `Withdrawal approved via ${method}${destination ? ` to ${destination}` : ''}`,
-    created_by: admin.id,
-    idempotency_key: `wd_approve_${withdrawal_id}`,
-  })
+  // ── APPROVE ──────────────────────────────────────────────────
 
-  await supabaseAdmin.from('notifications').insert({
-    user_id: playerId, type: 'general',
-    title: 'Withdrawal Approved ✅',
-    message: `Your withdrawal of $${(amtCents / 100).toFixed(2)} via ${method} is approved. Allow 1–3 business days.`,
-    reference_id: withdrawal.reference_id,
-  })
+  // Fetch player profile + level
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('player_level_id, player_levels(id, name, daily_withdrawal_limit_cents)')
+    .eq('id', playerId)
+    .single()
+
+  const levelId           = profile?.player_level_id
+  const levelName         = profile?.player_levels?.name || 'Bronze'
+  const levelDailyLimit   = profile?.player_levels?.daily_withdrawal_limit_cents || 50000
+
+  // Check daily withdrawal limit setting is enabled
+  const { data: limitSetting } = await supabaseAdmin
+    .from('platform_settings').select('value')
+    .eq('key', 'withdrawal_daily_limit_enabled').maybeSingle()
+  const limitEnabled = limitSetting?.value !== false && limitSetting?.value !== 'false'
+
+  if (limitEnabled) {
+    // Get rolling 24hr total from ledger (source of truth)
+    const { data: dailyTotal } = await supabaseAdmin
+      .rpc('get_daily_withdrawn_cents', { p_user_id: playerId })
+
+    const totalAfter = (dailyTotal || 0) + amountCents
+    if (totalAfter > levelDailyLimit) {
+      return res.status(422).json({
+        error: `Daily withdrawal limit exceeded. Limit: $${(levelDailyLimit / 100).toFixed(2)} (${levelName}), Used: $${((dailyTotal || 0) / 100).toFixed(2)}, Requested: $${(amountCents / 100).toFixed(2)}`,
+        code:  'DAILY_LIMIT_EXCEEDED',
+        limit_cents:     levelDailyLimit,
+        used_cents:      dailyTotal || 0,
+        requested_cents: amountCents,
+        level_name:      levelName,
+      })
+    }
+  }
+
+  // Fetch wallet
+  const { data: wallet, error: walletErr } = await supabaseAdmin
+    .from('wallets').select('*').eq('user_id', playerId).single()
+  if (walletErr || !wallet) return res.status(400).json({ error: 'Wallet not found' })
+
+  // Cash balance check — withdrawals from cash only
+  if (wallet.cash_balance_cents < amountCents) {
+    return res.status(422).json({
+      error: `Insufficient cash balance. Available: $${(wallet.cash_balance_cents / 100).toFixed(2)}, Requested: $${(amountCents / 100).toFixed(2)}`,
+      code:  'INSUFFICIENT_CASH',
+    })
+  }
+
+  // Idempotency check
+  const idempKey = `wd-approve-${withdrawal_id}`
+  const { data: existing } = await supabaseAdmin
+    .from('ledger').select('id').eq('idempotency_key', idempKey).maybeSingle()
+  if (existing) return res.status(200).json({ ok: true, status: 'approved', idempotent: true })
+
+  const newCashBalance = wallet.cash_balance_cents - amountCents
+
+  const dailyLimitSnapshot = {
+    level_id:              levelId,
+    level_name:            levelName,
+    daily_limit_cents:     levelDailyLimit,
+    limit_enabled:         limitEnabled,
+    approved_by:           actor.full_name,
+    approved_at:           now,
+  }
+
+  // Write wallet + ledger + withdrawal update in parallel
+  const [walletRes, ledgerRes, withdrawalRes] = await Promise.all([
+    supabaseAdmin.from('wallets').update({
+      cash_balance_cents:   newCashBalance,
+      total_withdrawn_cents: (wallet.total_withdrawn_cents || 0) + amountCents,
+      updated_at:           now,
+      version:              wallet.version + 1,
+    }).eq('user_id', playerId).eq('version', wallet.version),
+
+    supabaseAdmin.from('ledger').insert({
+      reference_id:        idempKey,
+      user_id:             playerId,
+      type:                'withdrawal',
+      wallet_bucket:       'cash',
+      amount_cents:        amountCents,
+      direction:           'debit',
+      balance_after_cents: newCashBalance,
+      withdrawal_id:       withdrawal_id,
+      description:         `Withdrawal ${withdrawal.reference_id} approved`,
+      created_by:          user.id,
+      idempotency_key:     idempKey,
+    }),
+
+    supabaseAdmin.from('withdrawals').update({
+      status:                 'approved',
+      reviewed_by:            user.id,
+      reviewed_at:            now,
+      processed_by:           user.id,
+      processed_at:           now,
+      updated_at:             now,
+      level_id_at_time:       levelId,
+      daily_limit_snapshot:   dailyLimitSnapshot,
+      ...(proof_screenshot_url ? { proof_screenshot_url } : {}),
+    }).eq('id', withdrawal_id),
+  ])
+
+  if (walletRes.error)     return res.status(500).json({ error: 'Wallet update failed: ' + walletRes.error.message })
+  if (ledgerRes.error)     return res.status(500).json({ error: 'Ledger write failed: ' + ledgerRes.error.message })
+  if (withdrawalRes.error) return res.status(500).json({ error: 'Withdrawal update failed: ' + withdrawalRes.error.message })
+
+  // Update daily_withdrawal_tracking cache
+  await supabaseAdmin.from('daily_withdrawal_tracking').upsert({
+    user_id:              playerId,
+    window_start:         new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    withdrawn_cents:      amountCents,  // will be summed from ledger on next check
+    level_id_snapshot:    levelId,
+    daily_limit_snapshot: levelDailyLimit,
+    updated_at:           now,
+  }, { onConflict: 'user_id' })
 
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id: admin.id, actor_role: admin.role,
-    action: 'withdrawal_approved',
-    target_type: 'withdrawal', target_id: withdrawal_id,
-    before_state: { status: 'pending', withdrawable_cents: wallet.withdrawable_cents },
-    after_state: { status: 'approved', withdrawable_cents: newWithdrawable },
-  }).catch(() => {})
+    actor_id:    user.id,
+    actor_role:  actor.role,
+    action:      'withdrawal_approved',
+    target_type: 'withdrawal',
+    target_id:   withdrawal_id,
+    description: `Withdrawal ${withdrawal.reference_id} approved — $${(amountCents / 100).toFixed(2)} (level: ${levelName}, limit: $${(levelDailyLimit / 100).toFixed(2)}/day)`,
+  })
 
-  return res.status(200).json({ message: 'Withdrawal approved successfully' })
+  return res.status(200).json({
+    ok:           true,
+    status:       'approved',
+    amount_cents: amountCents,
+    level_name:   levelName,
+    daily_limit_cents: levelDailyLimit,
+  })
 }

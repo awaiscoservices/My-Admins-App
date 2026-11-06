@@ -3,7 +3,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { signUpWithEmail, signInWithGoogle } from '../../lib/auth';
-import Logo from '../../components/ui/Logo'
+import { supabase } from '../../lib/supabase';
+import Logo from '../../components/ui/Logo';
+import AuthBackdrop from '../../components/site/AuthBackdrop'
 
 const PARTICLES = ['♠', '♥', '♦', '♣'];
 
@@ -23,7 +25,15 @@ export default function Register() {
   const [particles, setParticles] = useState([]);
   const [toast, setToast] = useState(null);
   const [success, setSuccess] = useState(false);
-  useEffect(() => { try { const r = new URLSearchParams(window.location.search).get('ref'); if (r) localStorage.setItem('cz_ref', r.trim().slice(0, 32)) } catch {} }, []);
+  const [refCode, setRefCode] = useState('');
+  // ?ref=CODE → remember it (also used by Google sign-up and email-confirmation flows) and show the banner
+  useEffect(() => {
+    try {
+      const r = (new URLSearchParams(window.location.search).get('ref') || '').trim().slice(0, 32);
+      if (r) { localStorage.setItem('referral_code', r); setRefCode(r); }
+      else setRefCode(localStorage.getItem('referral_code') || '');
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const generated = Array.from({ length: 22 }, (_, i) => ({
@@ -63,7 +73,12 @@ export default function Register() {
     setErrors({});
     setLoading(true);
     try {
-      await signUpWithEmail({ fullName: form.fullName, email: form.email, password: form.password });
+      const res = await signUpWithEmail({ fullName: form.fullName, email: form.email, password: form.password });
+      // Record the referral. This only works if signup returns a session; otherwise it is recorded at first login.
+      const code = refCode || (() => { try { return localStorage.getItem('referral_code') || ''; } catch { return ''; } })();
+      if (code && res?.user?.id) {
+        try { await supabase.from('referrals').insert({ referrer_code: code, referred_user_id: res.user.id }); } catch {}
+      }
       setSuccess(true);
       showToast('Account created! Check your email to confirm.', 'success');
       setTimeout(() => router.push('/auth/login'), 3000);
@@ -110,7 +125,7 @@ export default function Register() {
     <>
       <Head>
         <title>Create Account — Casinoze Room</title>
-        <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500;1,9..144,700&family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
         <style>{`
           *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
           body{background:var(--bg-gradient);background-attachment:fixed;overflow-x:hidden}
@@ -133,14 +148,7 @@ export default function Register() {
         </div>
       )}
 
-      {/* Background */}
-      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-gradient)', overflow: 'hidden', zIndex: 0 }}>
-        <div style={{ position: 'absolute', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%)', top: -200, right: -200, animation: 'orb-float 9s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,158,11,0.09) 0%, transparent 70%)', bottom: -150, left: -100, animation: 'orb-float 12s ease-in-out infinite reverse' }} />
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: `linear-gradient(rgba(251,191,36,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(251,191,36,0.04) 1px, transparent 1px)`, backgroundSize: '60px 60px' }} />
-      </div>
-
-      {particles.map(p => <Particle key={p.id} symbol={p.symbol} style={p.style} />)}
+      <AuthBackdrop />
 
       <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', fontFamily: 'Outfit, sans-serif' }}>
 
@@ -164,6 +172,11 @@ export default function Register() {
             <h2 style={{ fontFamily: 'Cinzel Decorative, serif', fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 6, textAlign: 'center' }}>Join the Table</h2>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', marginBottom: 28 }}>Create your Casinoze account and start playing</p>
 
+            {refCode && (
+              <div style={{ margin: '0 0 18px', padding: '12px 16px', borderRadius: 12, background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.35)', color: '#fbbf24', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
+                🎁 You were referred! <span style={{ opacity: .75, fontWeight: 600 }}>Code: {refCode}</span>
+              </div>
+            )}
             <form onSubmit={handleSubmit} noValidate>
               {/* Full Name */}
               <div style={{ marginBottom: 16 }}>

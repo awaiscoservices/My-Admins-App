@@ -13,5 +13,5 @@ export default function AuthCallback() {
     })
   }, [router])
 
-  return null
+  return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg-gradient)', color: '#fbbf24', fontFamily: 'Outfit, sans-serif', fontWeight: 600, letterSpacing: '.06em' }}>Signing you in…</div>
 }

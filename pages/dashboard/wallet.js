@@ -88,7 +88,7 @@ export default function WalletPage() {
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>My Wallet</h1>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>My Wallet</h1>
         <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>All your balance buckets and transaction history</p>
       </div>
 

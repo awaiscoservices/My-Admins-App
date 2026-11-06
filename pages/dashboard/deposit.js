@@ -214,7 +214,7 @@ export default function DepositPage() {
       <Head><title>Deposit Submitted — Casinoze Room</title></Head>
       <div style={{ maxWidth: 520, margin: '40px auto', textAlign: 'center' }}>
         <div style={{ fontSize: 64, marginBottom: 20 }}>✅</div>
-        <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: 26, fontWeight: 700, color: '#fff', marginBottom: 12 }}>Deposit Submitted!</h2>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700, color: '#fff', marginBottom: 12 }}>Deposit Submitted!</h2>
         <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 15, marginBottom: 28, lineHeight: 1.7 }}>
           Your deposit request has been submitted and is pending review by our team. You will be notified once it's approved.
         </p>
@@ -262,7 +262,7 @@ export default function DepositPage() {
 
       <div style={{ maxWidth: 680, margin: '0 auto' }}>
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>Add Money</h1>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>Add Money</h1>
           <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>Deposit funds to your wallet. Credits appear after approval.</p>
         </div>
 
