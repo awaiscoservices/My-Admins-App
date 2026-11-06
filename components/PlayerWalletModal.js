@@ -155,12 +155,22 @@ function TabSummary({ playerId }) {
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>Lifetime Activity</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          <Tile label="Total Deposited"  value={fmt(s.total_deposit_cents)}  color="#3b82f6" />
-          <Tile label="Total Withdrawn"  value={fmt(s.total_withdraw_cents)} color="#f59e0b" />
-          <Tile label="Total Scores"     value={fmt(s.total_scores_cents)}   color="#a855f7" />
-          <Tile label="Total Redeemed"   value={fmt(s.total_redeem_cents)}   color="#22c55e" />
-          <Tile label="Excess (XP src)"  value={fmt(s.excess_scores_cents)}  color="#fbbf24" sub="Generates XP" />
-          <Tile label="House Profit"     value={fmt(s.total_profit_cents)}   color={s.total_profit_cents >= 0 ? '#22c55e' : '#ef4444'} />
+          {(() => {
+            const dep    = s.total_deposit_cents  || 0
+            const with_  = s.total_withdraw_cents || 0
+            const scr    = s.total_scores_cents   || 0
+            const red    = s.total_redeem_cents   || 0
+            const profit  = dep - with_
+            const balance = scr - red
+            return <>
+              <Tile label="Total Deposit"  value={fmt(dep)}     color="#3b82f6" />
+              <Tile label="Total Withdraw" value={fmt(with_)}   color="#f59e0b" />
+              <Tile label="Total Profit"   value={fmt(profit)}  color={profit  >= 0 ? '#10b981' : '#f87171'} />
+              <Tile label="Total Scores"   value={fmt(scr)}     color="#a855f7" />
+              <Tile label="Total Redeem"   value={fmt(red)}     color="#22c55e" />
+              <Tile label="Total Balance"  value={fmt(balance)} color={balance >= 0 ? '#10b981' : '#f87171'} />
+            </>
+          })()}
         </div>
       </div>
 
