@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabase'
 import AdminLayout from '../../../components/layout/AdminLayout'
 import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
-import PlayerWalletModal from '../../../components/PlayerWalletModal'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -115,17 +114,16 @@ export default function AdminPlayerDetail() {
   const router = useRouter()
   const { id } = router.query
 
-  const [player, setPlayer]           = useState(null)
-  const [wallet, setWallet]           = useState(null)
-  const [deposits, setDeposits]       = useState([])
+  const [player, setPlayer] = useState(null)
+  const [wallet, setWallet] = useState(null)
+  const [deposits, setDeposits] = useState([])
   const [gameAccounts, setGameAccounts] = useState([])
   const [transactions, setTransactions] = useState([])
-  const [kyc, setKyc]                 = useState(null)
-  const [loading, setLoading]         = useState(true)
-  const [activeTab, setActiveTab]     = useState('overview')
+  const [kyc, setKyc] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('overview')
   const [showAdjModal, setShowAdjModal] = useState(false)
-  const [showWallet, setShowWallet]   = useState(false)   // ← NEW: wallet modal
-  const [toast, setToast]             = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => { if (id) loadPlayer() }, [id])
 
@@ -221,15 +219,6 @@ export default function AdminPlayerDetail() {
 
       {showAdjModal && <AdjustmentModal playerId={id} onClose={() => setShowAdjModal(false)} onSave={handleAdjustment} />}
 
-      {/* ── WALLET MODAL (Phase B) ── */}
-      {showWallet && (
-        <PlayerWalletModal
-          playerId={id}
-          playerName={player.full_name}
-          onClose={() => setShowWallet(false)}
-        />
-      )}
-
       {/* Back + header */}
       <div style={{ marginBottom: 20 }}>
         <Link href="/admin/players" style={{ color: '#fbbf24', textDecoration: 'none', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>← Players</Link>
@@ -247,13 +236,6 @@ export default function AdminPlayerDetail() {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {/* ── Wallet Overview button (Phase B) ── */}
-            <button
-              onClick={() => setShowWallet(true)}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,rgba(59,130,246,.25),rgba(99,102,241,.25))', border: '1px solid rgba(99,102,241,.5)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
-              💳 Wallet Overview
-            </button>
-
             <button onClick={() => setShowAdjModal(true)} style={{ padding: '9px 16px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
               ⚖️ Adjust Wallet
             </button>
@@ -284,22 +266,32 @@ export default function AdminPlayerDetail() {
       </div>
 
       {/* Wallet summary bar */}
-      {wallet && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px,100%),1fr))', gap: 10, marginBottom: 20 }}>
-          {[
-            { label: 'Cash',        cents: wallet.cash_balance_cents,    color: '#10b981' },
-            { label: 'Bonus',       cents: wallet.bonus_balance_cents,   color: '#f59e0b' },
-            { label: 'Reserved',    cents: wallet.reserved_cents,        color: '#94a3b8' },
-            { label: 'Withdrawable',cents: wallet.withdrawable_cents,    color: '#fbbf24' },
-            { label: 'Total Deposited', cents: wallet.total_deposited_cents, color: 'rgba(255,255,255,.5)' },
-          ].map(b => (
-            <div key={b.label} style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', marginBottom: 6 }}>{b.label}</div>
-              <MoneyDisplay cents={b.cents || 0} size="lg" color={b.color} />
-            </div>
-          ))}
-        </div>
-      )}
+      {wallet && (() => {
+        const dep   = wallet.total_deposited_cents  || 0;
+        const red   = wallet.total_redeemed_cents   || 0;
+        const with_ = wallet.total_withdrawn_cents  || 0;
+        const scr   = wallet.total_loaded_cents     || 0;
+        const profit  = dep - red;
+        const balance = scr - red;
+        const cards = [
+          { label: 'Total Deposit',  cents: dep,     color: '#60a5fa' },
+          { label: 'Total Withdraw', cents: with_,   color: '#f59e0b' },
+          { label: 'Total Profit',   cents: profit,  color: profit >= 0 ? '#10b981' : '#f87171' },
+          { label: 'Total Scores',   cents: scr,     color: '#60a5fa' },
+          { label: 'Total Redeem',   cents: red,     color: '#a78bfa' },
+          { label: 'Total Balance',  cents: balance, color: balance >= 0 ? '#10b981' : '#f87171' },
+        ];
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px,100%),1fr))', gap: 10, marginBottom: 20 }}>
+            {cards.map(b => (
+              <div key={b.label} style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', marginBottom: 6 }}>{b.label}</div>
+                <MoneyDisplay cents={b.cents} size="lg" color={b.color} />
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: 20, overflowX: 'auto' }}>
@@ -335,13 +327,6 @@ export default function AdminPlayerDetail() {
             <InfoRow label="Total Loaded"       value={<MoneyDisplay cents={wallet?.total_loaded_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Redeemed"     value={<MoneyDisplay cents={wallet?.total_redeemed_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Withdrawn"    value={<MoneyDisplay cents={wallet?.total_withdrawn_cents || 0} size="sm" color="#fff" />} />
-            <div style={{ marginTop: 16 }}>
-              <button
-                onClick={() => setShowWallet(true)}
-                style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg,rgba(59,130,246,.2),rgba(99,102,241,.2))', border: '1px solid rgba(99,102,241,.4)', borderRadius: 10, color: '#818cf8', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-                💳 Open Full Wallet Overview →
-              </button>
-            </div>
           </div>
         </div>
       )}
