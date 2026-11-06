@@ -58,3 +58,17 @@ a, button, select, label { touch-action: manipulation; -webkit-tap-highlight-col
   /* comfortable tap targets */
   button, .btn-gold, .btn-outline { min-height: 42px; }
 }
+
+/* ── ANIMATION LAYER (shared by every page) ── */
+.rv{opacity:0;transform:translateY(var(--rv-y,26px));transition:opacity .85s cubic-bezier(.2,.7,.2,1),transform .85s cubic-bezier(.2,.7,.2,1);transition-delay:var(--rv-d,0ms)}
+.rv.in{opacity:1;transform:none}
+.page-enter>*,.player-content>*{animation:pageRise .6s cubic-bezier(.2,.7,.2,1) both}
+.player-content>*:nth-child(2){animation-delay:.06s}.player-content>*:nth-child(3){animation-delay:.12s}.player-content>*:nth-child(4){animation-delay:.18s}
+.player-content>*:nth-child(5){animation-delay:.24s}.player-content>*:nth-child(6){animation-delay:.3s}.player-content>*:nth-child(n+7){animation-delay:.36s}
+@keyframes pageRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+main [style*="251,191,36,.14"]{transition:border-color .25s,box-shadow .25s}
+main [style*="251,191,36,.14"]:hover{border-color:rgba(251,191,36,.34)!important}
+@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.page-enter>*,.player-content>*{animation:none}}
+
+/* headings across the logged-in side use the same display font as the public site */
+.player-content h1{font-family:'Fraunces',serif!important}

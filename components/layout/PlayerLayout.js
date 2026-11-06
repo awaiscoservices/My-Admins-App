@@ -131,8 +131,12 @@ export default function PlayerLayout({ children }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     try {
-      const ref = localStorage.getItem('cz_ref')
-      if (ref) { await supabase.rpc('apply_referral', { p_code: ref }); localStorage.removeItem('cz_ref') }
+      const ref = localStorage.getItem('referral_code') || localStorage.getItem('cz_ref')
+      if (ref) {
+        await supabase.rpc('apply_referral', { p_code: ref })
+        try { await supabase.from('referrals').insert({ referrer_code: ref, referred_user_id: user.id }) } catch {}   // ignored if already recorded
+        localStorage.removeItem('referral_code'); localStorage.removeItem('cz_ref')
+      }
     } catch {}
     const [{ data: prof }, { data: wal }, { count }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
@@ -145,6 +149,10 @@ export default function PlayerLayout({ children }) {
   }, [])
 
   useEffect(() => { loadUserData() }, [loadUserData])
+  useEffect(() => {   // notifications page tells us when something was marked read
+    window.addEventListener('notifications-changed', loadUserData)
+    return () => window.removeEventListener('notifications-changed', loadUserData)
+  }, [loadUserData])
 
   // keep balances fresh after every page change
   useEffect(() => {

@@ -23,7 +23,7 @@ export function useUser() {
 export function Title({ children, sub }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: 'clamp(22px,3vw,28px)', fontWeight: 700, marginBottom: 4 }}>{children}</h1>
+      <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 'clamp(22px,3vw,28px)', fontWeight: 700, marginBottom: 4 }}>{children}</h1>
       {sub && <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 14 }}>{sub}</p>}
     </div>
   )
