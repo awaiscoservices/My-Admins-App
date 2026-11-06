@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import AdminLayout from '../../../components/layout/AdminLayout'
 import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
+import PlayerWalletModal from '../../../components/PlayerWalletModal'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -123,6 +124,7 @@ export default function AdminPlayerDetail() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [showAdjModal, setShowAdjModal] = useState(false)
+  const [showWalletModal, setShowWalletModal] = useState(false)
   const [toast, setToast] = useState(null)
 
   useEffect(() => { if (id) loadPlayer() }, [id])
@@ -218,6 +220,7 @@ export default function AdminPlayerDetail() {
       )}
 
       {showAdjModal && <AdjustmentModal playerId={id} onClose={() => setShowAdjModal(false)} onSave={handleAdjustment} />}
+      {showWalletModal && <PlayerWalletModal playerId={id} playerName={player?.full_name} onClose={() => setShowWalletModal(false)} />}
 
       {/* Back + header */}
       <div style={{ marginBottom: 20 }}>
@@ -236,6 +239,9 @@ export default function AdminPlayerDetail() {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setShowWalletModal(true)} style={{ padding: '9px 16px', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+              💳 Wallet Overview
+            </button>
             <button onClick={() => setShowAdjModal(true)} style={{ padding: '9px 16px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
               ⚖️ Adjust Wallet
             </button>
@@ -271,14 +277,14 @@ export default function AdminPlayerDetail() {
         const red   = wallet.total_redeemed_cents   || 0;
         const with_ = wallet.total_withdrawn_cents  || 0;
         const scr   = wallet.total_loaded_cents     || 0;
-        const profit  = dep - red;
+        const profit  = dep - with_;
         const balance = scr - red;
         const cards = [
           { label: 'Total Deposit',  cents: dep,     color: '#60a5fa' },
-          { label: 'Total Redeem',   cents: red,     color: '#a78bfa' },
+          { label: 'Total Withdraw', cents: with_,   color: '#f59e0b' },
           { label: 'Total Profit',   cents: profit,  color: profit >= 0 ? '#10b981' : '#f87171' },
           { label: 'Total Scores',   cents: scr,     color: '#60a5fa' },
-          { label: 'Total Withdraw', cents: with_,   color: '#f59e0b' },
+          { label: 'Total Redeem',   cents: red,     color: '#a78bfa' },
           { label: 'Total Balance',  cents: balance, color: balance >= 0 ? '#10b981' : '#f87171' },
         ];
         return (
@@ -327,6 +333,19 @@ export default function AdminPlayerDetail() {
             <InfoRow label="Total Loaded"       value={<MoneyDisplay cents={wallet?.total_loaded_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Redeemed"     value={<MoneyDisplay cents={wallet?.total_redeemed_cents || 0} size="sm" color="#fff" />} />
             <InfoRow label="Total Withdrawn"    value={<MoneyDisplay cents={wallet?.total_withdrawn_cents || 0} size="sm" color="#fff" />} />
+            <button
+              onClick={() => setShowWalletModal(true)}
+              style={{
+                width: '100%', marginTop: 16, padding: '12px',
+                background: 'linear-gradient(135deg,rgba(99,102,241,.25),rgba(129,140,248,.2))',
+                border: '1px solid rgba(99,102,241,.4)', borderRadius: 12,
+                color: '#818cf8', fontSize: 13, fontWeight: 800,
+                cursor: 'pointer', fontFamily: "'Outfit',sans-serif",
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              💳 See Detailed Wallet Overview →
+            </button>
           </div>
         </div>
       )}
