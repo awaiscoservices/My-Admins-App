@@ -1,212 +1,193 @@
-import { useState, useEffect, useCallback } from 'react';
-import AdminLayout from '../../components/layout/AdminLayout';
-import { supabase } from '../../lib/supabase';
+/**
+ * /admin/redemptions  (sidebar label: Redeems)
+ * Design matches Deposits page exactly.
+ */
+import { useEffect, useState } from 'react'
+import Head from 'next/head'
+import { supabase } from '../../lib/supabase'
+import AdminLayout from '../../components/layout/AdminLayout'
+import StatusBadge from '../../components/ui/StatusBadge'
 
+const fmt     = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+
+function ReviewModal({ item, onClose, onAction }) {
+  const [notes, setNotes]       = useState('')
+  const [approvedAmt, setApprovedAmt] = useState(String((item.amount_cents || 0) / 100))
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+
+  async function submit(action) {
+    setSaving(true); setError('')
+    const approved_cents = action === 'approve' ? Math.round(parseFloat(approvedAmt || 0) * 100) : undefined
+    const result = await onAction(item.id, action, notes, approved_cents)
+    if (result?.error) { setError(result.error); setSaving(false) }
+    else onClose()
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
+      <div style={{ background:'#0e1a2e', border:'1px solid rgba(251,191,36,.3)', borderRadius:20, padding:32, width:'100%', maxWidth:480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:18, fontWeight:700, color:'#fff' }}>Review Redemption</h2>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', fontSize:20, cursor:'pointer' }}>✕</button>
+        </div>
+        <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>{item.profiles?.full_name}</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>{item.profiles?.email}</div>
+          <div style={{ fontSize:13, color:'#f59e0b', fontWeight:700, marginTop:8 }}>Requested: {fmt(item.amount_cents)}</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:4 }}>
+            Game: {item.game_accounts?.game_panels?.name} · Account: {item.game_accounts?.game_username}
+          </div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>Ref: {item.reference_id}</div>
+        </div>
+        <div style={{ marginBottom:16 }}>
+          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Approved Amount ($)</label>
+          <input type="number" value={approvedAmt} onChange={e => setApprovedAmt(e.target.value)} step="0.01" min="0"
+            style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', boxSizing:'border-box' }} />
+        </div>
+        <div style={{ marginBottom:20 }}>
+          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Notes (optional)</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Internal note or rejection reason…"
+            style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', resize:'none', boxSizing:'border-box' }} />
+        </div>
+        {error && <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13 }}>⚠ {error}</div>}
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={() => submit('approve')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>✅ Approve</button>
+          <button onClick={() => submit('reject')}  disabled={saving} style={{ flex:1, padding:'11px', background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>❌ Reject</button>
+          <button onClick={onClose} style={{ padding:'11px 16px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.4)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminRedemptions() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // { item, action }
-  const [reason, setReason] = useState('');
-  const [approvedAmount, setApprovedAmount] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [filter, setFilter] = useState('pending');
+  const [items,    setItems]    = useState([])
+  const [filter,   setFilter]   = useState('pending')
+  const [search,   setSearch]   = useState('')
+  const [loading,  setLoading]  = useState(true)
+  const [selected, setSelected] = useState(null)
+  const [toast,    setToast]    = useState(null)
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('redemptions')
-      .select(`
-        id, status, requested_amount_cents, approved_amount_cents,
-        game_account_id, idempotency_key, created_at, updated_at,
-        players:player_id (id, display_name, email),
-        game_accounts:game_account_id (game_username, games:game_id (name))
-      `)
-      .eq('status', filter)
-      .order('created_at', { ascending: true })
-      .limit(100);
-    if (!error) setItems(data || []);
-    setLoading(false);
-  }, [filter]);
+  useEffect(() => { load() }, [filter])
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
 
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
-  };
-
-  const openModal = (item, action) => {
-    setModal({ item, action });
-    setReason('');
-    setApprovedAmount(action === 'approve' ? String((item.requested_amount_cents / 100).toFixed(2)) : '');
-  };
-
-  const closeModal = () => { setModal(null); setReason(''); setApprovedAmount(''); };
-
-  const handleSubmit = async () => {
-    if (!modal) return;
-    if (modal.action === 'reject' && !reason.trim()) {
-      showToast('Reason required for rejection', 'error'); return;
-    }
-    setSubmitting(true);
-    const body = { redemption_id: modal.item.id, action: modal.action, reason };
-    if (modal.action === 'approve' && approvedAmount) {
-      body.approved_amount_cents = Math.round(parseFloat(approvedAmount) * 100);
-    }
+  async function load() {
+    setLoading(true)
     try {
-      const res = await fetch('/api/admin/redemptions/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      showToast(`Redemption ${modal.action}d`);
-      closeModal();
-      fetchItems();
-    } catch (e) {
-      showToast(e.message, 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setItems([]); setLoading(false); return }
+      const res = await fetch(`/api/admin/redemptions/list?status=${filter}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      if (!res.ok) { showToast(d.error || 'Failed to load redemptions', 'error'); setItems([]) }
+      else setItems(d.data || [])
+    } catch (e) { console.error(e); setItems([]) }
+    setLoading(false)
+  }
 
-  const fmt = (cents) => cents != null ? `$${(cents / 100).toFixed(2)}` : '—';
-  const fmtDate = (d) => d ? new Date(d).toLocaleString() : '—';
+  async function handleAction(id, action, notes, approved_cents) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/redemptions/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ redemption_id: id, action, notes, approved_cents }),
+    })
+    const d = await res.json()
+    if (!res.ok) return { error: d.error }
+    showToast(`Redemption ${action}d`)
+    load()
+    return {}
+  }
+
+  const rows = items.filter(r => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return r.profiles?.full_name?.toLowerCase().includes(s) ||
+      r.profiles?.email?.toLowerCase().includes(s) ||
+      r.reference_id?.toLowerCase().includes(s) ||
+      r.game_accounts?.game_username?.toLowerCase().includes(s)
+  })
 
   return (
     <AdminLayout>
-      <div style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: 26, color: '#fbbf24', margin: 0 }}>Redemption Requests</h1>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {['pending', 'approved', 'rejected'].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{
-                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: filter === f ? '#fbbf24' : 'rgba(255,255,255,0.08)',
-                color: filter === f ? '#0f172a' : '#e2e8f0', fontWeight: 600, textTransform: 'capitalize',
-              }}>{f}</button>
-            ))}
-            <button onClick={fetchItems} style={{
-              padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.3)',
-              background: 'transparent', color: '#fbbf24', cursor: 'pointer', fontWeight: 600,
-            }}>↻ Refresh</button>
-          </div>
-        </div>
+      <Head><title>Redeems — Admin</title></Head>
+      {toast && <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999, background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600, fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
+      {selected && <ReviewModal item={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>Loading…</div>
-        ) : items.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>No {filter} redemptions</div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(251,191,36,0.2)' }}>
-                  {['Player','Game / Account','Requested','Approved','Status','Submitted','Actions'].map(h => (
-                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
-                    <td style={{ padding: '12px', color: '#e2e8f0' }}>
-                      <div style={{ fontWeight: 600 }}>{item.players?.display_name || '—'}</div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>{item.players?.email}</div>
-                    </td>
-                    <td style={{ padding: '12px', color: '#e2e8f0' }}>
-                      <div>{item.game_accounts?.games?.name || '—'}</div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>{item.game_accounts?.game_username}</div>
-                    </td>
-                    <td style={{ padding: '12px', color: '#fbbf24', fontWeight: 700 }}>{fmt(item.requested_amount_cents)}</td>
-                    <td style={{ padding: '12px', color: '#4ade80', fontWeight: 700 }}>{fmt(item.approved_amount_cents)}</td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                        background: item.status === 'pending' ? 'rgba(251,191,36,0.15)' : item.status === 'approved' ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)',
-                        color: item.status === 'pending' ? '#fbbf24' : item.status === 'approved' ? '#4ade80' : '#f87171',
-                      }}>{item.status}</span>
-                    </td>
-                    <td style={{ padding: '12px', color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(item.created_at)}</td>
-                    <td style={{ padding: '12px' }}>
-                      {item.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => openModal(item, 'approve')} style={{
-                            padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                            background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600, fontSize: 12,
-                          }}>Approve</button>
-                          <button onClick={() => openModal(item, 'reject')} style={{
-                            padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                            background: 'rgba(248,113,113,0.15)', color: '#f87171', fontWeight: 600, fontSize: 12,
-                          }}>Reject</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div style={{ marginBottom:20 }}>
+        <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', marginBottom:4 }}>Redeems</h1>
+        <p style={{ color:'rgba(255,255,255,.35)', fontSize:13 }}>Review and approve player redemption requests</p>
       </div>
 
-      {/* Modal */}
-      {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1e293b', borderRadius: 16, padding: 32, width: 440, border: '1px solid rgba(251,191,36,0.2)' }}>
-            <h2 style={{ fontFamily: 'Cinzel, serif', color: '#fbbf24', margin: '0 0 20px', fontSize: 20, textTransform: 'capitalize' }}>
-              {modal.action} Redemption
-            </h2>
-            <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8 }}>
-              <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{modal.item.players?.display_name}</div>
-              <div style={{ color: '#94a3b8', fontSize: 13 }}>{modal.item.game_accounts?.games?.name} · {modal.item.game_accounts?.game_username}</div>
-              <div style={{ color: '#fbbf24', fontWeight: 700, marginTop: 6 }}>Requested: {fmt(modal.item.requested_amount_cents)}</div>
-            </div>
-
-            {modal.action === 'approve' && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>Approved Amount ($)</label>
-                <input
-                  type="number" step="0.01" min="0.01"
-                  value={approvedAmount}
-                  onChange={e => setApprovedAmount(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, boxSizing: 'border-box' }}
-                />
-              </div>
-            )}
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>
-                {modal.action === 'reject' ? 'Reason (required)' : 'Note (optional)'}
-              </label>
-              <textarea
-                value={reason} onChange={e => setReason(e.target.value)}
-                rows={3} placeholder={modal.action === 'reject' ? 'Enter rejection reason…' : 'Optional note…'}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button onClick={closeModal} disabled={submitting} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button onClick={handleSubmit} disabled={submitting} style={{
-                padding: '10px 24px', borderRadius: 8, border: 'none', cursor: submitting ? 'not-allowed' : 'pointer', fontWeight: 700,
-                background: modal.action === 'approve' ? '#4ade80' : '#f87171',
-                color: '#0f172a', opacity: submitting ? 0.7 : 1, textTransform: 'capitalize',
-              }}>{submitting ? 'Processing…' : modal.action}</button>
-            </div>
-          </div>
+      <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
+        <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
+          {['all','pending','approved','partial','rejected'].map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
+          ))}
         </div>
-      )}
+        <input type="text" placeholder="Search player, email, reference, account…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ padding:'9px 14px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', minWidth:260 }} />
+      </div>
 
-      {/* Toast */}
-      {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '12px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 2000, background: toast.type === 'error' ? '#f87171' : '#4ade80', color: '#0f172a' }}>
-          {toast.msg}
+      <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, overflow:'hidden' }}>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ background:'rgba(255,255,255,.04)' }}>
+                {['Reference','Player','Game Account','Requested','Approved','Status','Date','Actions'].map(h => (
+                  <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={8} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
+                  {filter === 'pending' ? '✅ No pending redeems!' : 'No redemptions found'}
+                </td></tr>
+              ) : rows.map(r => (
+                <tr key={r.id} style={{ borderTop:'1px solid rgba(255,255,255,.04)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding:'12px 14px' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', fontFamily:'monospace' }}>{r.reference_id}</div>
+                  </td>
+                  <td style={{ padding:'12px 14px' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{r.profiles?.full_name || '—'}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                  </td>
+                  <td style={{ padding:'12px 14px' }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{r.game_accounts?.game_panels?.name || '—'}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.game_accounts?.game_username}</div>
+                  </td>
+                  <td style={{ padding:'12px 14px' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#f59e0b' }}>{fmt(r.amount_cents)}</div>
+                  </td>
+                  <td style={{ padding:'12px 14px', fontSize:13, color: r.approved_cents > 0 ? '#22c55e' : 'rgba(255,255,255,.25)', fontWeight:700 }}>
+                    {r.approved_cents > 0 ? fmt(r.approved_cents) : '—'}
+                  </td>
+                  <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
+                  <td style={{ padding:'12px 14px', fontSize:11, color:'rgba(255,255,255,.3)', whiteSpace:'nowrap' }}>{fmtDate(r.created_at)}</td>
+                  <td style={{ padding:'12px 14px' }}>
+                    {r.status === 'pending' ? (
+                      <button onClick={() => setSelected(r)} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:8, color:'#050505', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
+                        ⚡ Review
+                      </button>
+                    ) : (
+                      <span style={{ fontSize:11, color:'rgba(255,255,255,.25)' }}>Done</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </AdminLayout>
-  );
+  )
 }

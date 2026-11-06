@@ -1,87 +1,161 @@
-import { useState } from 'react';
-import AdminLayout from '../../components/layout/AdminLayout';
-import { supabase } from '../../lib/supabase';
+/**
+ * /admin/wallets
+ *
+ * Admin — Wallet overview
+ * Browse player wallets: balances, lifetime totals, search by name/email.
+ * Links to player detail page for adjustments.
+ * Roles: super_admin, admin, finance
+ */
+import { useEffect, useState, useCallback } from 'react'
+import Head from 'next/head'
+import { supabase } from '../../lib/supabase'
+import AdminLayout from '../../components/layout/AdminLayout'
 
-const Tile = ({ label, value, color = '#e2e8f0' }) => (
-  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '16px 20px', border: '1px solid rgba(255,255,255,0.06)' }}>
-    <div style={{ color: '#64748b', fontSize: 12, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</div>
-    <div style={{ color, fontSize: 22, fontWeight: 700 }}>{value}</div>
-  </div>
-);
+const fmt = cents => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
 export default function AdminWallets() {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [wallet, setWallet] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [wallets,  setWallets]  = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [toast,    setToast]    = useState(null)
+  const [role,     setRole]     = useState('')
+  const [page,     setPage]     = useState(0)
+  const PAGE_SIZE = 50
 
-  const showToast = (msg, type='success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
+  useEffect(() => { load() }, [page])
 
-  const search = async () => {
-    if (!query.trim()) return;
-    setLoading(true);
-    const { data } = await supabase.from('players').select('id, display_name, email, kyc_status, created_at').or(`email.ilike.%${query}%,display_name.ilike.%${query}%`).limit(20);
-    setResults(data || []);
-    setSelected(null); setWallet(null);
-    setLoading(false);
-  };
+  function showToast(msg, type = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
 
-  const selectPlayer = async (player) => {
-    setSelected(player);
-    const { data } = await supabase.from('wallets').select('*').eq('player_id', player.id).single();
-    setWallet(data);
-  };
+  async function load() {
+    setLoading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setLoading(false); return }
 
-  const fmt = cents => cents != null ? `$${(cents/100).toFixed(2)}` : '—';
-  const fmtDate = d => d ? new Date(d).toLocaleDateString() : '—';
+    const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    setRole(p?.role || '')
+
+    const { data, error } = await supabase
+      .from('wallets')
+      .select(`
+        id, user_id, cash_balance_cents, bonus_balance_cents,
+        total_deposited_cents, total_withdrawn_cents, total_loaded_cents, total_redeemed_cents,
+        updated_at,
+        profiles ( full_name, email, player_levels ( name, accent_color ) )
+      `)
+      .order('cash_balance_cents', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    if (error) { showToast(error.message, 'error'); setLoading(false); return }
+    setWallets(data || [])
+    setLoading(false)
+  }
+
+  const filtered = wallets.filter(w => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      w.profiles?.full_name?.toLowerCase().includes(q) ||
+      w.profiles?.email?.toLowerCase().includes(q)
+    )
+  })
+
+  const canAdjust = ['super_admin', 'admin'].includes(role)
 
   return (
     <AdminLayout>
-      <div style={{ padding: 24 }}>
-        <h1 style={{ fontFamily: 'Cinzel,serif', fontSize: 26, color: '#fbbf24', margin: '0 0 24px' }}>Player Wallets</h1>
+      <Head><title>Wallets — Admin</title></Head>
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-          <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="Search by email or display name…" style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, outline: 'none' }} />
-          <button onClick={search} disabled={loading} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#fbbf24', color: '#0f172a', fontWeight: 700 }}>Search</button>
+      {toast && (
+        <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999,
+          background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)',
+          borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600,
+          fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
+          {toast.msg}
         </div>
+      )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: results.length>0?'300px 1fr':'1fr', gap: 20 }}>
-          {results.length > 0 && (
-            <div>
-              {results.map(p => (
-                <div key={p.id} onClick={() => selectPlayer(p)} style={{ padding: '12px 14px', marginBottom: 6, borderRadius: 10, border: `1px solid ${selected?.id===p.id?'rgba(251,191,36,0.4)':'rgba(255,255,255,0.06)'}`, background: selected?.id===p.id?'rgba(251,191,36,0.05)':'rgba(255,255,255,0.02)', cursor: 'pointer' }}>
-                  <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{p.display_name||'—'}</div>
-                  <div style={{ color: '#64748b', fontSize: 12 }}>{p.email}</div>
-                  <div style={{ color: p.kyc_status==='verified'?'#4ade80':'#fbbf24', fontSize: 11, marginTop: 4, textTransform: 'uppercase', fontWeight: 700 }}>{p.kyc_status||'unverified'}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selected && wallet && (
-            <div>
-              <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 20, marginBottom: 16 }}>
-                <div style={{ fontFamily: 'Cinzel,serif', color: '#fbbf24', fontSize: 18, marginBottom: 4 }}>{selected.display_name}</div>
-                <div style={{ color: '#64748b', fontSize: 13 }}>{selected.email} · Joined {fmtDate(selected.created_at)}</div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
-                <Tile label="Cash Balance" value={fmt(wallet.cash_balance_cents)} color="#fbbf24" />
-                <Tile label="Withdrawable" value={fmt(wallet.withdrawable_cents)} color="#4ade80" />
-                <Tile label="Reserved" value={fmt(wallet.reserved_cents)} color="#f87171" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                <Tile label="Bonus" value={fmt(wallet.bonus_cents)} color="#a78bfa" />
-                <Tile label="XP Points" value={(wallet.xp_points||0).toLocaleString()} color="#38bdf8" />
-                <Tile label="Level" value={wallet.level||1} color="#fb923c" />
-              </div>
-            </div>
-          )}
-          {selected && !wallet && <div style={{ color: '#94a3b8', padding: 40, textAlign: 'center' }}>No wallet found for this player</div>}
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', margin:0 }}>Wallets</h1>
+          <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Player balance overview — adjust via player profile</p>
         </div>
+        <input
+          type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search name or email…"
+          style={{ padding:'9px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', width:220 }}
+        />
       </div>
-      {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '12px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 2000, background: toast.type==='error'?'#f87171':'#4ade80', color: '#0f172a' }}>{toast.msg}</div>}
+
+      {loading ? (
+        <div style={{ padding:60, textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</div>
+      ) : (
+        <>
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr style={{ borderBottom:'1px solid rgba(255,255,255,.08)' }}>
+                  {['Player', 'Level', 'Cash Balance', 'Bonus Balance', 'Total Deposited', 'Total Withdrawn', 'Total Loaded', 'Total Redeemed', ''].map(h => (
+                    <th key={h} style={{ padding:'10px 12px', textAlign: h === '' ? 'center' : 'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(w => {
+                  const accent = w.profiles?.player_levels?.accent_color || '#fbbf24'
+                  return (
+                    <tr key={w.id} style={{ borderBottom:'1px solid rgba(255,255,255,.04)', transition:'background .15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.025)'}
+                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      <td style={{ padding:'12px 12px' }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{w.profiles?.full_name || '—'}</div>
+                        <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>{w.profiles?.email}</div>
+                      </td>
+                      <td style={{ padding:'12px 12px' }}>
+                        {w.profiles?.player_levels ? (
+                          <span style={{ padding:'3px 8px', borderRadius:20, fontSize:11, fontWeight:700, background:`${accent}22`, color:accent }}>
+                            {w.profiles.player_levels.name}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding:'12px 12px', fontWeight:800, color:'#22c55e' }}>{fmt(w.cash_balance_cents)}</td>
+                      <td style={{ padding:'12px 12px', fontWeight:700, color:'#818cf8' }}>{fmt(w.bonus_balance_cents)}</td>
+                      <td style={{ padding:'12px 12px', color:'rgba(255,255,255,.6)' }}>{fmt(w.total_deposited_cents)}</td>
+                      <td style={{ padding:'12px 12px', color:'rgba(255,255,255,.6)' }}>{fmt(w.total_withdrawn_cents)}</td>
+                      <td style={{ padding:'12px 12px', color:'rgba(255,255,255,.6)' }}>{fmt(w.total_loaded_cents)}</td>
+                      <td style={{ padding:'12px 12px', color:'rgba(255,255,255,.6)' }}>{fmt(w.total_redeemed_cents)}</td>
+                      <td style={{ padding:'12px 12px', textAlign:'center' }}>
+                        {canAdjust && (
+                          <a href={`/admin/players/${w.user_id}`} style={{ padding:'6px 12px', background:'rgba(251,191,36,.1)', border:'1px solid rgba(251,191,36,.25)', borderRadius:7, color:'#fbbf24', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", textDecoration:'none', whiteSpace:'nowrap' }}>
+                            View / Adjust
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div style={{ display:'flex', gap:10, justifyContent:'center', marginTop:20 }}>
+            {page > 0 && (
+              <button onClick={() => setPage(p => p - 1)} style={{ padding:'8px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.6)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                ← Prev
+              </button>
+            )}
+            {wallets.length === PAGE_SIZE && (
+              <button onClick={() => setPage(p => p + 1)} style={{ padding:'8px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.6)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                Next →
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </AdminLayout>
-  );
+  )
 }

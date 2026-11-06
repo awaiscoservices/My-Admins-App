@@ -1,132 +1,212 @@
-import { useState, useEffect } from 'react';
-import AdminLayout from '../../components/layout/AdminLayout';
-import { supabase } from '../../lib/supabase';
+import { useEffect, useState } from 'react'
+import Head from 'next/head'
+import { supabase } from '../../lib/supabase'
+import AdminLayout from '../../components/layout/AdminLayout'
+import StatusBadge from '../../components/ui/StatusBadge'
 
-const emptyForm = { name:'', type:'deposit_bonus', bonus_amount_cents:'', min_deposit_cents:'', start_date:'', end_date:'', active: true };
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+const fmt = c => c != null ? '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'
+
+function PromoModal({ promo, onClose, onSave }) {
+  const isNew = !promo
+  const [form, setForm] = useState({
+    name: promo?.name || '',
+    type: promo?.type || 'deposit_bonus',
+    bonus_percent: promo?.bonus_percent || '',
+    max_bonus_cents: promo?.max_bonus_cents ? (promo.max_bonus_cents / 100).toFixed(2) : '',
+    min_deposit_cents: promo?.min_deposit_cents ? (promo.min_deposit_cents / 100).toFixed(2) : '',
+    wagering_requirement: promo?.wagering_requirement || '',
+    starts_at: promo?.starts_at ? promo.starts_at.slice(0, 10) : '',
+    ends_at: promo?.ends_at ? promo.ends_at.slice(0, 10) : '',
+    is_active: promo?.is_active ?? true,
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit() {
+    if (!form.name.trim()) { setError('Name is required'); return }
+    setSaving(true); setError('')
+    const body = {
+      ...form,
+      max_bonus_cents: form.max_bonus_cents ? Math.round(parseFloat(form.max_bonus_cents) * 100) : null,
+      min_deposit_cents: form.min_deposit_cents ? Math.round(parseFloat(form.min_deposit_cents) * 100) : null,
+      bonus_percent: form.bonus_percent ? parseFloat(form.bonus_percent) : null,
+      wagering_requirement: form.wagering_requirement ? parseFloat(form.wagering_requirement) : null,
+    }
+    const result = await onSave(promo?.id, body)
+    if (result?.error) { setError(result.error); setSaving(false) }
+    else onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>{isNew ? 'Create Promotion' : 'Edit Promotion'}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Promotion Name</label>
+            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Welcome Bonus 100%"
+              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Type</label>
+            <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
+              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
+              {['deposit_bonus', 'free_credit', 'cashback', 'reload'].map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+          {[['bonus_percent', 'Bonus %', '%'], ['wagering_requirement', 'Wagering Req.', 'x']].map(([key, label, suffix]) => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="number" min="0" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder="0"
+                  style={{ flex: 1, padding: '11px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }} />
+                <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>{suffix}</span>
+              </div>
+            </div>
+          ))}
+          {[['max_bonus_cents', 'Max Bonus ($)'], ['min_deposit_cents', 'Min Deposit ($)']].map(([key, label]) => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>$</span>
+                <input type="number" min="0" step="0.01" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder="0.00"
+                  style={{ flex: 1, padding: '11px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }} />
+              </div>
+            </div>
+          ))}
+          {[['starts_at', 'Start Date'], ['ends_at', 'End Date']].map(([key, label]) => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
+              <input type="date" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+          ))}
+          <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => setForm(p => ({ ...p, is_active: !p.is_active }))} style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: 'pointer', background: form.is_active ? '#22c55e' : 'rgba(255,255,255,.15)', position: 'relative', transition: 'background .2s' }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: form.is_active ? 21 : 3, transition: 'left .2s' }} />
+            </button>
+            <span style={{ fontSize: 13, color: form.is_active ? '#22c55e' : 'rgba(255,255,255,.35)' }}>{form.is_active ? 'Active' : 'Inactive'}</span>
+          </div>
+        </div>
+        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>{saving ? 'Saving…' : isNew ? 'Create' : 'Save'}</button>
+          <button onClick={onClose} style={{ padding: '11px 16px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.4)', fontSize: 13, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminPromotions() {
-  const [promos, setPromos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [rows, setRows] = useState([])
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(undefined)
+  const [toast, setToast] = useState(null)
 
-  const fetchPromos = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
-    setPromos(data || []);
-    setLoading(false);
-  };
+  useEffect(() => { load() }, [filter])
 
-  useEffect(() => { fetchPromos(); }, []);
+  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
 
-  const showToast = (msg, t='success') => { setToast({ msg, type: t }); setTimeout(() => setToast(null), 4000); };
-
-  const openAdd = () => { setForm(emptyForm); setModal('add'); };
-  const openEdit = (p) => {
-    setForm({ name: p.name, type: p.type, bonus_amount_cents: p.bonus_amount_cents ? (p.bonus_amount_cents/100).toFixed(2) : '', min_deposit_cents: p.min_deposit_cents ? (p.min_deposit_cents/100).toFixed(2) : '', start_date: p.start_date?.slice(0,10)||'', end_date: p.end_date?.slice(0,10)||'', active: p.active });
-    setModal(p);
-  };
-
-  const handleSave = async () => {
-    if (!form.name.trim()) { showToast('Name required','error'); return; }
-    setSubmitting(true);
+  async function load() {
+    setLoading(true)
     try {
-      const body = {
-        promo_id: typeof modal === 'object' && modal !== 'add' ? modal.id : null,
-        name: form.name.trim(), type: form.type,
-        bonus_amount_cents: form.bonus_amount_cents ? Math.round(parseFloat(form.bonus_amount_cents)*100) : null,
-        min_deposit_cents: form.min_deposit_cents ? Math.round(parseFloat(form.min_deposit_cents)*100) : null,
-        start_date: form.start_date||null, end_date: form.end_date||null, active: form.active,
-      };
-      const res = await fetch('/api/admin/promotions/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error||'Failed');
-      showToast(body.promo_id ? 'Promotion updated' : 'Promotion created');
-      setModal(null); fetchPromos();
-    } catch (e) { showToast(e.message,'error'); }
-    finally { setSubmitting(false); }
-  };
+      const { data: { session } } = await supabase.auth.getSession()
+      const params = new URLSearchParams({ is_active: filter === 'active' ? 'true' : filter === 'inactive' ? 'false' : '' })
+      const res = await fetch(`/api/admin/promotions/list?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      setRows(d.rows || d.promotions || [])
+    } catch (e) { console.error('Failed to load promotions', e); setRows([]) }
+    setLoading(false)
+  }
 
-  const fmt = cents => cents != null ? `$${(cents/100).toFixed(2)}` : '—';
+  async function handleSave(id, form) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/promotions/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify(id ? { promo_id: id, ...form } : form),
+    })
+    const d = await res.json()
+    if (!res.ok) return { error: d.error }
+    showToast(id ? 'Promotion updated' : 'Promotion created')
+    load()
+    return {}
+  }
+
+  const filtered = rows.filter(r => {
+    if (!search) return true
+    return r.name?.toLowerCase().includes(search.toLowerCase())
+  })
 
   return (
     <AdminLayout>
-      <div style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h1 style={{ fontFamily: 'Cinzel,serif', fontSize: 26, color: '#fbbf24', margin: 0 }}>Promotions</h1>
-          <button onClick={openAdd} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#fbbf24', color: '#0f172a', fontWeight: 700 }}>+ Create Promo</button>
-        </div>
+      <Head><title>Promotions — Admin</title></Head>
+      {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
+      {selected !== undefined && <PromoModal promo={selected || null} onClose={() => setSelected(undefined)} onSave={handleSave} />}
 
-        {loading ? <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>Loading…</div>
-        : promos.length === 0 ? <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>No promotions yet</div>
-        : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead><tr style={{ borderBottom: '1px solid rgba(251,191,36,0.2)' }}>
-                {['Name','Type','Bonus','Min Deposit','Dates','Status','Actions'].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {promos.map((p,i) => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: i%2===0?'rgba(255,255,255,0.02)':'transparent' }}>
-                    <td style={{ padding: '10px 12px', color: '#e2e8f0', fontWeight: 600 }}>{p.name}</td>
-                    <td style={{ padding: '10px 12px', color: '#94a3b8', textTransform: 'capitalize' }}>{p.type?.replace(/_/g,' ')}</td>
-                    <td style={{ padding: '10px 12px', color: '#fbbf24', fontWeight: 700 }}>{fmt(p.bonus_amount_cents)}</td>
-                    <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>{fmt(p.min_deposit_cents)}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{p.start_date?.slice(0,10)||'—'} → {p.end_date?.slice(0,10)||'—'}</td>
-                    <td style={{ padding: '10px 12px' }}><span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: p.active?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)', color: p.active?'#4ade80':'#64748b' }}>{p.active?'Active':'Inactive'}</span></td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <button onClick={() => openEdit(p)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#e2e8f0', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Edit</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Promotions</h1>
+          <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Manage deposit bonuses and promotional offers</p>
+        </div>
+        <button onClick={() => setSelected(null)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>+ Create Promo</button>
       </div>
 
-      {modal !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1e293b', borderRadius: 16, padding: 32, width: 460, border: '1px solid rgba(251,191,36,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ fontFamily: 'Cinzel,serif', color: '#fbbf24', margin: '0 0 20px', fontSize: 20 }}>{modal==='add'?'Create Promotion':'Edit Promotion'}</h2>
-            {[['name','Promo name'],['bonus_amount_cents','Bonus amount ($)'],['min_deposit_cents','Min deposit ($)']].map(([f,lbl]) => (
-              <div key={f} style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>{lbl}</label>
-                <input value={form[f]} onChange={e=>setForm(ff=>({...ff,[f]:e.target.value}))} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-            ))}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>Type</label>
-              <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: '#1e293b', color: '#e2e8f0', fontSize: 14 }}>
-                {['deposit_bonus','free_spin','cashback','referral','vip_reward'].map(t => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              {[['start_date','Start date'],['end_date','End date']].map(([f,lbl]) => (
-                <div key={f}>
-                  <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>{lbl}</label>
-                  <input type="date" value={form[f]} onChange={e=>setForm(ff=>({...ff,[f]:e.target.value}))} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: '#1e293b', color: '#e2e8f0', fontSize: 14 }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.active} onChange={e=>setForm(f=>({...f,active:e.target.checked}))} />
-                <span style={{ color: '#e2e8f0', fontSize: 14 }}>Active</span>
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button onClick={() => setModal(null)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button onClick={handleSave} disabled={submitting} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, background: '#fbbf24', color: '#0f172a', opacity: submitting?0.7:1 }}>{submitting?'Saving…':'Save'}</button>
-            </div>
-          </div>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10 }}>
+          {['all', 'active', 'inactive'].map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
+          ))}
         </div>
-      )}
-      {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '12px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 2000, background: toast.type==='error'?'#f87171':'#4ade80', color: '#0f172a' }}>{toast.msg}</div>}
+        <input type="text" placeholder="Search promotion…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 220 }} />
+      </div>
+
+      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
+                {['Name', 'Type', 'Bonus', 'Max Bonus', 'Min Deposit', 'Wagering', 'Period', 'Status', 'Actions'].map(h => (
+                  <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No promotions found</td></tr>
+              : filtered.map(r => (
+                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.name}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7', textTransform: 'capitalize' }}>{r.type?.replace(/_/g, ' ')}</span>
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fbbf24' }}>{r.bonus_percent ? r.bonus_percent + '%' : '—'}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: '#22c55e' }}>{fmt(r.max_bonus_cents)}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{fmt(r.min_deposit_cents)}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.wagering_requirement ? r.wagering_requirement + 'x' : '—'}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.starts_at)} → {fmtDate(r.ends_at)}</td>
+                  <td style={{ padding: '12px 14px' }}><StatusBadge status={r.is_active ? 'active' : 'inactive'} size="xs" /></td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Edit</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </AdminLayout>
-  );
+  )
 }

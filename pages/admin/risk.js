@@ -1,153 +1,160 @@
-import { useState, useEffect, useCallback } from 'react';
-import AdminLayout from '../../components/layout/AdminLayout';
-import { supabase } from '../../lib/supabase';
+import { useEffect, useState } from 'react'
+import Head from 'next/head'
+import { supabase } from '../../lib/supabase'
+import AdminLayout from '../../components/layout/AdminLayout'
+import StatusBadge from '../../components/ui/StatusBadge'
+
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+
+const SEVERITY_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#fbbf24', low: '#22c55e' }
+
+function FlagModal({ flag, onClose, onAction }) {
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(action) {
+    setSaving(true); setError('')
+    const result = await onAction(flag.id, action, notes)
+    if (result?.error) { setError(result.error); setSaving(false) }
+    else onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>Risk Flag Review</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: (SEVERITY_COLORS[flag.severity] || '#fbbf24') + '22', color: SEVERITY_COLORS[flag.severity] || '#fbbf24', textTransform: 'uppercase' }}>{flag.severity}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{flag.flag_type?.replace(/_/g, ' ')}</span>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{flag.profiles?.full_name}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{flag.profiles?.email}</div>
+          {flag.details && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 8, lineHeight: 1.5 }}>{typeof flag.details === 'string' ? flag.details : JSON.stringify(flag.details, null, 2)}</div>}
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Resolution Notes</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Investigation findings or action taken…"
+            style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+        </div>
+        {error && <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => submit('resolve')} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#22c55e,#16a34a)', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>✅ Resolve</button>
+          <button onClick={() => submit('escalate')} disabled={saving} style={{ flex: 1, padding: '11px', background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>🚨 Escalate</button>
+          <button onClick={onClose} style={{ padding: '11px 16px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.4)', fontSize: 13, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminRisk() {
-  const [flags, setFlags] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // { player_id, action }
-  const [note, setNote] = useState('');
-  const [reason, setReason] = useState('');
-  const [playerSearch, setPlayerSearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [filter, setFilter] = useState('active');
+  const [rows, setRows] = useState([])
+  const [filter, setFilter] = useState('open')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(null)
+  const [toast, setToast] = useState(null)
 
-  const fetchFlags = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase.from('risk_flags')
-      .select('id, reason, note, status, created_at, resolved_at, players:player_id(id, display_name, email)')
-      .eq('status', filter).order('created_at', { ascending: false }).limit(100);
-    setFlags(data || []);
-    setLoading(false);
-  }, [filter]);
+  useEffect(() => { load() }, [filter])
 
-  useEffect(() => { fetchFlags(); }, [fetchFlags]);
+  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
 
-  const showToast = (msg, t='success') => { setToast({ msg, type: t }); setTimeout(() => setToast(null), 4000); };
-
-  const searchPlayers = async () => {
-    if (!playerSearch.trim()) return;
-    const { data } = await supabase.from('players').select('id, display_name, email').or(`email.ilike.%${playerSearch}%,display_name.ilike.%${playerSearch}%`).limit(5);
-    setSearchResults(data||[]);
-  };
-
-  const openFlag = (player) => { setModal({ player, action: 'flag' }); setReason(''); setNote(''); setSearchResults([]); setPlayerSearch(''); };
-  const openUnflag = (flag) => { setModal({ flag, action: 'unflag' }); setNote(''); };
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
+  async function load() {
+    setLoading(true)
     try {
-      const body = modal.action === 'flag'
-        ? { action: 'flag', player_id: modal.player.id, reason, note }
-        : { action: 'unflag', flag_id: modal.flag.id, note };
-      const res = await fetch('/api/admin/risk/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error||'Failed');
-      showToast(modal.action === 'flag' ? 'Player flagged' : 'Flag resolved');
-      setModal(null); fetchFlags();
-    } catch (e) { showToast(e.message,'error'); }
-    finally { setSubmitting(false); }
-  };
+      const { data: { session } } = await supabase.auth.getSession()
+      const params = new URLSearchParams({ limit: '100' })
+      const res = await fetch(`/api/admin/risk/list?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      setRows(d.rows || [])
+    } catch (e) { console.error('Failed to load risk flags', e); setRows([]) }
+    setLoading(false)
+  }
 
-  const fmtDate = d => d ? new Date(d).toLocaleString() : '—';
+  async function handleAction(id, action, notes) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/admin/risk/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ flag_id: id, action, notes }),
+    })
+    const d = await res.json()
+    if (!res.ok) return { error: d.error }
+    showToast(`Flag ${action}d`)
+    load()
+    return {}
+  }
+
+  const filtered = rows.filter(r => {
+    if (!search) return true
+    const s = search.toLowerCase()
+    return r.profiles?.full_name?.toLowerCase().includes(s) || r.profiles?.email?.toLowerCase().includes(s) || r.flag_type?.toLowerCase().includes(s)
+  })
 
   return (
     <AdminLayout>
-      <div style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h1 style={{ fontFamily: 'Cinzel,serif', fontSize: 26, color: '#fbbf24', margin: 0 }}>Risk Monitoring</h1>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {['active','resolved'].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: filter===f?'#fbbf24':'rgba(255,255,255,0.08)', color: filter===f?'#0f172a':'#e2e8f0', fontWeight: 600, textTransform: 'capitalize' }}>{f}</button>
-            ))}
-            <button onClick={() => setModal({ action: 'flag' })} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(248,113,113,0.15)', color: '#f87171', fontWeight: 700 }}>+ Flag Player</button>
-            <button onClick={fetchFlags} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.3)', background: 'transparent', color: '#fbbf24', cursor: 'pointer', fontWeight: 600 }}>↻</button>
-          </div>
-        </div>
+      <Head><title>Risk — Admin</title></Head>
+      {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
+      {selected && <FlagModal flag={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
 
-        {loading ? <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>Loading…</div>
-        : flags.length === 0 ? <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}>No {filter} flags</div>
-        : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead><tr style={{ borderBottom: '1px solid rgba(251,191,36,0.2)' }}>
-                {['Player','Reason','Note','Flagged','Actions'].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {flags.map((f,i) => (
-                  <tr key={f.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: i%2===0?'rgba(255,255,255,0.02)':'transparent' }}>
-                    <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>
-                      <div style={{ fontWeight: 600 }}>{f.players?.display_name||'—'}</div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>{f.players?.email}</div>
-                    </td>
-                    <td style={{ padding: '10px 12px', color: '#f87171', fontSize: 13 }}>{f.reason||'—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#94a3b8', fontSize: 13, maxWidth: 200 }}>{f.note||'—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(f.created_at)}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {f.status === 'active' && <button onClick={() => openUnflag(f)} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600, fontSize: 12 }}>Resolve</button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Risk Flags</h1>
+        <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Review and resolve player risk alerts</p>
       </div>
 
-      {/* Flag / unflag modal */}
-      {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1e293b', borderRadius: 16, padding: 32, width: 420, border: '1px solid rgba(251,191,36,0.2)' }}>
-            <h2 style={{ fontFamily: 'Cinzel,serif', color: '#fbbf24', margin: '0 0 20px', fontSize: 20 }}>{modal.action === 'flag' ? 'Flag Player' : 'Resolve Flag'}</h2>
-
-            {modal.action === 'flag' && !modal.player && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <input value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&searchPlayers()} placeholder="Search player…" style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, outline: 'none' }} />
-                  <button onClick={searchPlayers} style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: '#fbbf24', color: '#0f172a', cursor: 'pointer', fontWeight: 700 }}>Find</button>
-                </div>
-                {searchResults.map(p => <div key={p.id} onClick={() => setModal(m=>({...m,player:p}))} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', cursor: 'pointer', marginBottom: 4, border: '1px solid rgba(255,255,255,0.06)' }}><span style={{ color: '#e2e8f0', fontWeight: 600 }}>{p.display_name}</span><span style={{ color: '#64748b', fontSize: 12, marginLeft: 8 }}>{p.email}</span></div>)}
-              </div>
-            )}
-
-            {modal.action === 'flag' && modal.player && (
-              <div style={{ padding: 12, background: 'rgba(248,113,113,0.08)', borderRadius: 8, border: '1px solid rgba(248,113,113,0.2)', marginBottom: 14 }}>
-                <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{modal.player.display_name}</div>
-                <div style={{ color: '#64748b', fontSize: 12 }}>{modal.player.email}</div>
-              </div>
-            )}
-
-            {modal.action === 'unflag' && (
-              <div style={{ padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8, marginBottom: 14 }}>
-                <div style={{ color: '#f87171', fontSize: 13 }}>{modal.flag?.reason}</div>
-                <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{modal.flag?.players?.display_name}</div>
-              </div>
-            )}
-
-            {modal.action === 'flag' && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>Reason (required)</label>
-                <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="e.g. High withdrawal frequency" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, boxSizing: 'border-box' }} />
-              </div>
-            )}
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>Note (optional)</label>
-              <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3} placeholder="Additional context…" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button onClick={() => setModal(null)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button onClick={handleSubmit} disabled={submitting||(modal.action==='flag'&&!modal.player)} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, background: modal.action==='flag'?'#f87171':'#4ade80', color: '#0f172a', opacity: submitting?0.7:1 }}>{submitting?'Processing…':modal.action==='flag'?'Flag Player':'Resolve'}</button>
-            </div>
-          </div>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10 }}>
+          {['all', 'open', 'escalated', 'resolved'].map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
+          ))}
         </div>
-      )}
-      {toast && <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '12px 20px', borderRadius: 10, fontWeight: 600, fontSize: 14, zIndex: 2000, background: toast.type==='error'?'#f87171':'#4ade80', color: '#0f172a' }}>{toast.msg}</div>}
+        <input type="text" placeholder="Search player, email, flag type…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }} />
+      </div>
+
+      <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
+                {['Player', 'Flag Type', 'Severity', 'Status', 'Flagged', 'Actions'].map(h => (
+                  <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'open' ? '✅ No open risk flags!' : 'No risk flags found'}</td></tr>
+              : filtered.map(r => (
+                <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.profiles?.full_name}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24', fontWeight: 600, textTransform: 'capitalize' }}>{r.flag_type?.replace(/_/g, ' ')}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: (SEVERITY_COLORS[r.severity] || '#fbbf24') + '22', color: SEVERITY_COLORS[r.severity] || '#fbbf24', textTransform: 'uppercase' }}>{r.severity}</span>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
+                  <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    {r.status === 'open' && <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 8, color: '#050505', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Review</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </AdminLayout>
-  );
+  )
 }
