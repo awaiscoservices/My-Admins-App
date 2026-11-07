@@ -6,21 +6,15 @@ import { supabase } from '../../lib/supabase'
 import { centsToDisplay } from '../ui/MoneyDisplay'
 import Logo from '../ui/Logo'
 
-// Edit this text to change the strip under the top bar. Set to '' to hide it.
 const PROMO_TEXT = 'Welcome to Casinoze Room — add money, load a game and play.'
-
 const GOLD = '#fbbf24'
 
-// Minimal line icons (24x24, stroke only)
 const ICONS = {
   home:     'M3 11l9-8 9 8M5 10v10h14V10',
   games:    'M6 12h4M8 10v4M15 13h.01M18 11h.01M7 7h10a4 4 0 014 4v2a4 4 0 01-4 4l-2-2H9l-2 2a4 4 0 01-4-4v-2a4 4 0 014-4z',
   cards:    'M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2zM9 9h6M9 13h6',
   wallet:   'M3 7h16a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm0 0V6a2 2 0 012-2h11M16 13.5h.01',
   plus:     'M12 5v14M5 12h14',
-  list:     'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
-  trophy:   'M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3',
-  out:      'M7 17L17 7M9 7h8v8',
   star:     'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z',
   users:    'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M9.5 10a4 4 0 100-8 4 4 0 000 8zM21 20v-2a4 4 0 00-3-3.9M16 2.1a4 4 0 010 7.8',
   shield:   'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4',
@@ -40,16 +34,13 @@ function Icon({ name, size = 18, color = 'currentColor' }) {
   )
 }
 
+// Sidebar: Wallet is the hub — Deposit/Transactions/Redeem/Withdraw all removed
 const NAV_GROUPS = [
   { title: 'Main', items: [
-    { href: '/dashboard',               icon: 'home',   label: 'Dashboard'    },
-    { href: '/dashboard/games',         icon: 'games',  label: 'Games'        },
-    { href: '/dashboard/game-accounts', icon: 'cards',  label: 'My Games'     },
-    { href: '/dashboard/wallet',        icon: 'wallet', label: 'Wallet'       },
-    { href: '/dashboard/deposit',       icon: 'plus',   label: 'Add Money'    },
-    { href: '/dashboard/transactions',  icon: 'list',   label: 'Transactions' },
-    { href: '/dashboard/redeem',        icon: 'trophy', label: 'Redeem'       },
-    { href: '/dashboard/withdraw',      icon: 'out',    label: 'Withdraw'     },
+    { href: '/dashboard',               icon: 'home',   label: 'Dashboard' },
+    { href: '/dashboard/games',         icon: 'games',  label: 'Games'     },
+    { href: '/dashboard/game-accounts', icon: 'cards',  label: 'My Games'  },
+    { href: '/dashboard/wallet',        icon: 'wallet', label: 'Wallet'    },
   ]},
   { title: 'Account', items: [
     { href: '/dashboard/rewards',   icon: 'star',   label: 'Player Levels' },
@@ -60,7 +51,6 @@ const NAV_GROUPS = [
   ]},
 ]
 
-// Pill in the top bar: label on top, amount below
 function BalanceChip({ label, cents, accent }) {
   return (
     <Link href="/dashboard/wallet" className="bal-chip" style={{
@@ -75,8 +65,6 @@ function BalanceChip({ label, cents, accent }) {
   )
 }
 
-// Live "recent wins" strip. Reads real rows from a `recent_wins` table/view
-// (columns: id, masked_name, amount_cents, created_at). Renders nothing if there is no data.
 function WinsTicker() {
   const [wins, setWins] = useState([])
   useEffect(() => {
@@ -100,16 +88,14 @@ function WinsTicker() {
   )
 }
 
-// Each player page renders its own PlayerLayout, so it is rebuilt on every click.
-// This cache (lives until the tab is reloaded) keeps balances and the sidebar scroll from resetting.
 const cache = { profile: null, wallet: null, unread: 0, navScroll: 0 }
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 export default function PlayerLayout({ children }) {
   const router = useRouter()
   const [profile, setProfile] = useState(cache.profile)
-  const [wallet, setWallet] = useState(cache.wallet)
-  const [unread, setUnread] = useState(cache.unread)
+  const [wallet, setWallet]   = useState(cache.wallet)
+  const [unread, setUnread]   = useState(cache.unread)
   const navRef = useRef(null)
 
   useIsoLayoutEffect(() => {
@@ -123,38 +109,28 @@ export default function PlayerLayout({ children }) {
     }
     cache.navScroll = nav.scrollTop
   }, [router.pathname])
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
-  const [promoOpen, setPromoOpen] = useState(true)
+  const [signingOut, setSigningOut]   = useState(false)
+  const [promoOpen, setPromoOpen]     = useState(true)
 
   const loadUserData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     try {
-      const ref = localStorage.getItem('referral_code') || localStorage.getItem('cz_ref')
-      if (ref) {
-        await supabase.rpc('apply_referral', { p_code: ref })
-        try { await supabase.from('referrals').insert({ referrer_code: ref, referred_user_id: user.id }) } catch {}   // ignored if already recorded
-        localStorage.removeItem('referral_code'); localStorage.removeItem('cz_ref')
-      }
+      const ref = localStorage.getItem('cz_ref')
+      if (ref) { await supabase.rpc('apply_referral', { p_code: ref }); localStorage.removeItem('cz_ref') }
     } catch {}
     const [{ data: prof }, { data: wal }, { count }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('wallets').select('*').eq('user_id', user.id).single(),
-      supabase.from('notifications').select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id).eq('is_read', false),
+      supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_read', false),
     ])
     cache.profile = prof; cache.wallet = wal; cache.unread = count || 0
     setProfile(prof); setWallet(wal); setUnread(count || 0)
   }, [])
 
   useEffect(() => { loadUserData() }, [loadUserData])
-  useEffect(() => {   // notifications page tells us when something was marked read
-    window.addEventListener('notifications-changed', loadUserData)
-    return () => window.removeEventListener('notifications-changed', loadUserData)
-  }, [loadUserData])
-
-  // keep balances fresh after every page change
   useEffect(() => {
     router.events.on('routeChangeComplete', loadUserData)
     return () => router.events.off('routeChangeComplete', loadUserData)
@@ -164,7 +140,7 @@ export default function PlayerLayout({ children }) {
     setSigningOut(true)
     await supabase.auth.signOut()
     cache.profile = null; cache.wallet = null; cache.unread = 0; cache.navScroll = 0
-    window.location.href = '/'   // full reload to the home page so no old session state lingers
+    window.location.href = '/'
   }
 
   const isActive = (href) =>
@@ -179,13 +155,12 @@ export default function PlayerLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* ── TOP BAR ── */}
+      {/* TOP BAR */}
       <header className="top-header" style={{
         position: 'fixed', top: 0, left: 0, right: 0, height: 64, zIndex: 60,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '0 20px', maxWidth: '100vw',
         background: 'var(--panel-gradient)', backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(251,191,36,.18)',
-        boxShadow: '0 4px 24px rgba(0,0,0,.6)',
+        borderBottom: '1px solid rgba(251,191,36,.18)', boxShadow: '0 4px 24px rgba(0,0,0,.6)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => setSidebarOpen(p => !p)} className="mobile-hamburger" aria-label="Menu"
@@ -193,7 +168,8 @@ export default function PlayerLayout({ children }) {
             <Icon name="menu" size={24} />
           </button>
           <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="logo-full"><Logo variant="full" height={54} /></span><span className="logo-icon"><Logo variant="icon" height={50} /></span>
+            <span className="logo-full"><Logo variant="full" height={54} /></span>
+            <span className="logo-icon"><Logo variant="icon" height={50} /></span>
           </Link>
         </div>
 
@@ -218,11 +194,10 @@ export default function PlayerLayout({ children }) {
         </div>
       </header>
 
-      {/* ── SIDEBAR ── */}
+      {/* SIDEBAR */}
       <aside className={`player-sidebar${sidebarOpen ? ' open' : ''}`} style={{
         position: 'fixed', top: 64, left: 0, bottom: 0, width: 250, zIndex: 50,
-        background: 'var(--panel-gradient)',
-        borderRight: '1px solid rgba(251,191,36,.1)',
+        background: 'var(--panel-gradient)', borderRight: '1px solid rgba(251,191,36,.1)',
         display: 'flex', flexDirection: 'column',
       }}>
         <nav ref={navRef} onScroll={e => { cache.navScroll = e.currentTarget.scrollTop }} style={{ flex: 1, overflowY: 'auto', padding: '14px 12px', scrollbarWidth: 'none' }}>
@@ -265,7 +240,7 @@ export default function PlayerLayout({ children }) {
 
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, top: 64, background: 'rgba(0,0,0,.7)', zIndex: 40 }} />}
 
-      {/* ── MAIN ── */}
+      {/* MAIN */}
       <div className="player-main" style={{ marginLeft: 250, paddingTop: 64, minHeight: '100vh' }}>
         <WinsTicker />
         {showPromo && (
@@ -298,7 +273,6 @@ export default function PlayerLayout({ children }) {
           .player-content { padding: 18px 14px !important; }
           .top-header { padding: 0 12px !important; gap: 8px !important; }
           .header-right { gap: 8px !important; }
-          .logo-icon .logo-mark { height: 42px !important; width: 42px !important; }
           .mobile-hamburger { display: flex !important; }
           .avatar-btn { display: none !important; }
           .bal-chip { min-width: 0 !important; padding: 4px 8px !important; }
