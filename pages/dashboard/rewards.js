@@ -127,25 +127,37 @@ function LevelCard({ level, status, bonusRows }) {
           Redeem Rules
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {/* Wallet sub-panel */}
-          <div style={{
-            background: 'rgba(96,165,250,.06)', border: '1px solid rgba(96,165,250,.18)',
-            borderRadius: 12, padding: '12px 10px',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#93c5fd', marginBottom: 10, textAlign: 'center' }}>💰 Wallet</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {/* Wallet Rules sub-panel */}
+          <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(96,165,250,.4)' }}>
+            {/* Panel header */}
+            <div style={{
+              background: 'rgba(96,165,250,.18)',
+              padding: '8px 12px',
+              borderBottom: '1px solid rgba(96,165,250,.3)',
+              textAlign: 'center',
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#93c5fd' }}>💰 Wallet Rules</span>
+            </div>
+            {/* Panel body */}
+            <div style={{ background: 'rgba(96,165,250,.05)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 7 }}>
               <StatBox label="Min Withdraw"   value={fmt(level.min_withdrawal_cents)} />
               <StatBox label="Max Withdraw"   value={fmt(level.max_withdrawal_cents)} />
               <StatBox label="Limit Duration" value="24 Hours" color="rgba(255,255,255,.6)" />
             </div>
           </div>
-          {/* Game sub-panel */}
-          <div style={{
-            background: 'rgba(167,139,250,.06)', border: '1px solid rgba(167,139,250,.18)',
-            borderRadius: 12, padding: '12px 10px',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#c4b5fd', marginBottom: 10, textAlign: 'center' }}>🎮 Game</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {/* Game Rules sub-panel */}
+          <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(167,139,250,.4)' }}>
+            {/* Panel header */}
+            <div style={{
+              background: 'rgba(167,139,250,.18)',
+              padding: '8px 12px',
+              borderBottom: '1px solid rgba(167,139,250,.3)',
+              textAlign: 'center',
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#c4b5fd' }}>🎮 Game Rules</span>
+            </div>
+            {/* Panel body */}
+            <div style={{ background: 'rgba(167,139,250,.05)', padding: '10px', display: 'flex', flexDirection: 'column', gap: 7 }}>
               <StatBox label="Min Multiplier"   value={fmtX(level.min_redeem_multiplier)} />
               <StatBox label="Max Multiplier"   value={fmtX(level.max_redeem_multiplier)} />
               <StatBox label="Max Redeem Limit" value={fmt(level.max_redeem_cap_cents)} />
@@ -157,7 +169,7 @@ function LevelCard({ level, status, bonusRows }) {
       {/* Deposit Bonuses */}
       <div style={{ padding: '16px 20px' }}>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.75)', marginBottom: 12, textAlign: 'center' }}>
-          Deposit Bonuses — Today
+          Deposit Bonuses
         </div>
         {bonusRows.length === 0 ? (
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', padding: '8px 0', textAlign: 'center' }}>No bonuses configured</div>
