@@ -93,22 +93,30 @@ function LevelCard({ level, isCurrentLevel, reached, bonusRows }) {
         )}
       </div>
 
-      {/* Rules */}
+      {/* Redeem Rules */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)', marginBottom: 12 }}>Rules</div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.75)', marginBottom: 14, textAlign: 'center' }}>
+          Redeem Rules
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {/* Wallet Rules */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#60a5fa', marginBottom: 8 }}>💰 Wallet</div>
+          {/* Wallet sub-panel */}
+          <div style={{
+            background: 'rgba(96,165,250,.06)', border: '1px solid rgba(96,165,250,.18)',
+            borderRadius: 12, padding: '12px 10px',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#93c5fd', marginBottom: 10, textAlign: 'center' }}>💰 Wallet</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <StatBox label="Min Withdraw"     value={fmt(level.min_withdrawal_cents)} />
-              <StatBox label="Max Withdraw"     value={fmt(level.max_withdrawal_cents)} />
-              <StatBox label="Limit Duration"   value="24 Hours" color="rgba(255,255,255,.5)" />
+              <StatBox label="Min Withdraw"   value={fmt(level.min_withdrawal_cents)} />
+              <StatBox label="Max Withdraw"   value={fmt(level.max_withdrawal_cents)} />
+              <StatBox label="Limit Duration" value="24 Hours" color="rgba(255,255,255,.6)" />
             </div>
           </div>
-          {/* Game Rules */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#a78bfa', marginBottom: 8 }}>🎮 Game</div>
+          {/* Game sub-panel */}
+          <div style={{
+            background: 'rgba(167,139,250,.06)', border: '1px solid rgba(167,139,250,.18)',
+            borderRadius: 12, padding: '12px 10px',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: '#c4b5fd', marginBottom: 10, textAlign: 'center' }}>🎮 Game</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <StatBox label="Min Multiplier"   value={fmtX(level.min_redeem_multiplier)} />
               <StatBox label="Max Multiplier"   value={fmtX(level.max_redeem_multiplier)} />
@@ -118,29 +126,29 @@ function LevelCard({ level, isCurrentLevel, reached, bonusRows }) {
         </div>
       </div>
 
-      {/* Bonuses */}
+      {/* Deposit Bonuses */}
       <div style={{ padding: '16px 20px' }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)', marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.75)', marginBottom: 12, textAlign: 'center' }}>
           Deposit Bonuses — Today
         </div>
         {bonusRows.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.25)', padding: '8px 0' }}>No bonuses configured</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', padding: '8px 0', textAlign: 'center' }}>No bonuses configured</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,.07)' }}>
+          <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', padding: '7px 12px', background: 'rgba(255,255,255,.04)' }}>
-              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)' }}>Payment Method</span>
-              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)', textAlign: 'right' }}>Bonus %</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', padding: '8px 14px', background: 'rgba(255,255,255,.07)' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,.65)' }}>Payment Method</span>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,.65)', textAlign: 'right' }}>Bonus %</span>
             </div>
             {bonusRows.map((b, i) => (
               <div key={b.pmId} style={{
                 display: 'grid', gridTemplateColumns: '1fr auto',
-                padding: '9px 12px', alignItems: 'center',
-                background: i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'transparent',
-                borderTop: '1px solid rgba(255,255,255,.04)',
+                padding: '10px 14px', alignItems: 'center',
+                background: i % 2 === 0 ? 'rgba(255,255,255,.03)' : 'transparent',
+                borderTop: '1px solid rgba(255,255,255,.06)',
               }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.75)' }}>{b.pmName}</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>{parseFloat(b.bonus_percent).toFixed(0)}%</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>{b.pmName}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#fbbf24' }}>{parseFloat(b.bonus_percent).toFixed(0)}%</span>
               </div>
             ))}
           </div>
