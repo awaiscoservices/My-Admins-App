@@ -39,57 +39,85 @@ function StatBox({ label, value, color = 'rgba(255,255,255,.85)' }) {
   )
 }
 
+// Default emoji per level name (admin can override via badge_icon)
+const LEVEL_EMOJIS = {
+  bronze:   '🥉',
+  silver:   '🥈',
+  gold:     '🥇',
+  platinum: '💠',
+  diamond:  '💎',
+  elite:    '👑',
+  master:   '🔥',
+  champion: '⚡',
+  legend:   '🏆',
+}
+function levelEmoji(level) {
+  if (level.badge_icon) return level.badge_icon
+  return LEVEL_EMOJIS[level.name?.toLowerCase()] || '⭐'
+}
+
 // ─── Level card ───────────────────────────────────────────────────────────────
-function LevelCard({ level, isCurrentLevel, reached, bonusRows }) {
+// status: 'active' | 'achieved' | 'locked'
+function LevelCard({ level, status, bonusRows }) {
   const accent = level.accent_color || level.badge_color || '#fbbf24'
-  const locked = !reached
+
+  const badgeCfg = {
+    active:   { label: 'Active',   bg: `${accent}25`,              border: `1px solid ${accent}66`,           color: accent,      },
+    achieved: { label: 'Achieved', bg: 'rgba(16,185,129,.18)',      border: '1px solid rgba(16,185,129,.45)',   color: '#34d399',   },
+    locked:   { label: 'Locked',   bg: 'rgba(255,255,255,.07)',     border: '1px solid rgba(255,255,255,.18)',  color: 'rgba(255,255,255,.5)', },
+  }
+  const badge = badgeCfg[status]
+
+  const borderColor = status === 'active'
+    ? accent
+    : status === 'achieved'
+      ? 'rgba(16,185,129,.35)'
+      : 'rgba(255,255,255,.13)'
+
+  const headerBg = status === 'active'
+    ? `linear-gradient(135deg,${accent}18,transparent)`
+    : status === 'achieved'
+      ? 'linear-gradient(135deg,rgba(16,185,129,.08),transparent)'
+      : 'transparent'
 
   return (
     <div style={{
       background: 'rgba(10,22,40,.7)',
-      border: `1px solid ${isCurrentLevel ? accent : locked ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.12)'}`,
+      border: `1px solid ${borderColor}`,
       borderRadius: 18,
-      boxShadow: isCurrentLevel ? `0 0 28px ${accent}30` : 'none',
-      opacity: locked ? 0.55 : 1,
+      boxShadow: status === 'active' ? `0 0 28px ${accent}30` : 'none',
       transition: 'box-shadow .2s',
       overflow: 'hidden',
     }}>
       {/* Card header */}
       <div style={{
         padding: '18px 20px 14px',
-        background: isCurrentLevel
-          ? `linear-gradient(135deg,${accent}18,transparent)`
-          : 'transparent',
+        background: headerBg,
         borderBottom: '1px solid rgba(255,255,255,.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           {/* Icon */}
           <div style={{
             width: 46, height: 46, borderRadius: 12,
-            background: locked ? 'rgba(255,255,255,.06)' : `${accent}22`,
-            border: `2px solid ${locked ? 'rgba(255,255,255,.12)' : accent}`,
+            background: `${accent}22`,
+            border: `2px solid ${status === 'locked' ? 'rgba(255,255,255,.2)' : accent}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 22, flexShrink: 0,
           }}>
-            {locked ? '🔒' : (level.badge_icon || '⭐')}
+            {levelEmoji(level)}
           </div>
-          {/* Badge */}
-          {isCurrentLevel && (
-            <span style={{
-              fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase',
-              padding: '3px 10px', borderRadius: 99,
-              background: `${accent}25`, border: `1px solid ${accent}55`, color: accent,
-            }}>Active</span>
-          )}
-          {locked && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.25)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Locked</span>
-          )}
+          {/* Status badge */}
+          <span style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase',
+            padding: '3px 10px', borderRadius: 99,
+            background: badge.bg, border: badge.border, color: badge.color,
+          }}>{badge.label}</span>
         </div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: isCurrentLevel ? accent : locked ? 'rgba(255,255,255,.4)' : '#fff', fontFamily: "'Cinzel',serif", letterSpacing: '.02em' }}>
+        <div style={{ fontSize: 20, fontWeight: 800, color: status === 'active' ? accent : '#fff', fontFamily: "'Cinzel',serif", letterSpacing: '.02em' }}>
           {level.name}
         </div>
         {level.description && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 3 }}>{level.description}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 3 }}>{level.description}</div>
         )}
       </div>
 
@@ -205,17 +233,22 @@ export default function PlayerLevels() {
   }, [])
 
   // Progress calculation
-  const currentLevel = levels.find(l => l.id === profile?.player_level_id)
+  // Uses sort_order position to determine current level index
   const currentIdx   = levels.findIndex(l => l.id === profile?.player_level_id)
-  const nextLevel    = levels[currentIdx + 1]
+  const currentLevel = currentIdx >= 0 ? levels[currentIdx] : null
+  const nextLevel    = currentIdx >= 0 ? levels[currentIdx + 1] : null
 
   let progressPct = 0
   if (profile && currentLevel && nextLevel) {
-    const xp = profile.total_xp || 0
-    const from = currentLevel.xp_required
-    const to   = nextLevel.xp_required
-    progressPct = Math.min(100, Math.max(0, Math.round(((xp - from) / (to - from)) * 100)))
-  } else if (currentIdx === levels.length - 1 && levels.length > 0) {
+    const xp   = profile.total_xp || 0
+    const from = currentLevel.xp_required || 0
+    const to   = nextLevel.xp_required || 0
+    // Guard: if xp thresholds are equal or bad, show 0%
+    progressPct = (to > from)
+      ? Math.min(100, Math.max(0, Math.round(((xp - from) / (to - from)) * 100)))
+      : 0
+  } else if (currentIdx > 0 && currentIdx === levels.length - 1) {
+    // Truly at max level
     progressPct = 100
   }
 
@@ -276,16 +309,22 @@ export default function PlayerLevels() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          {levels.map(level => {
-            const reached       = (profile?.total_xp || 0) >= level.xp_required
-            const isCurrentLevel = level.id === profile?.player_level_id
-            const bonusRows     = bonusMap[level.id] || []
+          {levels.map((level, idx) => {
+            // Status logic:
+            // idx < currentIdx  → Achieved (completed, below current)
+            // idx === currentIdx → Active   (player's current level)
+            // idx > currentIdx  → Locked   (not yet reached)
+            let status = 'locked'
+            if (currentIdx >= 0) {
+              if (idx < currentIdx)      status = 'achieved'
+              else if (idx === currentIdx) status = 'active'
+            }
+            const bonusRows = bonusMap[level.id] || []
             return (
               <LevelCard
                 key={level.id}
                 level={level}
-                isCurrentLevel={isCurrentLevel}
-                reached={reached}
+                status={status}
                 bonusRows={bonusRows}
               />
             )
