@@ -52,7 +52,7 @@ const NAV_GROUPS = [
     { href: '/dashboard/withdraw',      icon: 'out',    label: 'Withdraw'     },
   ]},
   { title: 'Account', items: [
-    { href: '/dashboard/rewards',   icon: 'star',   label: 'Rewards & VIP' },
+    { href: '/dashboard/rewards',   icon: 'star',   label: 'Player Levels' },
     { href: '/dashboard/referrals', icon: 'users',  label: 'Referrals'     },
     { href: '/dashboard/kyc',       icon: 'shield', label: 'Verification'  },
     { href: '/dashboard/profile',   icon: 'user',   label: 'Profile'       },

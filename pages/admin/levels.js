@@ -2,7 +2,7 @@
  * Admin → Player Levels
  *
  * Simplified schema (no bonus fields, no game-load limits):
- *   • Max Redeem Cap ($) — hard ceiling per game per day, overrides multiplier
+ *   • Max Redeem Limit ($) — hard ceiling per game per day, overrides multiplier
  *   • Min Redeem Multiplier (X) — lowest multiplier for this tier
  *   • Max Redeem Multiplier (X) — highest multiplier for this tier
  *   • Min Withdraw ($) — minimum withdrawal amount
@@ -135,7 +135,7 @@ function LevelDrawer({ level, onClose, onSaved }) {
           {/* Redeem Rules */}
           <Section title="Redeem Rules" subtitle="Redeems link to game balance" color="#a78bfa" mt={20}>
             <Row2>
-              <Field label="Max Redeem Cap ($)" hint="Hard ceiling per game per day">
+              <Field label="Max Redeem Limit ($)" hint="Hard ceiling per game per day">
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,.4)', fontSize: 13 }}>$</span>
                   <input style={{ ...inp, paddingLeft: 22 }} type="number" min="0" step="0.01" value={form.max_redeem_cap_cents} onChange={e => set('max_redeem_cap_cents', e.target.value)} placeholder="500.00" />
@@ -311,7 +311,7 @@ export default function AdminLevels() {
       {/* Legend pills */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { dot: '#a78bfa', label: 'Redeem Cap & Multipliers — link to game balance' },
+          { dot: '#a78bfa', label: 'Redeem Limit & Multipliers — link to game balance' },
           { dot: '#34d399', label: 'Withdraw Limits — link to wallet balance' },
         ].map(({ dot, label }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,.4)' }}>
@@ -330,7 +330,7 @@ export default function AdminLevels() {
                 <TH>#</TH>
                 <TH>Level</TH>
                 <TH>XP Req.</TH>
-                <TH>Max Redeem Cap</TH>
+                <TH>Max Redeem Limit</TH>
                 <TH>Min Mult.</TH>
                 <TH>Max Mult.</TH>
                 <TH>Min Withdraw</TH>
