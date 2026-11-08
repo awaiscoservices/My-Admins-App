@@ -1,48 +1,71 @@
 /**
- * GET /api/admin/bonuses/list
- * Returns all player bonus tiers + referral tiers. Staff only.
+ * pages/api/admin/bonuses/list.js
+ *
+ * GET → returns all data the Player Bonuses admin page needs:
+ *   { paymentMethods, levels, bonuses, referralTiers }
+ *
+ * paymentMethods now includes allow_deposit + allow_withdraw flags.
+ * Admin-only (service-role key, server-side only).
  */
 import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance', 'marketing']
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const supabaseUser = createServerSupabaseClient({ req, res })
+  const { data: { user }, error: authErr } = await supabaseUser.auth.getUser()
   if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return res.status(403).json({ error: 'Forbidden' })
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } }
+  )
 
-  const [bonuses, referral, paymentMethods, levels] = await Promise.all([
-    supabaseAdmin
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('is_staff')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.is_staff) return res.status(403).json({ error: 'Forbidden' })
+
+  // ── Fetch in parallel ─────────────────────────────────────────────────────
+  const [pmRes, levelRes, bonusRes, referralRes] = await Promise.all([
+    admin
+      .from('payment_methods')
+      .select('id, name, type, description, is_active, sort_order, allow_deposit, allow_withdraw')
+      .order('sort_order', { ascending: true }),
+
+    admin
+      .from('player_levels')
+      .select('id, name, sort_order, accent_color, xp_required')
+      .order('sort_order', { ascending: true }),
+
+    admin
       .from('player_bonuses')
-      .select('*, payment_methods(id, name), player_levels(id, name)')
-      .order('day_number')
-      .order('created_at'),
-    supabaseAdmin
+      .select('id, payment_method_id, player_level_id, day_number, bonus_percent'),
+
+    admin
       .from('referral_bonus_tiers')
-      .select('*')
-      .order('deposit_number'),
-    supabaseAdmin.from('payment_methods').select('id, name').eq('is_active', true).order('name'),
-    supabaseAdmin.from('player_levels').select('id, name').order('sort_order'),
+      .select('id, deposit_number, bonus_percent, is_active')
+      .order('deposit_number', { ascending: true }),
   ])
 
-  if (bonuses.error) return res.status(500).json({ error: bonuses.error.message })
+  // Surface any DB errors
+  for (const r of [pmRes, levelRes, bonusRes, referralRes]) {
+    if (r.error) {
+      console.error('[bonuses/list]', r.error)
+      return res.status(500).json({ error: r.error.message })
+    }
+  }
 
   return res.status(200).json({
-    bonuses: bonuses.data || [],
-    referralTiers: referral.data || [],
-    paymentMethods: paymentMethods.data || [],
-    levels: levels.data || [],
+    paymentMethods: pmRes.data    || [],
+    levels:         levelRes.data || [],
+    bonuses:        bonusRes.data || [],
+    referralTiers:  referralRes.data || [],
   })
 }

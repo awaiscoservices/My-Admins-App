@@ -295,6 +295,98 @@ function ReferralTab({ tiers, onSave, saving }) {
   )
 }
 
+// ─── Toggle switch ────────────────────────────────────────────────────────────
+function Toggle({ checked, onChange, disabled }) {
+  return (
+    <button
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      style={{
+        width: 44, height: 24, borderRadius: 99, border: 'none', cursor: disabled ? 'default' : 'pointer',
+        background: checked ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.12)',
+        position: 'relative', transition: 'background .2s', flexShrink: 0,
+        boxShadow: checked ? '0 0 10px rgba(34,197,94,.3)' : 'none',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 3, left: checked ? 23 : 3,
+        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+        transition: 'left .2s', boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+      }} />
+    </button>
+  )
+}
+
+// ─── Payment Methods tab ───────────────────────────────────────────────────────
+function PaymentMethodsTab({ methods, onToggle, saving }) {
+  const METHOD_ICONS = {
+    cashapp: '💚', zelle: '⚡', venmo: '💙', chime: '💳',
+    paypal: '🅿️', bank_transfer: '🏦', crypto: '₿', other: '💵',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 13, color: DIM, marginBottom: 6 }}>
+        Control which payment methods appear in the Deposit and Withdraw flows. Changes take effect immediately.
+      </div>
+
+      {/* Header */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 130px', gap: 12, padding: '8px 20px', alignItems: 'center' }}>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: DIM2 }}>Method</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#60a5fa', textAlign: 'center' }}>Deposit</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#a78bfa', textAlign: 'center' }}>Withdraw</span>
+      </div>
+
+      {methods.map(m => (
+        <div key={m.id} style={{
+          display: 'grid', gridTemplateColumns: '1fr 130px 130px', gap: 12,
+          padding: '14px 20px', alignItems: 'center',
+          background: BG_CARD, border: BDR, borderRadius: 14,
+        }}>
+          {/* Method name */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0,
+            }}>
+              {METHOD_ICONS[m.type] || '💳'}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{m.name}</div>
+              <div style={{ fontSize: 10, color: DIM2, textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 1 }}>{m.type}</div>
+            </div>
+          </div>
+
+          {/* Deposit toggle */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <Toggle
+              checked={m.allow_deposit}
+              onChange={val => onToggle(m.id, 'allow_deposit', val)}
+              disabled={saving === `${m.id}_allow_deposit`}
+            />
+            <span style={{ fontSize: 10, fontWeight: 700, color: m.allow_deposit ? '#22c55e' : 'rgba(255,255,255,.25)', letterSpacing: '.05em' }}>
+              {m.allow_deposit ? 'ON' : 'OFF'}
+            </span>
+          </div>
+
+          {/* Withdraw toggle */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <Toggle
+              checked={m.allow_withdraw}
+              onChange={val => onToggle(m.id, 'allow_withdraw', val)}
+              disabled={saving === `${m.id}_allow_withdraw`}
+            />
+            <span style={{ fontSize: 10, fontWeight: 700, color: m.allow_withdraw ? '#22c55e' : 'rgba(255,255,255,.25)', letterSpacing: '.05em' }}>
+              {m.allow_withdraw ? 'ON' : 'OFF'}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function PlayerBonuses() {
   const [tab, setTab]           = useState('deposit')
@@ -305,6 +397,7 @@ export default function PlayerBonuses() {
   const [loading, setLoading]   = useState(true)
   const [savingCell, setSavingCell] = useState(null)
   const [savingReferral, setSavingReferral] = useState(null)
+  const [savingFlag, setSavingFlag] = useState(null)   // `${methodId}_allow_deposit` or `${methodId}_allow_withdraw`
   const [toast, setToast]       = useState(null)
 
   function showToast(msg, type = 'success') {
@@ -356,6 +449,23 @@ export default function PlayerBonuses() {
     setSavingCell(null)
   }
 
+  async function handleFlagToggle(methodId, flag, value) {
+    const key = `${methodId}_${flag}`
+    setSavingFlag(key)
+    try {
+      await apiFetch('/api/admin/payment-methods/toggle-flag', {
+        method: 'POST',
+        body: JSON.stringify({ id: methodId, flag, value }),
+      })
+      // Update local state optimistically
+      setPaymentMethods(prev => prev.map(m => m.id === methodId ? { ...m, [flag]: value } : m))
+      showToast(`${flag === 'allow_deposit' ? 'Deposit' : 'Withdraw'} ${value ? 'enabled' : 'disabled'}`)
+    } catch (e) {
+      showToast(e.message, 'error')
+    }
+    setSavingFlag(null)
+  }
+
   async function handleReferralSave(dep, percent, isActive) {
     setSavingReferral(dep)
     try {
@@ -385,7 +495,7 @@ export default function PlayerBonuses() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 12, width: 'fit-content', marginBottom: 24 }}>
-        {[['deposit','💰 Deposit Bonuses'], ['referral','🤝 Referral Bonuses']].map(([key, label]) => (
+        {[['deposit','💰 Deposit Bonuses'], ['referral','🤝 Referral Bonuses'], ['methods','⚙️ Payment Methods']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
             fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700,
@@ -448,6 +558,21 @@ export default function PlayerBonuses() {
             tiers={referralTiers}
             onSave={handleReferralSave}
             saving={savingReferral}
+          />
+        )
+      )}
+
+      {/* ── Payment Methods tab ── */}
+      {tab === 'methods' && (
+        loading ? (
+          <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
+        ) : paymentMethods.length === 0 ? (
+          <div style={{ color: DIM2, padding: 40, textAlign: 'center', fontSize: 13 }}>No payment methods found.</div>
+        ) : (
+          <PaymentMethodsTab
+            methods={paymentMethods}
+            onToggle={handleFlagToggle}
+            saving={savingFlag}
           />
         )
       )}
