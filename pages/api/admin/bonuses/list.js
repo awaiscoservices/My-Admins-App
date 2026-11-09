@@ -8,13 +8,13 @@
  * Admin-only (service-role key, server-side only).
  */
 import { createClient } from '@supabase/supabase-js'
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs'
+import { createPagesServerClient } from '../../../../lib/supabaseServer'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const supabaseUser = createServerSupabaseClient({ req, res })
+  const supabaseUser = createPagesServerClient({ req, res })
   const { data: { user }, error: authErr } = await supabaseUser.auth.getUser()
   if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
 
