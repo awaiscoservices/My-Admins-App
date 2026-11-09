@@ -9,57 +9,57 @@ const NAV_SECTIONS = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin',              icon: 'home',    label: 'Dashboard',       roles: ['super_admin','finance','game_ops','support','kyc_agent','risk','reporting','marketing'] },
+      { href: '/admin',              icon: 'home',    label: 'Dashboard',       roles: ['admin','super_admin','finance','game_ops','support','kyc_agent','risk','reporting','marketing'] },
     ],
   },
   {
     label: 'Players',
     items: [
-      { href: '/admin/players',      icon: 'users',   label: 'Players',         roles: ['super_admin','support','kyc_agent','risk','finance'] },
-      { href: '/admin/kyc',          icon: 'shield',  label: 'KYC Review',      roles: ['super_admin','kyc_agent','risk'] },
-      { href: '/admin/risk',         icon: 'alert',   label: 'Risk Flags',      roles: ['super_admin','risk','finance'] },
+      { href: '/admin/players',      icon: 'users',   label: 'Players',         roles: ['admin','super_admin','support','kyc_agent','risk','finance'] },
+      { href: '/admin/kyc',          icon: 'shield',  label: 'KYC Review',      roles: ['admin','super_admin','kyc_agent','risk'] },
+      { href: '/admin/risk',         icon: 'alert',   label: 'Risk Flags',      roles: ['admin','super_admin','risk','finance'] },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['super_admin','finance'] },
-      { href: '/admin/game-accounts',icon: 'cards',   label: 'Game Accounts',   roles: ['super_admin','game_ops'] },
-      { href: '/admin/game-loads',   icon: 'refresh', label: 'Game Loads',      roles: ['super_admin','game_ops'] },
-      { href: '/admin/redemptions',  icon: 'trophy',  label: 'Redemptions',     roles: ['super_admin','game_ops','finance'] },
-      { href: '/admin/withdrawals',  icon: 'out',     label: 'Withdrawals',     roles: ['super_admin','finance'] },
+      { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['admin','super_admin','finance'] },
+      { href: '/admin/game-accounts',icon: 'cards',   label: 'Game Accounts',   roles: ['admin','super_admin','game_ops'] },
+      { href: '/admin/game-loads',   icon: 'refresh', label: 'Game Loads',      roles: ['admin','super_admin','game_ops'] },
+      { href: '/admin/redemptions',  icon: 'trophy',  label: 'Redemptions',     roles: ['admin','super_admin','game_ops','finance'] },
+      { href: '/admin/withdrawals',  icon: 'out',     label: 'Withdrawals',     roles: ['admin','super_admin','finance'] },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/admin/wallets',      icon: 'wallet',  label: 'Wallets',         roles: ['super_admin','finance'] },
-      { href: '/admin/transactions', icon: 'list',    label: 'Transactions',    roles: ['super_admin','finance','reporting'] },
-      { href: '/admin/adjustments',  icon: 'scale',   label: 'Adjustments',     roles: ['super_admin','finance'] },
+      { href: '/admin/wallets',      icon: 'wallet',  label: 'Wallets',         roles: ['admin','super_admin','finance'] },
+      { href: '/admin/transactions', icon: 'list',    label: 'Transactions',    roles: ['admin','super_admin','finance','reporting'] },
+      { href: '/admin/adjustments',  icon: 'scale',   label: 'Adjustments',     roles: ['admin','super_admin','finance'] },
     ],
   },
   {
     label: 'Configuration',
     items: [
-      { href: '/admin/games',        icon: 'games',   label: 'Game Panels',     roles: ['super_admin'] },
-      { href: '/admin/payments',     icon: 'coin',    label: 'Payment Methods', roles: ['super_admin','finance'] },
-      { href: '/admin/promotions',   icon: 'gift',    label: 'Player Bonuses',  roles: ['super_admin','marketing'] },
-      { href: '/admin/levels',       icon: 'star',    label: 'Player Levels',   roles: ['super_admin','marketing'] },
+      { href: '/admin/games',        icon: 'games',   label: 'Game Panels',     roles: ['admin','super_admin'] },
+      { href: '/admin/payments',     icon: 'coin',    label: 'Payment Methods', roles: ['admin','super_admin','finance'] },
+      { href: '/admin/promotions',   icon: 'gift',    label: 'Promotions',      roles: ['admin','super_admin','marketing'] },
+      { href: '/admin/levels',       icon: 'star',    label: 'Player Levels',   roles: ['admin','super_admin','marketing'] },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/support',      icon: 'chat',    label: 'Support Tickets', roles: ['super_admin','support'] },
-      { href: '/admin/notifications',icon: 'bell',    label: 'Notifications',   roles: ['super_admin','support'] },
+      { href: '/admin/support',      icon: 'chat',    label: 'Support Tickets', roles: ['admin','super_admin','support'] },
+      { href: '/admin/notifications',icon: 'bell',    label: 'Notifications',   roles: ['admin','super_admin','support'] },
     ],
   },
   {
     label: 'System',
     items: [
-      { href: '/admin/staff',        icon: 'user',    label: 'Staff & Roles',   roles: ['super_admin'] },
-      { href: '/admin/audit-logs',   icon: 'search',  label: 'Audit Logs',      roles: ['super_admin'] },
-      { href: '/admin/settings',     icon: 'gear',    label: 'Settings',        roles: ['super_admin'] },
+      { href: '/admin/staff',        icon: 'user',    label: 'Staff & Roles',   roles: ['admin','super_admin'] },
+      { href: '/admin/audit-logs',   icon: 'search',  label: 'Audit Logs',      roles: ['admin','super_admin'] },
+      { href: '/admin/settings',     icon: 'gear',    label: 'Settings',        roles: ['admin','super_admin'] },
     ],
   },
 ]
