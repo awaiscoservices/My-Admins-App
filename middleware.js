@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 // Player routes (/dashboard, /profile, /notifications) live in My-Clients-App.
 const ADMIN_ROUTES = ['/admin']
 const SUPER_ADMIN_ROUTES = ['/superadmin']
-const GUEST_ROUTES = ['/auth/login']
 
 export function middleware(request) {
   const { pathname } = request.nextUrl
@@ -16,7 +15,6 @@ export function middleware(request) {
 
   const isAdminRoute = ADMIN_ROUTES.some(r => pathname.startsWith(r))
   const isSuperAdminRoute = SUPER_ADMIN_ROUTES.some(r => pathname.startsWith(r))
-  const isGuestOnly = GUEST_ROUTES.some(r => pathname.startsWith(r))
 
   // Role is checked again server-side on every API route; this only keeps
   // signed-out visitors off the staff pages.
@@ -24,9 +22,11 @@ export function middleware(request) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
-  if (isLoggedIn && isGuestOnly) {
-    return NextResponse.redirect(new URL('/admin', request.url))
-  }
+  // Deliberately no "logged in, bounce away from /auth/login" rule.
+  // Pairing that with the role check in pages/index.js produced an infinite
+  // redirect for a signed-in non-staff session: / sent them to /auth/login,
+  // middleware sent them back to /. The login page signs out non-staff
+  // itself, so a staff member seeing the login form is harmless.
 
   return NextResponse.next()
 }

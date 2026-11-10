@@ -46,7 +46,9 @@ export default function SupportLogin() {
       const { supabase: sb } = await import('../../lib/supabase')
       const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single()
       if (prof?.role && STAFF_ROLES.includes(prof.role)) {
-        router.push('/admin')
+        // Super admins manage tenants, so they land on their own portal.
+        // Every other staff role works inside a single tenant's admin panel.
+        router.push(prof.role === 'super_admin' ? '/superadmin' : '/admin')
       } else {
         await sb.auth.signOut()
         showToast('Access denied. This portal is for staff only.')

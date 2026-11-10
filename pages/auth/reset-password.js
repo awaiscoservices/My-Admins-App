@@ -18,7 +18,7 @@ export default function ResetPassword() {
     setBusy(false)
     if (error) return setMsg({ kind: 'error', text: error.message.includes('session') ? 'This reset link has expired. Request a new one.' : error.message })
     setMsg({ kind: 'success', text: 'Password updated. Redirecting…' })
-    setTimeout(() => router.push('/admin'), 1200)
+    setTimeout(() => router.push('/'), 1200)
   }
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-gradient)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: "'Outfit', sans-serif" }}>
