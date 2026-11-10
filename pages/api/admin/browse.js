@@ -17,10 +17,14 @@ export default async function handler(req, res) {
   let query = supabaseAdmin.from(cfg.table).select('*', { count: 'exact' })
     .order(cfg.order, { ascending: false }).range(page * PAGE, page * PAGE + PAGE - 1)
 
+  // Scoped, or this generic browser returns every casino's rows.
+  query = admin.scope(query)
+
   if (q && cfg.byAction) query = query.ilike('action', `%${q}%`)
   else if (q) {   // search by player name / email
-    const { data: found } = await supabaseAdmin.from('profiles').select('id')
-      .or(`full_name.ilike.%${q}%,email.ilike.%${q}%`).limit(200)
+    const safe = String(q).replace(/[^a-zA-Z0-9@._ -]/g, '').trim()
+      const { data: found } = await admin.scope(supabaseAdmin.from('profiles').select('id')
+        .or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%`).limit(200))
     const ids = (found || []).map(p => p.id)
     if (!ids.length) return res.status(200).json({ rows: [], total: 0, hasMore: false })
     query = query.in('user_id', ids)

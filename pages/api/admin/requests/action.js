@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
   // ── KYC ─────────────────────────────────────────────────────
   if (kind === 'kyc') {
-    const { data: rec } = await supabaseAdmin.from('kyc_records').select('*').eq('id', id).single()
+    const { data: rec } = await admin.scope(supabaseAdmin.from('kyc_records').select('*').eq('id', id)).maybeSingle()
     if (!rec) return res.status(404).json({ error: 'Record not found' })
     if (!['pending', 'under_review'].includes(rec.status))
       return res.status(409).json({ error: `Already ${rec.status}` })
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
   }
 
   // ── Support ─────────────────────────────────────────────────
-  const { data: t } = await supabaseAdmin.from('support_tickets').select('*').eq('id', id).single()
+  const { data: t } = await admin.scope(supabaseAdmin.from('support_tickets').select('*').eq('id', id)).maybeSingle()
   if (!t) return res.status(404).json({ error: 'Ticket not found' })
 
   const update = { status: action, replied_by: admin.id, replied_at: new Date().toISOString() }

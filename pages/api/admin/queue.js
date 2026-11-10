@@ -15,7 +15,8 @@ export default async function handler(req, res) {
   if (!admin) return
 
   const open = OPEN_STATUSES[kind]
-  let q = supabaseAdmin.from(cfg.table).select('*').order('created_at', { ascending: view === 'open' }).limit(100)
+  // Scoped, or every casino's queue shows in every casino's panel.
+  let q = admin.scope(supabaseAdmin.from(cfg.table).select('*').order('created_at', { ascending: view === 'open' }).limit(100))
   if (view === 'open') q = q.in('status', open)
   else if (view === 'done') q = q.not('status', 'in', `(${open.join(',')})`)
 

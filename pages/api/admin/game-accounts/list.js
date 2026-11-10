@@ -2,12 +2,7 @@
  * GET /api/admin/game-accounts/list?status=pending&search=foo
  * Returns game accounts for admin — bypasses RLS using service role key.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -35,6 +30,8 @@ export default async function handler(req, res) {
     .select('*, profiles!game_accounts_user_id_fkey(full_name, email, kyc_status, status), game_panels!game_accounts_game_panel_id_fkey(name, accent_color)')
     .order('created_at', { ascending: true })
     .limit(100)
+
+  query = scopeToTenant(query, gate)
 
   if (status && status !== 'all') query = query.eq('status', status)
 

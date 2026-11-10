@@ -29,6 +29,14 @@ export default async function handler(req, res) {
   const { player_id } = req.body
   if (!player_id) return res.status(400).json({ error: 'player_id required' })
 
+  // Only act on a player in the caller's own casino.
+  const { data: me } = await supabaseAdmin.from('profiles').select('tenant_id, role').eq('id', user.id).single()
+  if (me?.role !== 'super_admin') {
+    const { data: owned } = await supabaseAdmin
+      .from('profiles').select('id').eq('id', player_id).eq('tenant_id', me?.tenant_id).maybeSingle()
+    if (!owned) return res.status(404).json({ error: 'Player not found' })
+  }
+
   // Use the DB function to check and upgrade if needed
   const { data, error } = await supabaseAdmin.rpc('check_and_upgrade_player_level', {
     p_user_id: player_id,
