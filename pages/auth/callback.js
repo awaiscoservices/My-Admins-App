@@ -9,7 +9,7 @@ export default function AuthCallback() {
     // getSession() waits for the OAuth code exchange to finish and
     // writes the session cookie before we redirect.
     supabase.auth.getSession().then(({ data: { session } }) => {
-      router.replace(session ? '/dashboard' : '/auth/login')
+      router.replace(session ? '/admin' : '/auth/login')
     })
   }, [router])
 
