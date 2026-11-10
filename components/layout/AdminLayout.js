@@ -23,8 +23,8 @@ const NAV_SECTIONS = [
   {
     label: 'Operations',
     items: [
-      { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['admin','super_admin','finance'] },
       { href: '/admin/game-accounts',icon: 'cards',   label: 'Game Accounts',   roles: ['admin','super_admin','game_ops'] },
+      { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['admin','super_admin','finance'] },
       { href: '/admin/game-loads',   icon: 'refresh', label: 'Scores',          roles: ['admin','super_admin','game_ops'] },
       { href: '/admin/redemptions',  icon: 'trophy',  label: 'Redemptions',     roles: ['admin','super_admin','game_ops','finance'] },
       { href: '/admin/withdrawals',  icon: 'out',     label: 'Withdrawals',     roles: ['admin','super_admin','finance'] },
@@ -137,6 +137,16 @@ const PENDING_COLORS = {
   '/admin/support':       '#6366f1',
 }
 
+// Topbar quick-action tabs (6 items with badge counts)
+const TOPBAR_TABS = [
+  { href: '/admin/game-accounts', label: 'Game Accounts', color: '#06b6d4' },
+  { href: '/admin/deposits',      label: 'Deposits',      color: '#10b981' },
+  { href: '/admin/game-loads',    label: 'Scores',        color: '#fbbf24' },
+  { href: '/admin/redemptions',   label: 'Redemptions',   color: '#f59e0b' },
+  { href: '/admin/withdrawals',   label: 'Withdrawals',   color: '#3b82f6' },
+  { href: '/admin/kyc',           label: 'KYC',           color: '#ec4899' },
+]
+
 export default function AdminLayout({ children }) {
   const router = useRouter()
   const [profile, setProfile]         = useState(null)
@@ -184,7 +194,7 @@ export default function AdminLayout({ children }) {
   const canSee   = (roles) => profile && roles.includes(profile.role)
 
   const roleColors = {
-    super_admin: '#ef4444', finance: '#10b981', game_ops: '#fbbf24',
+    super_admin: '#ef4444', admin: '#fbbf24', finance: '#10b981', game_ops: '#fbbf24',
     support: '#3b82f6', kyc_agent: '#ec4899', risk: '#f97316',
     reporting: '#94a3b8', marketing: '#f59e0b',
   }
@@ -224,6 +234,41 @@ export default function AdminLayout({ children }) {
             <span style={{ color: '#fff' }}>{currentLabel}</span>
           </div>
         </div>
+
+        {/* 6 TOPBAR ACTION TABS with badge counts */}
+        <div className="topbar-tabs" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {TOPBAR_TABS.map(tab => {
+            const count   = pendingCounts[tab.href] || 0
+            const active  = isActive(tab.href)
+            return (
+              <Link key={tab.href} href={tab.href}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 11px',
+                  borderRadius: 9,
+                  textDecoration: 'none',
+                  fontSize: 11, fontWeight: 700,
+                  background: active ? `${tab.color}22` : 'rgba(255,255,255,.04)',
+                  border: `1px solid ${active ? tab.color : 'rgba(255,255,255,.1)'}`,
+                  color: active ? tab.color : 'rgba(255,255,255,.6)',
+                  whiteSpace: 'nowrap',
+                  transition: 'all .15s',
+                  position: 'relative',
+                }}>
+                {tab.label}
+                {count > 0 && (
+                  <span style={{
+                    background: tab.color, color: '#050505',
+                    fontSize: 9, fontWeight: 900,
+                    padding: '1px 5px', borderRadius: 99,
+                    minWidth: 16, textAlign: 'center', lineHeight: '14px',
+                  }}>{count}</span>
+                )}
+              </Link>
+            )
+          })}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={loadPendingCounts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, color: 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Icon name="refresh" size={14} /> <span className="hide-sm">Refresh</span>
@@ -291,6 +336,10 @@ export default function AdminLayout({ children }) {
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }
         .admin-logo-icon { display: none; }
+        .topbar-tabs a:hover { opacity: .85; }
+        @media (max-width: 1200px) {
+          .topbar-tabs { display: none !important; }
+        }
         @media (max-width: 900px) {
           .admin-logo-full { display: none; }
           .admin-logo-icon { display: inline-flex; }
