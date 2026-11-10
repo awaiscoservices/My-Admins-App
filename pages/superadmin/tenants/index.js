@@ -7,6 +7,20 @@ import { useRouter } from 'next/router'
 import SuperAdminLayout from '../../../components/layout/SuperAdminLayout'
 import { supabase } from '../../../lib/supabase'
 
+/**
+ * A fresh access token for every request.
+ *
+ * These pages used to read the token once on mount and reuse it. Supabase
+ * access tokens expire after about an hour, so a page left open long enough
+ * started getting "Unauthorized" on every action. getSession() refreshes the
+ * token when it is close to expiring, so asking per request avoids that.
+ */
+async function freshToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || null
+}
+
+
 const G = '#fbbf24'
 const PER_PAGE = 20
 
@@ -43,7 +57,7 @@ export default function TenantsPage() {
     if (search) params.set('search', search)
     if (status) params.set('status', status)
     const r = await fetch(`/api/superadmin/tenants/list?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${await freshToken()}` },
     })
     const data = await r.json()
     setTenants(data.tenants || [])
@@ -148,7 +162,7 @@ function CreateTenantModal({ token, onClose, onCreated }) {
     setSaving(true); setError('')
     const r = await fetch('/api/superadmin/tenants/create', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
       body: JSON.stringify(form),
     })
     const data = await r.json()

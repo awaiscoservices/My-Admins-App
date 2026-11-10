@@ -108,16 +108,23 @@ export default async function handler(req, res) {
   let admin_invite = null
 
   if (admin_username?.trim() || admin_email?.trim()) {
-    const username = admin_username?.trim().toLowerCase() || null
+    // An email typed into the username box is treated as the address, not
+    // rejected — people reach for an email out of habit.
+    const typed = admin_username?.trim().toLowerCase() || ''
+    const typedIsEmail = typed.includes('@')
+    const username = typedIsEmail ? null : (typed || null)
+    const emailGiven = admin_email?.trim() || (typedIsEmail ? typed : null)
     const password = admin_password
 
-    if (username && !/^[a-z0-9._-]{3,32}$/.test(username)) {
+    if (!username && !emailGiven) {
+      admin_invite = { ok: false, error: 'Casino created, but no admin username or email was given.' }
+    } else if (username && !/^[a-z0-9._-]{3,32}$/.test(username)) {
       admin_invite = { ok: false, error: 'Casino created, but the username must be 3-32 characters: letters, numbers, dot, dash or underscore.' }
     } else if (!password || password.length < 8) {
       admin_invite = { ok: false, error: 'Casino created, but the admin password must be at least 8 characters.' }
     } else {
       // Username-only accounts get an internal address that is never emailed.
-      const loginEmail = admin_email?.trim() || `${username}@${INTERNAL_EMAIL_DOMAIN}`
+      const loginEmail = emailGiven || `${username}@${INTERNAL_EMAIL_DOMAIN}`
 
       const taken = username
         ? await supabaseAdmin.from('profiles').select('id').ilike('username', username).maybeSingle()

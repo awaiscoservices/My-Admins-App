@@ -7,6 +7,20 @@ import { useRouter } from 'next/router'
 import SuperAdminLayout from '../../../components/layout/SuperAdminLayout'
 import { supabase } from '../../../lib/supabase'
 
+/**
+ * A fresh access token for every request.
+ *
+ * These pages used to read the token once on mount and reuse it. Supabase
+ * access tokens expire after about an hour, so a page left open long enough
+ * started getting "Unauthorized" on every action. getSession() refreshes the
+ * token when it is close to expiring, so asking per request avoids that.
+ */
+async function freshToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || null
+}
+
+
 const G = '#fbbf24'
 
 export default function TenantDetail() {
@@ -32,7 +46,9 @@ export default function TenantDetail() {
 
   useEffect(() => {
     if (!token || !id) return
-    fetch(`/api/superadmin/tenants/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+    ;(async () => {
+      const t = await freshToken()
+      fetch(`/api/superadmin/tenants/${id}`, { headers: { Authorization: `Bearer ${t}` } })
       .then(r => r.json())
       .then(data => {
         if (data.error) { setErr(data.error); setLoading(false); return }
@@ -46,13 +62,14 @@ export default function TenantDetail() {
         })
         setLoading(false)
       })
+    })()
   }, [token, id])
 
   const save = async () => {
     setSaving(true); setMsg(''); setErr('')
     const r = await fetch(`/api/superadmin/tenants/update`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
       body: JSON.stringify({ tenant_id: id, ...form }),
     })
     const data = await r.json()
@@ -66,7 +83,7 @@ export default function TenantDetail() {
     setSaving(true)
     const r = await fetch('/api/superadmin/tenants/suspend', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
       body: JSON.stringify({ tenant_id: id, action: tenant.status === 'suspended' ? 'activate' : 'suspend' }),
     })
     const data = await r.json()
@@ -80,7 +97,7 @@ export default function TenantDetail() {
     if (!confirm(`Impersonate admin of "${tenant.name}"? This action is logged.`)) return
     const r = await fetch('/api/superadmin/tenants/impersonate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
       body: JSON.stringify({ tenant_id: id }),
     })
     const data = await r.json()
@@ -195,8 +212,11 @@ function DomainsTab({ tenantId, token }) {
 
   useEffect(() => {
     if (!token) return
-    fetch(`/api/superadmin/tenants/domains?tenant_id=${tenantId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(d => { setDomains(d.domains || []); setLoading(false) })
+    ;(async () => {
+      const t = await freshToken()
+      await fetch(`/api/superadmin/tenants/domains?tenant_id=${tenantId}`, { headers: { Authorization: `Bearer ${t}` } })
+        .then(r => r.json()).then(d => { setDomains(d.domains || []); setLoading(false) })
+    })()
   }, [token, tenantId])
 
   const addDomain = async () => {
@@ -204,7 +224,7 @@ function DomainsTab({ tenantId, token }) {
     setAdding(true); setErr('')
     const r = await fetch('/api/superadmin/tenants/domains', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
       body: JSON.stringify({ tenant_id: tenantId, domain: newDomain.trim() }),
     })
     const data = await r.json()
@@ -242,8 +262,11 @@ function AuditTab({ tenantId, token }) {
 
   useEffect(() => {
     if (!token) return
-    fetch(`/api/superadmin/audit?tenant_id=${tenantId}&limit=50`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(d => { setLogs(d.logs || []); setLoading(false) })
+    ;(async () => {
+      const t = await freshToken()
+      await fetch(`/api/superadmin/audit?tenant_id=${tenantId}&limit=50`, { headers: { Authorization: `Bearer ${t}` } })
+        .then(r => r.json()).then(d => { setLogs(d.logs || []); setLoading(false) })
+    })()
   }, [token, tenantId])
 
   if (loading) return <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>Loading…</div>
