@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import SuperAdminLayout from '../../../components/layout/SuperAdminLayout'
+import { supabase } from '../../../lib/supabase'
 
 const G = '#fbbf24'
 const PER_PAGE = 20
@@ -28,9 +29,9 @@ export default function TenantsPage() {
 
   // Get token once
   useEffect(() => {
-    const { createClient } = require('@supabase/supabase-js')
-    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    sb.auth.getSession().then(({ data: { session } }) => {
+    // Shared cookie-based client; a local createClient() reads localStorage
+    // and never finds the session.
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setToken(session.access_token)
     })
   }, [])
@@ -56,7 +57,7 @@ export default function TenantsPage() {
 
   return (
     <SuperAdminLayout title="Tenants">
-      <div style={{ padding: 32 }}>
+      <div>
 
         {/* Controls */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>

@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout'
+import { supabase } from '../../lib/supabase'
 
 const G  = '#fbbf24'
 const G2 = '#f59e0b'
@@ -31,30 +32,35 @@ export default function SuperAdminDashboard() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const { createClient } = require('@supabase/supabase-js')
-    const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    )
-    sb.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return
-      const token = session.access_token
-      const r = await fetch('/api/superadmin/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await r.json()
-      if (!r.ok) { setError(data.error); setLoading(false); return }
-      setStats(data.stats)
-      setRecent(data.recent || [])
-      setLoading(false)
-    })
+    // Must be the shared cookie-based client. A client built here with
+    // createClient() keeps its session in localStorage, finds nothing, and
+    // leaves the page stuck on "Loading…" forever.
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { setError('Your session has expired. Please sign in again.'); return }
+
+        const r = await fetch('/api/superadmin/dashboard', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        const data = await r.json()
+        if (!r.ok) { setError(data.error || `Request failed (${r.status})`); return }
+
+        setStats(data.stats)
+        setRecent(data.recent || [])
+      } catch (e) {
+        setError(e.message || 'Could not reach the server.')
+      } finally {
+        setLoading(false)   // always, so the page can never hang
+      }
+    })()
   }, [])
 
   const statusColor = s => s === 'active' ? '#22c55e' : s === 'suspended' ? '#ef4444' : '#f59e0b'
 
   return (
     <SuperAdminLayout title="Platform Dashboard">
-      <div style={{ padding: 32 }}>
+      <div>
         {loading && <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>Loading…</div>}
         {error  && <div style={{ color: '#ef4444', fontSize: 14 }}>{error}</div>}
 

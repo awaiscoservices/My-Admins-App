@@ -230,9 +230,8 @@ export default function AdminLayout({ children }) {
                 <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4" />
               </svg>
             </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>Casinoze <span style={{ color: GOLD }}>Support</span></div>
-              <div style={{ fontSize: 9, color: 'rgba(251,191,36,.5)', letterSpacing: 2, textTransform: 'uppercase' }}>Management Portal</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
+              Casinoze <span style={{ color: GOLD }}>Support</span>
             </div>
           </Link>
           <div className="admin-crumb" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.4)', marginLeft: 8, whiteSpace: 'nowrap' }}>
@@ -271,11 +270,15 @@ export default function AdminLayout({ children }) {
       </header>
 
       {/* SIDEBAR */}
-      <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 64, left: 0, bottom: 0, width: 250, zIndex: 50, background: 'var(--panel-gradient,rgba(6,11,24,.98))', borderRight: '1px solid rgba(251,191,36,.1)', display: 'flex', flexDirection: 'column' }}>
+      <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 64, left: 0, bottom: 0, zIndex: 50, background: 'var(--panel-gradient,rgba(6,11,24,.98))', borderRight: '1px solid rgba(251,191,36,.1)', display: 'flex', flexDirection: 'column' }}>
+        {/* Initial always visible; the name appears when the rail expands.
+            No role badge here — it lives in the top bar. */}
         {profile && (
-          <div style={{ margin: '14px 12px 0', padding: '10px 14px', borderRadius: 12, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.12)' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile.full_name}</div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: roleColor, textTransform: 'uppercase', letterSpacing: '.08em' }}>{profile.role.replace('_', ' ')}</div>
+          <div style={{ margin: '14px 12px 0', padding: '10px 12px', borderRadius: 12, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 8, background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', color: '#050505', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {(profile.full_name || '?').charAt(0).toUpperCase()}
+            </div>
+            <div className="rail-label" style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile.full_name}</div>
           </div>
         )}
         <nav style={{ flex: 1, overflowY: 'auto', padding: '12px', scrollbarWidth: 'none' }}>
@@ -284,16 +287,17 @@ export default function AdminLayout({ children }) {
             if (visibleItems.length === 0) return null
             return (
               <div key={section.label} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,.7)', padding: '4px 12px 8px' }}>{section.label}</div>
+                <div className="rail-label rail-section" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,.7)', padding: '4px 12px 8px', whiteSpace: 'nowrap' }}>{section.label}</div>
                 {visibleItems.map(item => {
                   const active  = isActive(item.href)
                   const pending = pendingCounts[item.href] || 0
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
+                      title={item.label}
                       className={`admin-nav${active ? ' active' : ''}`}
                       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 3, textDecoration: 'none', fontSize: 14, fontWeight: active ? 700 : 500, color: active ? '#050505' : 'rgba(255,255,255,.7)', background: active ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : 'transparent', boxShadow: active ? '0 0 20px rgba(251,191,36,.25)' : 'none' }}>
                       <Icon name={item.icon} />
-                      <span style={{ flex: 1 }}>{item.label}</span>
+                      <span className="rail-label" style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>
                       {pending > 0 && (
                         <span style={{ background: active ? '#050505' : (PENDING_COLORS[item.href] || '#ef4444'), color: active ? GOLD : '#fff', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 99, flexShrink: 0 }}>{pending}</span>
                       )}
@@ -306,28 +310,54 @@ export default function AdminLayout({ children }) {
         </nav>
         <div style={{ padding: 12, borderTop: '1px solid rgba(251,191,36,.1)' }}>
           <button onClick={handleSignOut} disabled={signingOut} style={{ width: '100%', padding: '10px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 12, color: '#f87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Icon name="logout" size={16} /> {signingOut ? 'Signing out…' : 'Sign Out'}
+            <Icon name="logout" size={16} />
+            <span className="rail-label" style={{ whiteSpace: 'nowrap' }}>{signingOut ? 'Signing out…' : 'Sign Out'}</span>
           </button>
         </div>
       </aside>
 
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, top: 64, background: 'rgba(0,0,0,.7)', zIndex: 40 }} />}
 
-      <div className="admin-main" style={{ marginLeft: 250, paddingTop: 64, minHeight: '100vh' }}>
+      <div className="admin-main" style={{ marginLeft: 72, paddingTop: 64, minHeight: '100vh' }}>
         <main className="admin-content" style={{ padding: '28px', maxWidth: 1400, margin: '0 auto', overflowX: 'hidden' }}>
           {children}
         </main>
       </div>
 
       <style>{`
+        /* Icon rail: 72px of icons, expands to 250px on hover and overlays the
+           page, so the content never shifts. Labels fade with the width. */
+        .admin-sidebar {
+          width: 72px;
+          overflow: hidden;
+          transition: width .18s ease;
+        }
+        .admin-sidebar:hover,
+        .admin-sidebar:focus-within { width: 250px; box-shadow: 8px 0 32px rgba(0,0,0,.55); }
+
+        .admin-sidebar .rail-label {
+          opacity: 0;
+          transition: opacity .12s ease;
+          pointer-events: none;
+        }
+        .admin-sidebar:hover .rail-label,
+        .admin-sidebar:focus-within .rail-label { opacity: 1; pointer-events: auto; }
+
+        /* Keep section headings from collapsing to a blank gap when narrow. */
+        .admin-sidebar .rail-section { height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; transition: height .18s ease, padding .18s ease; }
+        .admin-sidebar:hover .rail-section,
+        .admin-sidebar:focus-within .rail-section { height: 22px; padding: 4px 12px 8px !important; }
+
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }
         .topbar-tabs a:hover { opacity: .85; }
         @media (max-width: 1200px) { .topbar-tabs { display: none !important; } }
         @media (max-width: 900px) { .admin-crumb { display: none; } }
         @media (max-width: 768px) {
-          .admin-sidebar { transform: translateX(-100%); transition: transform .25s; }
+          .admin-sidebar { width: 250px !important; transform: translateX(-100%); transition: transform .25s; }
           .admin-sidebar.open { transform: translateX(0); }
+          .admin-sidebar .rail-label { opacity: 1 !important; pointer-events: auto !important; }
+          .admin-sidebar .rail-section { height: auto !important; padding: 4px 12px 8px !important; }
           .admin-main { margin-left: 0 !important; }
           .mobile-ham { display: flex !important; }
           .admin-content { padding: 16px 12px !important; }
