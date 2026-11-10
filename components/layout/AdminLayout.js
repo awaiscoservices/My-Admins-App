@@ -190,12 +190,6 @@ export default function AdminLayout({ children }) {
   const isActive = (href) => href === '/admin' ? router.pathname === '/admin' : router.pathname.startsWith(href)
   const canSee   = (roles) => profile && roles.includes(profile.role)
 
-  const roleColors = {
-    super_admin: '#ef4444', admin: '#fbbf24', finance: '#10b981', game_ops: '#fbbf24',
-    support: '#3b82f6', kyc_agent: '#ec4899', risk: '#f97316',
-    reporting: '#94a3b8', marketing: '#f59e0b',
-  }
-  const roleColor    = roleColors[profile?.role] || '#94a3b8'
   const currentLabel = NAV_SECTIONS.flatMap(s => s.items).find(i => isActive(i.href))?.label || 'Dashboard'
 
   if (!authorized) return (
@@ -282,8 +276,12 @@ export default function AdminLayout({ children }) {
           <button onClick={loadPendingCounts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, color: 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Icon name="refresh" size={14} /> <span className="hide-sm">Refresh</span>
           </button>
-          <div style={{ padding: '7px 12px', background: `${roleColor}18`, border: `1px solid ${roleColor}55`, borderRadius: 10, fontSize: 10, fontWeight: 800, color: roleColor, textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>
-            {profile?.role?.replace('_', ' ')}
+          {/* Shows which portal you are in, not your account's role. A super
+              admin working inside a tenant's panel is acting as an admin here;
+              their real role is in the tooltip and on the Super Admin portal. */}
+          <div title={`Signed in as ${profile?.role?.replace('_', ' ')}`}
+            style={{ padding: '7px 12px', background: `${GOLD}18`, border: `1px solid ${GOLD}55`, borderRadius: 10, fontSize: 10, fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap', cursor: 'default' }}>
+            admin
           </div>
         </div>
       </header>
