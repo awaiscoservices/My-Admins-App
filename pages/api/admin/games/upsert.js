@@ -1,14 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 const ALGO = 'aes-256-gcm'
+
+/**
+ * Throws if ENCRYPTION_KEY is absent or malformed, rather than letting
+ * Buffer.from(undefined) fail with something unreadable. The caller must let
+ * this reach the client: storing a game credential unencrypted would be worse
+ * than refusing to store it.
+ */
 function encrypt(text) {
-  const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
+  const raw = process.env.ENCRYPTION_KEY
+  if (!raw || !/^[0-9a-fA-F]{64}$/.test(raw)) {
+    throw new Error('ENCRYPTION_KEY must be exactly 64 hex characters')
+  }
+  const key = Buffer.from(raw, 'hex')
   const iv = crypto.randomBytes(12)
   const cipher = crypto.createCipheriv(ALGO, key, iv)
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])

@@ -1,38 +1,31 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: admin } = await supabaseAdmin.from('profiles').select('id, role').eq('id', user.id).single()
-  if (!admin || !['super_admin', 'finance'].includes(admin.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.ADJUSTMENTS_CREATE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { user_id, type, amount_cents, reason } = req.body
   if (!user_id || !['credit', 'debit'].includes(type) || !amount_cents || amount_cents <= 0 || !reason?.trim()) {
     return res.status(400).json({ error: 'Invalid params' })
   }
 
-  const { data: wallet, error: wErr } = await supabaseAdmin.from('wallets').select('*').eq('user_id', user_id).single()
+  const { data: wallet, error: wErr } = await scopeToTenant(supabaseAdmin.from('wallets').select('*').eq('user_id', user_id), gate).maybeSingle()
   if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' })
 
-  if (type === 'debit' && wallet.balance_cents < amount_cents) {
+  if (type === 'debit' && wallet.cash_balance_cents < amount_cents) {
     return res.status(400).json({ error: 'Insufficient balance for debit' })
   }
 
   const newBalance = type === 'credit'
-    ? wallet.balance_cents + amount_cents
-    : wallet.balance_cents - amount_cents
+    ? wallet.cash_balance_cents + amount_cents
+    : wallet.cash_balance_cents - amount_cents
 
   const { error: updateErr } = await supabaseAdmin.from('wallets')
-    .update({ balance_cents: newBalance, version: wallet.version + 1, updated_at: new Date().toISOString() })
+    .update({ cash_balance_cents: newBalance, version: wallet.version + 1, updated_at: new Date().toISOString() })
     .eq('user_id', user_id)
     .eq('version', wallet.version)
   if (updateErr) return res.status(409).json({ error: 'Concurrent update, please retry' })
@@ -40,11 +33,13 @@ export default async function handler(req, res) {
   const refId = `ADJ-${Date.now()}`
 
   await supabaseAdmin.from('wallet_adjustments').insert({
+    tenant_id: gate.tenantId,
     user_id, type, amount_cents, reason: reason.trim(),
     reference_id: refId, performed_by: admin.id, created_at: new Date().toISOString()
   })
 
   await supabaseAdmin.from('ledger').insert({
+    tenant_id: gate.tenantId,
     user_id, type: 'adjustment', amount_cents,
     reference_id: refId, description: reason.trim(), created_at: new Date().toISOString()
   })

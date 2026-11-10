@@ -6,33 +6,16 @@
  *
  * Admin-only. Uses service-role key (server-side only).
  */
-import { createClient } from '@supabase/supabase-js'
-import { createPagesServerClient } from '../../../../lib/supabaseServer'
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 const ALLOWED_FLAGS = ['allow_deposit', 'allow_withdraw']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // ── Auth: must be signed-in admin ─────────────────────────────────────────
-  const supabaseUser = createPagesServerClient({ req, res })
-  const { data: { user }, error: authErr } = await supabaseUser.auth.getUser()
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  // Check is_staff via service role
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false } }
-  )
-
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('is_staff')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.is_staff) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.PAYMENTS_WRITE })
+  if (!gate) return
+  const admin = gate.db
 
   // ── Validate body ─────────────────────────────────────────────────────────
   const { id, flag, value } = req.body
