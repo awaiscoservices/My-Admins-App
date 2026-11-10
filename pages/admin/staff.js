@@ -27,11 +27,30 @@ export default function AdminStaff() {
   const [role,     setRole]     = useState('')
   const [toast,    setToast]    = useState(null)
   const [modal,    setModal]    = useState(null)   // 'invite' | { type:'role'|'deactivate', member }
-  const [invite,   setInvite]   = useState({ email:'', role:'admin' })
+  const [invite,   setInvite]   = useState({ email:'', role:'admin', tenant_id:'' })
+  const [tenants,  setTenants]  = useState([])
   const [saving,   setSaving]   = useState(false)
   const [myId,     setMyId]     = useState(null)
 
   useEffect(() => { load() }, [])
+
+  // Super admins can staff any casino, so they get a picker. Everyone else
+  // invites into their own, which the API fills in from their profile.
+  useEffect(() => {
+    if (role !== 'super_admin') return
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const res = await fetch('/api/superadmin/tenants/list?limit=100', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!res.ok) return
+        const d = await res.json()
+        setTenants(d.tenants || [])
+      } catch { /* picker just stays hidden */ }
+    })()
+  }, [role])
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
@@ -97,14 +116,16 @@ export default function AdminStaff() {
     const res = await fetch('/api/admin/staff/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(invite),
+      body: JSON.stringify(
+        invite.tenant_id ? invite : { email: invite.email, role: invite.role }
+      ),
     })
     const json = await res.json()
     setSaving(false)
     if (!res.ok) { showToast(json.error || 'Invite failed', 'error'); return }
     showToast(`Invite sent to ${invite.email}`)
     setModal(null)
-    setInvite({ email:'', role:'admin' })
+    setInvite({ email:'', role:'admin', tenant_id:'' })
     load()
   }
 
@@ -142,6 +163,26 @@ export default function AdminStaff() {
                 ))}
               </div>
             </div>
+            {role === 'super_admin' && tenants.length > 0 && (
+              <div style={{ marginBottom:20 }}>
+                <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>Casino</label>
+                <select
+                  value={invite.tenant_id}
+                  onChange={e => setInvite(i => ({ ...i, tenant_id: e.target.value }))}
+                  style={{ width:'100%', padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.12)', color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif" }}>
+                  <option value="">My own casino</option>
+                  {tenants.map(t => (
+                    <option key={t.id} value={t.id} style={{ background:'#0d1f35' }}>
+                      {t.name}{t.status !== 'active' ? ` (${t.status})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,.3)', marginTop:6 }}>
+                  They will only ever see this casino's players and money.
+                </div>
+              </div>
+            )}
+
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={sendInvite} disabled={saving} style={{ flex:1, padding:'10px 0', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                 {saving ? 'Sending…' : 'Send Invite'}
