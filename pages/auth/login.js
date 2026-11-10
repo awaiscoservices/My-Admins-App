@@ -1,215 +1,161 @@
-import { useState, useEffect } from 'react';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { signInWithEmail, signInWithGoogle } from '../../lib/auth';
-import Logo from '../../components/ui/Logo';
-import AuthBackdrop from '../../components/site/AuthBackdrop'
+// Casinoze Support — Staff Login
+// Domain: casinozoesupport.com
+// This page is ONLY for Super Admin, Admin, and staff roles.
+// Players are directed to their own tenant site (e.g. casinozeroom.com).
 
-const PARTICLES = ['♠', '♥', '♦', '♣'];
+import { useState, useEffect } from 'react'
+import Head from 'next/head'
+import { useRouter } from 'next/router'
+import { signInWithEmail } from '../../lib/auth'
 
-function Particle({ symbol, style }) {
-  return (
-    <div style={{
-      position: 'fixed', fontSize: style.size, color: style.color,
-      left: style.left, top: style.top, opacity: style.opacity,
-      animation: `floatUp ${style.duration}s linear ${style.delay}s infinite`,
-      pointerEvents: 'none', zIndex: 0, userSelect: 'none',
-      filter: style.glow ? `drop-shadow(0 0 6px ${style.color})` : 'none',
-    }}>{symbol}</div>
-  );
-}
+const STAFF_ROLES = ['super_admin', 'admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
 
-// All roles that belong to admin panel — add 'admin' to the list
-const ADMIN_ROLES = ['super_admin', 'admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
+export default function SupportLogin() {
+  const router = useRouter()
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [errors, setErrors]     = useState({})
+  const [loading, setLoading]   = useState(false)
+  const [toast, setToast]       = useState(null)
+  const [focused, setFocused]   = useState(null)
+  const [mounted, setMounted]   = useState(false)
 
-export default function Login() {
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
-  const [particles, setParticles] = useState([]);
-  const [toast, setToast] = useState(null);
-
-  useEffect(() => {
-    const generated = Array.from({ length: 22 }, (_, i) => ({
-      id: i,
-      symbol: PARTICLES[Math.floor(Math.random() * 4)],
-      style: {
-        left: `${Math.random() * 100}%`, top: `${100 + Math.random() * 20}%`,
-        size: `${Math.random() * 18 + 10}px`, opacity: Math.random() * 0.18 + 0.04,
-        duration: Math.random() * 14 + 10, delay: -(Math.random() * 20),
-        color: Math.random() > 0.5 ? '#fbbf24' : '#f59e0b', glow: Math.random() > 0.65,
-      },
-    }));
-    setParticles(generated);
-  }, []);
+  useEffect(() => { setMounted(true) }, [])
 
   const showToast = (msg, type = 'error') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 4500)
+  }
 
   const validate = () => {
-    const e = {};
-    if (!email.trim()) e.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email address';
-    if (!password) e.password = 'Password is required';
-    return e;
-  };
+    const e = {}
+    if (!email.trim()) e.email = 'Email is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email'
+    if (!password) e.password = 'Password is required'
+    return e
+  }
 
   const handleSubmit = async (ev) => {
-    ev.preventDefault();
-    const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    setErrors({});
-    setLoading(true);
+    ev.preventDefault()
+    const e = validate()
+    if (Object.keys(e).length) { setErrors(e); return }
+    setErrors({})
+    setLoading(true)
     try {
-      const data = await signInWithEmail({ email, password });
-      // Fetch role and redirect: admin roles → /admin, players → /dashboard
-      const { supabase: sb } = await import('../../lib/supabase');
-      const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single();
-      if (prof?.role && ADMIN_ROLES.includes(prof.role)) {
-        router.push('/admin');
+      const data = await signInWithEmail({ email, password })
+      const { supabase: sb } = await import('../../lib/supabase')
+      const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single()
+      if (prof?.role && STAFF_ROLES.includes(prof.role)) {
+        router.push('/admin')
       } else {
-        router.push('/dashboard');
+        await sb.auth.signOut()
+        showToast('Access denied. This portal is for staff only.')
       }
     } catch (err) {
-      showToast(err.message || 'Invalid email or password');
+      showToast(err.message || 'Invalid email or password')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handleGoogle = async () => {
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      showToast(err.message || 'Google sign in failed');
-      setGoogleLoading(false);
-    }
-  };
-
-  const inputStyle = (field) => ({
-    width: '100%', padding: '14px 16px',
-    background: 'rgba(255,255,255,0.05)',
-    border: `1.5px solid ${focusedField === field
+  const inp = (field) => ({
+    width: '100%', padding: '13px 16px',
+    background: 'rgba(255,255,255,.04)',
+    border: `1.5px solid ${focused === field
       ? errors[field] ? '#ef4444' : '#fbbf24'
-      : errors[field] ? 'rgba(239,68,68,0.5)' : 'rgba(251,191,36,0.2)'}`,
-    borderRadius: '10px', color: '#ffffff', fontSize: '15px',
-    fontFamily: 'Outfit, sans-serif', outline: 'none', boxSizing: 'border-box',
-    transition: 'border-color 0.25s, box-shadow 0.25s',
-    boxShadow: focusedField === field
-      ? errors[field] ? '0 0 0 3px rgba(239,68,68,0.15)' : '0 0 0 3px rgba(251,191,36,0.15), 0 0 20px rgba(251,191,36,0.1)'
-      : 'none',
+      : errors[field] ? 'rgba(239,68,68,.5)' : 'rgba(251,191,36,.18)'}`,
+    borderRadius: 10, color: '#fff', fontSize: 14,
+    fontFamily: "'Outfit', sans-serif", outline: 'none',
+    boxSizing: 'border-box', transition: 'border-color .2s, box-shadow .2s',
+    boxShadow: focused === field ? '0 0 0 3px rgba(251,191,36,.12)' : 'none',
     caretColor: '#fbbf24',
-  });
+  })
 
   return (
     <>
       <Head>
-        <title>Login — Casinoze Room</title>
-        <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500;1,9..144,700&family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+        <title>Casinoze Support — Staff Login</title>
+        <meta name="robots" content="noindex,nofollow" />
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
         <style>{`
           *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-          body{background:var(--bg-gradient);background-attachment:fixed;overflow-x:hidden}
+          body{background:#060b18;min-height:100vh;overflow-x:hidden}
           input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{
-            -webkit-box-shadow:0 0 0 1000px rgba(10,4,30,1) inset!important;
-            -webkit-text-fill-color:#ffffff!important;caret-color:#fbbf24!important}
-          @keyframes floatUp{0%{transform:translateY(0) rotate(0deg);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(-110vh) rotate(360deg);opacity:0}}
-          @keyframes fadeSlideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
-          @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
-          @keyframes pulse-glow{0%,100%{box-shadow:0 0 20px rgba(251,191,36,0.15)}50%{box-shadow:0 0 40px rgba(251,191,36,0.35)}}
+            -webkit-box-shadow:0 0 0 1000px #0a1020 inset!important;
+            -webkit-text-fill-color:#fff!important;caret-color:#fbbf24!important}
+          @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
           @keyframes spin{to{transform:rotate(360deg)}}
-          @keyframes orb-float{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-30px) scale(1.06)}}
-          @keyframes toastIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+          @keyframes toastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+          @keyframes gridPulse{0%,100%{opacity:.18}50%{opacity:.28}}
         `}</style>
       </Head>
 
+      {/* Background grid */}
+      <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(251,191,36,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(251,191,36,.07) 1px,transparent 1px)', backgroundSize: '48px 48px', animation: 'gridPulse 6s ease-in-out infinite', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(251,191,36,.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 9999, animation: 'toastIn .3s ease',
-          background: toast.type === 'error' ? 'rgba(239,68,68,0.95)' : 'rgba(16,185,129,0.95)',
-          border: `1px solid ${toast.type === 'error' ? '#ef4444' : '#10b981'}`,
-          borderRadius: 12, padding: '12px 24px',
-          color: '#fff', fontSize: 14, fontWeight: 600,
-          fontFamily: 'Outfit, sans-serif', backdropFilter: 'blur(12px)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-        }}>
+        <div style={{ position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, animation: 'toastIn .3s ease', background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(16,185,129,.95)', border: `1px solid ${toast.type === 'error' ? '#ef4444' : '#10b981'}`, borderRadius: 10, padding: '11px 22px', color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: "'Outfit',sans-serif", backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,.5)', whiteSpace: 'nowrap' }}>
           {toast.type === 'error' ? '⚠ ' : '✓ '}{toast.msg}
         </div>
       )}
 
-      <AuthBackdrop />
+      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', fontFamily: "'Outfit', sans-serif" }}>
 
-      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', fontFamily: 'Outfit, sans-serif' }}>
-
-        {/* Logo */}
-        <div style={{ animation: 'fadeSlideUp 0.6s ease both', marginBottom: 36, textAlign: 'center' }}>
-          <Logo variant="full" stack height={88} />
-          <div style={{ marginTop: 6, fontSize: 11, letterSpacing: 4, color: 'rgba(251,191,36,0.7)', textTransform: 'uppercase', fontWeight: 500 }}>Premium Fish Game Platform</div>
+        {/* Brand header */}
+        <div style={{ textAlign: 'center', marginBottom: 40, animation: 'fadeUp .5s ease both' }}>
+          {/* Logo mark */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', marginBottom: 16, boxShadow: '0 0 32px rgba(251,191,36,.4)' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#050505" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: .5 }}>Casinoze <span style={{ color: '#fbbf24' }}>Support</span></div>
+          <div style={{ fontSize: 11, color: 'rgba(251,191,36,.6)', letterSpacing: 3, textTransform: 'uppercase', marginTop: 4 }}>Management Portal</div>
         </div>
 
         {/* Card */}
-        <div style={{ width: '100%', maxWidth: 440, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 20, padding: 'clamp(28px, 5vw, 44px)', backdropFilter: 'blur(20px)', animation: 'fadeSlideUp 0.7s ease 0.1s both, pulse-glow 4s ease-in-out infinite', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, background: 'linear-gradient(90deg, transparent, #fbbf24, #f59e0b, #fbbf24, transparent)' }} />
+        <div style={{ width: '100%', maxWidth: 420, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(251,191,36,.18)', borderRadius: 18, padding: 'clamp(28px,5vw,42px)', backdropFilter: 'blur(20px)', animation: 'fadeUp .5s ease .1s both', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: 1, background: 'linear-gradient(90deg,transparent,#fbbf24,transparent)' }} />
 
-          <h2 style={{ fontFamily: 'Cinzel Decorative, serif', fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 6, textAlign: 'center' }}>Welcome Back</h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', marginBottom: 28 }}>Sign in to your Casinoze account</p>
+          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', textAlign: 'center', marginBottom: 6 }}>Staff Sign In</h2>
+          <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 12, textAlign: 'center', marginBottom: 28 }}>Authorised personnel only</p>
 
           <form onSubmit={handleSubmit} noValidate>
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.65)', letterSpacing: 0.5 }}>Email Address</label>
-              <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (errors.email) setErrors(p => ({ ...p, email: '' })); }} onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)} placeholder="you@example.com" style={inputStyle('email')} autoComplete="email" />
-              {errors.email && <p style={{ color: '#f87171', fontSize: 12, marginTop: 6, fontWeight: 500 }}>⚠ {errors.email}</p>}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Email Address</label>
+              <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (errors.email) setErrors(p => ({ ...p, email: '' })) }} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} placeholder="staff@casinozoesupport.com" style={inp('email')} autoComplete="email" />
+              {errors.email && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}>⚠ {errors.email}</p>}
             </div>
 
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.65)', letterSpacing: 0.5 }}>Password</label>
-              <input type="password" value={password} onChange={e => { setPassword(e.target.value); if (errors.password) setErrors(p => ({ ...p, password: '' })); }} onFocus={() => setFocusedField('password')} onBlur={() => setFocusedField(null)} placeholder="••••••••" style={inputStyle('password')} autoComplete="current-password" />
-              {errors.password && <p style={{ color: '#f87171', fontSize: 12, marginTop: 6, fontWeight: 500 }}>⚠ {errors.password}</p>}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Password</label>
+              <input type="password" value={password} onChange={e => { setPassword(e.target.value); if (errors.password) setErrors(p => ({ ...p, password: '' })) }} onFocus={() => setFocused('password')} onBlur={() => setFocused(null)} placeholder="••••••••" style={inp('password')} autoComplete="current-password" />
+              {errors.password && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}>⚠ {errors.password}</p>}
             </div>
 
-            <div style={{ textAlign: 'right', marginBottom: 24 }}>
-              <Link href="/auth/forgot-password" style={{ color: 'rgba(251,191,36,0.7)', fontSize: 12, textDecoration: 'none', fontWeight: 500 }}>Forgot password?</Link>
-            </div>
-
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: 15, background: loading ? 'rgba(245,158,11,0.4)' : 'linear-gradient(135deg, #f59e0b, #fbbf24)', border: 'none', borderRadius: 10, color: '#0a0410', fontSize: 15, fontWeight: 700, fontFamily: 'Outfit, sans-serif', letterSpacing: 0.5, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'transform 0.15s, box-shadow 0.15s', boxShadow: loading ? 'none' : '0 4px 24px rgba(245,158,11,0.35)' }}
-              onMouseEnter={e => { if (!loading) e.currentTarget.style.transform = 'scale(1.02)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}>
-              {loading ? (<><span style={{ width: 18, height: 18, border: '2px solid rgba(0,0,0,0.3)', borderTopColor: '#0a0410', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />Signing in…</>) : '🎰 Sign In to Play'}
+            <button type="submit" disabled={loading} style={{ width: '100%', padding: 14, background: loading ? 'rgba(245,158,11,.35)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 14, fontWeight: 800, fontFamily: "'Outfit',sans-serif", letterSpacing: .5, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: loading ? 'none' : '0 4px 20px rgba(245,158,11,.3)', transition: 'transform .15s, box-shadow .15s' }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.transform = 'scale(1.02)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+              {loading
+                ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(0,0,0,.2)', borderTopColor: '#050505', borderRadius: '50%', animation: 'spin .7s linear infinite', display: 'inline-block' }} /> Signing in…</>
+                : '🔐 Sign In to Portal'}
             </button>
           </form>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '22px 0' }}>
-            <div style={{ flex: 1, height: 1, background: 'rgba(251,191,36,0.2)' }} />
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, letterSpacing: 1 }}>OR</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(251,191,36,0.2)' }} />
+          <div style={{ marginTop: 24, padding: '12px 16px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 10 }}>
+            <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, textAlign: 'center', lineHeight: 1.6 }}>
+              🔒 This portal is restricted to authorised staff.<br />
+              Player accounts are managed on tenant websites.
+            </p>
           </div>
-
-          <button onClick={handleGoogle} disabled={googleLoading} style={{ width: '100%', padding: 13, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(251,191,36,0.25)', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 500, fontFamily: 'Outfit, sans-serif', cursor: googleLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'border-color 0.2s, background 0.2s', opacity: googleLoading ? 0.6 : 1 }}
-            onMouseEnter={e => { if (!googleLoading) { e.currentTarget.style.borderColor = '#fbbf24'; e.currentTarget.style.background = 'rgba(251,191,36,0.08)'; } }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.25)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}>
-            {googleLoading ? <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fbbf24', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /> : <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/></svg>}
-            {googleLoading ? 'Connecting…' : 'Continue with Google'}
-          </button>
-
-          <p style={{ textAlign: 'center', marginTop: 24, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
-            New to Casinoze?{' '}
-            <Link href="/auth/register" style={{ color: '#fbbf24', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid rgba(251,191,36,0.3)', paddingBottom: 1 }}>Create an account →</Link>
-          </p>
         </div>
 
-        <p style={{ marginTop: 28, color: 'rgba(255,255,255,0.18)', fontSize: 11, letterSpacing: 1, textAlign: 'center', animation: 'fadeSlideUp 0.7s ease 0.3s both' }}>
-          ♠ ♥ CASINOZE ROOM · PLAY RESPONSIBLY ♦ ♣
+        <p style={{ marginTop: 24, color: 'rgba(255,255,255,.12)', fontSize: 10, letterSpacing: 2, textAlign: 'center' }}>
+          CASINOZE SUPPORT · MANAGEMENT PLATFORM · CONFIDENTIAL
         </p>
       </div>
     </>
-  );
+  )
 }
