@@ -15,6 +15,39 @@ const supabaseAdmin = createClient(
 
 const ASSIGNABLE_ROLES = ['admin', 'finance', 'game_ops', 'support']
 
+/**
+ * profiles.full_name is NOT NULL, so an invite that does not set it fails
+ * after the auth user has already been created. Derive something readable
+ * from the address: "lucky.spin@x.com" -> "Lucky Spin".
+ */
+
+/**
+ * Find an existing auth user by email.
+ *
+ * An invite that half-failed leaves the auth user created and the profile
+ * missing, and inviting the same address again is rejected as already
+ * registered — so the account can never be repaired through the UI. Looking
+ * first makes a retry fix the profile instead of erroring.
+ */
+async function findUserByEmail(client, email) {
+  const target = String(email).toLowerCase()
+  for (let page = 1; page <= 5; page++) {
+    const { data, error } = await client.auth.admin.listUsers({ page, perPage: 200 })
+    if (error || !data?.users?.length) return null
+    const hit = data.users.find(u => (u.email || '').toLowerCase() === target)
+    if (hit) return hit
+    if (data.users.length < 200) return null
+  }
+  return null
+}
+
+function nameFromEmail(email) {
+  const local = String(email).split('@')[0] || 'New User'
+  const words = local.replace(/[._-]+/g, ' ').trim().split(/\s+/)
+  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'New User'
+}
+
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -52,15 +85,24 @@ export default async function handler(req, res) {
 
   // Invite via Supabase Admin API — sends a magic link, so the person sets
   // their own password and no temporary one is ever created or transmitted.
-  const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    data: { invited_role: role, is_staff: true, tenant_id: targetTenant },
-  })
-  if (inviteErr) return res.status(500).json({ error: inviteErr.message })
+  // Reuse an existing account rather than failing on "already registered".
+  const existing = await findUserByEmail(supabaseAdmin, email)
+
+  let invited = existing ? { user: existing } : null
+
+  if (!existing) {
+    const r = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { invited_role: role, is_staff: true, tenant_id: targetTenant },
+    })
+    if (r.error) return res.status(500).json({ error: r.error.message })
+    invited = r.data
+  }
 
   if (invited?.user?.id) {
     const { error: profileErr } = await supabaseAdmin.from('profiles').upsert({
       id:        invited.user.id,
       email:     email,
+      full_name: nameFromEmail(email),
       role:      role,
       tenant_id: targetTenant,
     }, { onConflict: 'id', ignoreDuplicates: false })
