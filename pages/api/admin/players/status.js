@@ -3,28 +3,15 @@
  * Change a player's account status (active/suspended/banned).
  * Requires finance or super_admin role.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: admin } = await supabaseAdmin
-    .from('profiles').select('id, role, full_name').eq('id', user.id).single()
-
-  const allowedRoles = ['super_admin', 'admin', 'support', 'risk']
-  if (!admin || !allowedRoles.includes(admin.role))
-    return res.status(403).json({ error: 'Insufficient permissions' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.PLAYER_STATUS })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { player_id, status, reason } = req.body
 
@@ -35,10 +22,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Reason required for suspend/ban' })
 
   // Cannot modify another admin
-  const { data: target } = await supabaseAdmin
-    .from('profiles').select('id, role, status, full_name').eq('id', player_id).single()
+  // Scoped: a player in another casino is not found, so cannot be banned here.
+  const { row: target } = await loadOwnedRow(
+    gate, 'profiles', player_id, 'id, role, status, full_name, tenant_id'
+  )
 
   if (!target) return res.status(404).json({ error: 'Player not found' })
+  const tenantId = tenantOf(target, gate)
   if (target.role !== 'player')
     return res.status(403).json({ error: 'Cannot modify staff accounts here' })
 
@@ -56,6 +46,7 @@ export default async function handler(req, res) {
     active:    'Your account has been reactivated. You can now log in and play.',
   }
   await supabaseAdmin.from('notifications').insert({
+    tenant_id: tenantId,
     user_id: player_id,
     title: status === 'active' ? 'Account Reactivated' : `Account ${status.charAt(0).toUpperCase() + status.slice(1)}`,
     message: messages[status],
@@ -63,6 +54,7 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id: tenantId,
     actor_id: admin.id, actor_role: admin.role,
     action: `player_status_changed_to_${status}`,
     target_type: 'player', target_id: player_id,

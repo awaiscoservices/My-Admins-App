@@ -8,28 +8,15 @@
  *
  * Roles: super_admin, admin
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin']
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role))
-    return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.KYC_ACTION })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
 
   const { kyc_id, action, rejection_reason } = req.body
   if (!kyc_id || !['approve', 'reject'].includes(action))
@@ -38,9 +25,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'rejection_reason required when rejecting' })
 
   // Fetch KYC record
-  const { data: kyc, error: kycErr } = await supabaseAdmin
-    .from('kyc_records').select('id, user_id, status').eq('id', kyc_id).single()
+  // Scoped: another casino's KYC record is not found, so it cannot be reviewed.
+  const { row: kyc, error: kycErr } = await loadOwnedRow(
+    gate, 'kyc_records', kyc_id, 'id, user_id, status, tenant_id'
+  )
   if (kycErr || !kyc) return res.status(404).json({ error: 'KYC record not found' })
+  const tenantId = tenantOf(kyc, gate)
   if (kyc.status !== 'pending') return res.status(409).json({ error: `Already ${kyc.status}` })
 
   const now = new Date().toISOString()
@@ -50,7 +40,7 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('kyc_records').update({
       status: 'approved',
       reviewed_at: now,
-      reviewed_by: user.id,
+      reviewed_by: actor.id,
     }).eq('id', kyc_id)
 
     // Mark profile verified
@@ -62,14 +52,15 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('kyc_records').update({
       status: 'rejected',
       reviewed_at: now,
-      reviewed_by: user.id,
+      reviewed_by: actor.id,
       rejection_reason: rejection_reason.trim(),
     }).eq('id', kyc_id)
   }
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id:    user.id,
+    tenant_id:   tenantId,
+    actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'kyc_reviewed',
     target_type: 'kyc_record',

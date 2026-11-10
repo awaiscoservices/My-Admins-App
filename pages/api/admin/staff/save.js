@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
@@ -16,7 +17,10 @@ export default async function handler(req, res) {
   if (action === 'invite') {
     // Create auth user + profile with staff role
     if (!email?.trim() || !VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Valid email and role required' })
-    const tempPassword = Math.random().toString(36).slice(2, 10) + 'X1!'
+    // Math.random() is not cryptographically secure and this gave only ~8
+    // base36 characters, for accounts that can move money. 24 hex chars from
+    // crypto.randomBytes instead.
+    const tempPassword = crypto.randomBytes(12).toString('hex') + 'X1!'
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email: email.trim(), password: tempPassword, email_confirm: true,
       user_metadata: { full_name: full_name?.trim() || email.split('@')[0] }
@@ -30,6 +34,15 @@ export default async function handler(req, res) {
   if (action === 'update_role') {
     if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role' })
     if (staff_id === user.id) return res.status(400).json({ error: 'Cannot change own role' })
+
+    // staff/update.js refuses to touch another super_admin; this route did not,
+    // so the rule could simply be bypassed by calling this one instead.
+    const { data: target } = await supabaseAdmin
+      .from('profiles').select('role').eq('id', staff_id).maybeSingle()
+    if (!target) return res.status(404).json({ error: 'Staff member not found' })
+    if (target.role === 'super_admin')
+      return res.status(403).json({ error: 'Cannot modify another super admin' })
+
     await supabaseAdmin.from('profiles').update({ role }).eq('id', staff_id)
     await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: 'staff_role_changed', target_type: 'profiles', target_id: staff_id, details: { new_role: role } }).then(() => {}, () => {})
     return res.status(200).json({ message: 'Role updated' })
@@ -37,6 +50,15 @@ export default async function handler(req, res) {
 
   if (action === 'deactivate') {
     if (staff_id === user.id) return res.status(400).json({ error: 'Cannot deactivate yourself' })
+
+    // Same hole: this banned the account for 100 years with no super_admin
+    // check, so one super admin could lock out every other one.
+    const { data: target } = await supabaseAdmin
+      .from('profiles').select('role').eq('id', staff_id).maybeSingle()
+    if (!target) return res.status(404).json({ error: 'Staff member not found' })
+    if (target.role === 'super_admin')
+      return res.status(403).json({ error: 'Cannot deactivate another super admin' })
+
     await supabaseAdmin.from('profiles').update({ status: 'suspended' }).eq('id', staff_id)
     await supabaseAdmin.auth.admin.updateUserById(staff_id, { ban_duration: '876600h' })
     await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: 'staff_deactivated', target_type: 'profiles', target_id: staff_id }).then(() => {}, () => {})
