@@ -155,16 +155,7 @@ export default function SuperAdminLayout({ children, title }) {
       {/* SIDEBAR — icon rail, expands on hover */}
       <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 64, left: 0, bottom: 0, zIndex: 50, background: 'var(--panel-gradient,rgba(6,11,24,.98))', borderRight: '1px solid rgba(251,191,36,.1)', display: 'flex', flexDirection: 'column' }}>
 
-        {profile && (
-          <div style={{ margin: '14px 12px 0', padding: '10px 12px', borderRadius: 12, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 8, background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', color: '#050505', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {(profile.full_name || profile.email || 'S').charAt(0).toUpperCase()}
-            </div>
-            <div className="rail-label" style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {profile.full_name || 'Super Admin'}
-            </div>
-          </div>
-        )}
+        {/* No identity card here — the top bar carries it. */}
 
         <nav style={{ flex: 1, overflowY: 'auto', padding: 12, scrollbarWidth: 'none' }}>
           {NAV_SECTIONS.map(section => (

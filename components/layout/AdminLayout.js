@@ -241,15 +241,34 @@ export default function AdminLayout({ children }) {
         </div>
 
         {/* Centre — 6 quick-action tabs */}
-        <div className="topbar-tabs" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div className="topbar-tabs" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center', maxWidth: 820, margin: '0 16px' }}>
           {TOPBAR_TABS.map(tab => {
             const count  = pendingCounts[tab.href] || 0
             const active = isActive(tab.href)
             return (
-              <Link key={tab.href} href={tab.href} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 9, textDecoration: 'none', fontSize: 11, fontWeight: 700, background: active ? `${tab.color}22` : 'rgba(255,255,255,.04)', border: `1px solid ${active ? tab.color : 'rgba(255,255,255,.1)'}`, color: active ? tab.color : 'rgba(255,255,255,.6)', whiteSpace: 'nowrap', transition: 'all .15s' }}>
+              <Link key={tab.href} href={tab.href}
+                className={`tbtab${active ? ' active' : ''}`}
+                style={{
+                  flex: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  padding: '11px 14px', borderRadius: 12, textDecoration: 'none',
+                  fontSize: 13, fontWeight: 700, letterSpacing: '.01em',
+                  background: active
+                    ? `linear-gradient(135deg, ${tab.color}, ${tab.color}aa)`
+                    : 'rgba(255,255,255,.04)',
+                  border: `1px solid ${active ? tab.color : 'rgba(255,255,255,.09)'}`,
+                  color: active ? '#050505' : 'rgba(255,255,255,.62)',
+                  boxShadow: active ? `0 0 18px ${tab.color}55` : 'none',
+                  whiteSpace: 'nowrap', transition: 'all .18s ease',
+                }}>
                 {tab.label}
                 {count > 0 && (
-                  <span style={{ background: tab.color, color: '#050505', fontSize: 9, fontWeight: 900, padding: '1px 5px', borderRadius: 99, minWidth: 16, textAlign: 'center', lineHeight: '14px' }}>
+                  <span style={{
+                    background: active ? 'rgba(5,5,5,.82)' : tab.color,
+                    color: active ? tab.color : '#050505',
+                    fontSize: 10, fontWeight: 900, padding: '2px 7px', borderRadius: 99,
+                    minWidth: 18, textAlign: 'center', lineHeight: '14px', flexShrink: 0,
+                  }}>
                     {count}
                   </span>
                 )}
@@ -271,16 +290,8 @@ export default function AdminLayout({ children }) {
 
       {/* SIDEBAR */}
       <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 64, left: 0, bottom: 0, zIndex: 50, background: 'var(--panel-gradient,rgba(6,11,24,.98))', borderRight: '1px solid rgba(251,191,36,.1)', display: 'flex', flexDirection: 'column' }}>
-        {/* Initial always visible; the name appears when the rail expands.
-            No role badge here — it lives in the top bar. */}
-        {profile && (
-          <div style={{ margin: '14px 12px 0', padding: '10px 12px', borderRadius: 12, background: 'rgba(251,191,36,.05)', border: '1px solid rgba(251,191,36,.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 8, background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', color: '#050505', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {(profile.full_name || '?').charAt(0).toUpperCase()}
-            </div>
-            <div className="rail-label" style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile.full_name}</div>
-          </div>
-        )}
+        {/* No identity card here. Who you are signed in as is shown once, in
+            the top bar. */}
         <nav style={{ flex: 1, overflowY: 'auto', padding: '12px', scrollbarWidth: 'none' }}>
           {NAV_SECTIONS.map(section => {
             const visibleItems = section.items.filter(item => canSee(item.roles) && BUILT.has(item.href))
@@ -350,8 +361,10 @@ export default function AdminLayout({ children }) {
 
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }
-        .topbar-tabs a:hover { opacity: .85; }
-        @media (max-width: 1200px) { .topbar-tabs { display: none !important; } }
+        .tbtab:not(.active):hover { background: rgba(255,255,255,.09) !important; color: #fff !important; border-color: rgba(255,255,255,.2) !important; }
+        .tbtab.active:hover { filter: brightness(1.06); }
+        @media (max-width: 1400px) { .topbar-tabs { max-width: 620px !important; } .tbtab { font-size: 12px !important; padding: 10px 8px !important; } }
+        @media (max-width: 1100px) { .topbar-tabs { display: none !important; } }
         @media (max-width: 900px) { .admin-crumb { display: none; } }
         @media (max-width: 768px) {
           .admin-sidebar { width: 250px !important; transform: translateX(-100%); transition: transform .25s; }
