@@ -7,62 +7,56 @@
  * account is created by the admin in the external game panel. This route stores
  * the credentials the admin enters so the player can see them in their dashboard.
  */
-import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
+/**
+ * Encrypt a game password with AES-256-GCM.
+ *
+ * Throws if ENCRYPTION_KEY is absent or malformed. The caller must let that
+ * throw reach the client: storing the password unencrypted instead would be
+ * worse than refusing to store it at all.
+ *
+ * The key must be exactly 64 hex characters (32 bytes). The old check only
+ * tested length, so a 64-character non-hex string passed it and then produced
+ * a short buffer, which createCipheriv rejects.
+ */
 function encryptPassword(plaintext) {
   const key = process.env.ENCRYPTION_KEY
-  if (!key || key.length < 64) throw new Error('ENCRYPTION_KEY not set or too short (needs 64 hex chars)')
-  const keyBuffer = Buffer.from(key.slice(0, 64), 'hex')
-  const iv = crypto.randomBytes(16)
+  if (!key || !/^[0-9a-fA-F]{64}$/.test(key)) {
+    throw new Error('ENCRYPTION_KEY must be exactly 64 hex characters')
+  }
+  const keyBuffer = Buffer.from(key, 'hex')
+  const iv = crypto.randomBytes(12)   // 12 bytes is the correct IV size for GCM
   const cipher = crypto.createCipheriv('aes-256-gcm', keyBuffer, iv)
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
   return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`
 }
 
-// Roles allowed to set up game accounts
-const ALLOWED_ROLES = ['super_admin', 'admin', 'game_ops']
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: admin, error: profileErr } = await supabaseAdmin
-    .from('profiles')
-    .select('id, role, full_name')
-    .eq('id', user.id)
-    .single()
-
-  if (profileErr || !admin) return res.status(401).json({ error: 'Profile not found' })
-  if (!ALLOWED_ROLES.includes(admin.role))
-    return res.status(403).json({ error: `Insufficient permissions (role: ${admin.role})` })
+  const gate = await guardAdmin(req, res, { allow: PERMS.GAME_ACCOUNTS_SETUP })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { account_id, game_username, game_password, game_id, admin_notes, action } = req.body
   if (!account_id) return res.status(400).json({ error: 'account_id required' })
 
-  // Load account
-  const { data: account, error: accountErr } = await supabaseAdmin
-    .from('game_accounts')
-    .select('id, user_id, status, reference_id, game_panel_id, game_username')
-    .eq('id', account_id)
-    .single()
+  // Load account, scoped to the caller's casino.
+  const { row: account, error: accountErr } = await loadOwnedRow(
+    gate, 'game_accounts', account_id,
+    'id, user_id, status, reference_id, game_panel_id, game_username, tenant_id'
+  )
 
   if (accountErr) {
     console.error('game-accounts setup - account lookup error:', accountErr)
     return res.status(500).json({ error: 'Database error looking up game account', detail: accountErr.message })
   }
   if (!account) return res.status(404).json({ error: 'Game account not found' })
+  const tenantId = tenantOf(account, gate)
 
   // Load game panel name separately for notification
   const { data: panel } = await supabaseAdmin
@@ -104,12 +98,16 @@ export default async function handler(req, res) {
   }
 
   if (game_password?.trim()) {
+    // No fallback. This used to store `UNENCRYPTED:<password>` when the key was
+    // missing, which looked like success while writing the password in clear
+    // text. Refusing the save is the safe outcome.
     try {
       updates.game_password_enc = encryptPassword(game_password.trim())
     } catch (encErr) {
-      console.warn('ENCRYPTION_KEY issue:', encErr.message)
-      // Store with prefix so it's obvious — must configure ENCRYPTION_KEY in prod
-      updates.game_password_enc = `UNENCRYPTED:${game_password.trim()}`
+      console.error('[game-accounts/setup] encryption unavailable:', encErr.message)
+      return res.status(500).json({
+        error: 'Cannot store the game password because encryption is not configured on the server. Nothing was saved. Ask a super admin to set ENCRYPTION_KEY.',
+      })
     }
   }
 
