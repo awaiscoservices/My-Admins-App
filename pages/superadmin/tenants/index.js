@@ -153,6 +153,15 @@ function CreateTenantModal({ token, onClose, onCreated }) {
     })
     const data = await r.json()
     if (!r.ok) { setError(data.error); setSaving(false); return }
+
+      // The casino is saved either way; only the invite can part-fail. Say so
+      // rather than closing on a quiet half-success.
+      if (data.admin_invite && data.admin_invite.ok === false) {
+        setError(data.admin_invite.error)
+        setSaving(false)
+        onCreated()
+        return
+      }
     onCreated()
     onClose()
   }
@@ -165,7 +174,7 @@ function CreateTenantModal({ token, onClose, onCreated }) {
         {[
           { key: 'name',        label: 'Tenant Name',  placeholder: 'Acme Casino' },
           { key: 'slug',        label: 'Slug',         placeholder: 'acme-casino' },
-          { key: 'admin_email', label: 'Admin Email',  placeholder: 'admin@acme.com' },
+          { key: 'admin_email', label: 'Admin Email (optional)',  placeholder: 'admin@acme.com' },
         ].map(f => (
           <div key={f.key} style={{ marginBottom: 14 }}>
             <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>{f.label}</label>
@@ -175,6 +184,12 @@ function CreateTenantModal({ token, onClose, onCreated }) {
         ))}
         <div style={{ marginBottom: 20 }}>
           <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Plan</label>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', margin: '-6px 0 16px', lineHeight: 1.5 }}>
+            An invite email is sent to this address. They set their own password
+            from the link and become this casino's admin. Leave it blank to
+            invite someone later from Staff &amp; Roles.
+          </div>
+
           <select value={form.plan} onChange={e => setForm(x => ({ ...x, plan: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}>
             <option value="free">Free</option>
             <option value="starter">Starter</option>
