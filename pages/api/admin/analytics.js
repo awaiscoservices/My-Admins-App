@@ -3,14 +3,7 @@
  * Returns platform-wide KPIs and chart data for the admin dashboard.
  * Accessible to all staff roles.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const STAFF_ROLES = ['super_admin', 'admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
+import { guardAdmin, scopeToTenant, PERMS } from '../../../lib/adminGuard'
 
 function daysAgo(n) {
   const d = new Date()
@@ -29,17 +22,12 @@ function last7DayLabels() {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.ANALYTICS })
+  if (!gate) return
 
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: admin } = await supabaseAdmin
-    .from('profiles').select('id, role').eq('id', user.id).single()
-
-  if (!admin || !STAFF_ROLES.includes(admin.role))
-    return res.status(403).json({ error: 'Insufficient permissions' })
+  // Every count below is scoped, or the dashboard reports the whole platform's
+  // numbers to a single casino's staff — which is what it used to do.
+  const q = (table, select, opts) => scopeToTenant(gate.db.from(table).select(select, opts), gate)
 
   const today = daysAgo(0)
   const ago7  = daysAgo(7)
@@ -69,41 +57,40 @@ export default async function handler(req, res) {
     recentTxRes,
   ] = await Promise.all([
     // Players
-    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player'),
-    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player').gte('created_at', today),
-    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago7),
-    supabaseAdmin.from('profiles').select('id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago14),
-    supabaseAdmin.from('profiles').select('created_at').eq('role','player').gte('created_at', ago14).order('created_at'),
+    q('profiles', 'id', { count:'exact', head:true }).eq('role','player'),
+    q('profiles', 'id', { count:'exact', head:true }).eq('role','player').gte('created_at', today),
+    q('profiles', 'id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago7),
+    q('profiles', 'id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago14),
+    q('profiles', 'created_at').eq('role','player').gte('created_at', ago14).order('created_at'),
 
     // Financial totals (all time approved)
-    supabaseAdmin.from('deposits').select('amount_cents').in('status',['approved','completed']),
-    supabaseAdmin.from('withdrawals').select('amount_cents').in('status',['approved','completed']),
+    q('deposits', 'amount_cents').in('status',['approved','completed']),
+    q('withdrawals', 'amount_cents').in('status',['approved','completed']),
 
     // Game accounts
-    supabaseAdmin.from('game_accounts').select('id', { count:'exact', head:true }).eq('status','active'),
-    supabaseAdmin.from('game_accounts').select('id', { count:'exact', head:true }).eq('status','pending'),
+    q('game_accounts', 'id', { count:'exact', head:true }).eq('status','active'),
+    q('game_accounts', 'id', { count:'exact', head:true }).eq('status','pending'),
 
     // Pending queues
-    supabaseAdmin.from('deposits').select('id', { count:'exact', head:true }).eq('status','pending'),
-    supabaseAdmin.from('withdrawals').select('id', { count:'exact', head:true }).eq('status','pending'),
-    supabaseAdmin.from('kyc_records').select('id', { count:'exact', head:true }).eq('status','pending'),
-    supabaseAdmin.from('support_tickets').select('id', { count:'exact', head:true }).eq('status','open'),
+    q('deposits', 'id', { count:'exact', head:true }).eq('status','pending'),
+    q('withdrawals', 'id', { count:'exact', head:true }).eq('status','pending'),
+    q('kyc_records', 'id', { count:'exact', head:true }).eq('status','pending'),
+    q('support_tickets', 'id', { count:'exact', head:true }).eq('status','open'),
 
     // 7d charts
-    supabaseAdmin.from('deposits').select('amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
-    supabaseAdmin.from('withdrawals').select('amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
+    q('deposits', 'amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
+    q('withdrawals', 'amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
 
     // Game loads (scores) — 7d count + pending
-    supabaseAdmin.from('game_loads').select('id', { count:'exact', head:true }).gte('created_at', ago7),
-    supabaseAdmin.from('game_loads').select('id', { count:'exact', head:true }).eq('status','pending'),
+    q('game_loads', 'id', { count:'exact', head:true }).gte('created_at', ago7),
+    q('game_loads', 'id', { count:'exact', head:true }).eq('status','pending'),
 
     // Redemptions — 7d count + pending
-    supabaseAdmin.from('redemptions').select('id', { count:'exact', head:true }).gte('created_at', ago7),
-    supabaseAdmin.from('redemptions').select('id', { count:'exact', head:true }).eq('status','pending'),
+    q('redemptions', 'id', { count:'exact', head:true }).gte('created_at', ago7),
+    q('redemptions', 'id', { count:'exact', head:true }).eq('status','pending'),
 
     // Recent ledger transactions
-    supabaseAdmin.from('ledger')
-      .select('reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(full_name)')
+    q('ledger', 'reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(full_name)')
       .in('type', ['deposit','withdrawal'])
       .order('created_at', { ascending:false })
       .limit(20),
