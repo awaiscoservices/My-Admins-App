@@ -146,7 +146,7 @@ export default function TenantDetail() {
 
         {/* Details tab */}
         {tab === 'details' && (
-          <div style={{ maxWidth: 500 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '0 24px', alignItems: 'start' }}>
             {[
               { key: 'name',          label: 'Tenant Name' },
               { key: 'owner_email',    label: 'Owner Email' },
@@ -169,7 +169,7 @@ export default function TenantDetail() {
                 <option value="enterprise">Enterprise</option>
               </select>
             </div>
-            <button onClick={save} disabled={saving} style={{ ...goldBtn, opacity: saving ? .6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ ...goldBtn, opacity: saving ? .6 : 1, gridColumn: '1 / -1', justifySelf: 'start' }}>
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
@@ -216,7 +216,7 @@ function DomainsTab({ tenantId, token }) {
   if (loading) return <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>Loading…</div>
 
   return (
-    <div style={{ maxWidth: 500 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '0 24px', alignItems: 'start' }}>
       {err && <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{err}</div>}
       <div style={{ marginBottom: 20 }}>
         {domains.length === 0 && <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 13 }}>No custom domains configured.</div>}
