@@ -25,7 +25,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['admin','super_admin','finance'] },
       { href: '/admin/game-accounts',icon: 'cards',   label: 'Game Accounts',   roles: ['admin','super_admin','game_ops'] },
-      { href: '/admin/game-loads',   icon: 'refresh', label: 'Game Loads',      roles: ['admin','super_admin','game_ops'] },
+      { href: '/admin/game-loads',   icon: 'refresh', label: 'Scores',          roles: ['admin','super_admin','game_ops'] },
       { href: '/admin/redemptions',  icon: 'trophy',  label: 'Redemptions',     roles: ['admin','super_admin','game_ops','finance'] },
       { href: '/admin/withdrawals',  icon: 'out',     label: 'Withdrawals',     roles: ['admin','super_admin','finance'] },
     ],
@@ -43,7 +43,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/admin/games',        icon: 'games',   label: 'Game Panels',     roles: ['admin','super_admin'] },
       { href: '/admin/payments',     icon: 'coin',    label: 'Payment Methods', roles: ['admin','super_admin','finance'] },
-      { href: '/admin/promotions',   icon: 'gift',    label: 'Player Bonuses',  roles: ['admin','super_admin','marketing'] },
+      { href: '/admin/promotions',   icon: 'gift',    label: 'Promotions',      roles: ['admin','super_admin','marketing'] },
       { href: '/admin/levels',       icon: 'star',    label: 'Player Levels',   roles: ['admin','super_admin','marketing'] },
     ],
   },
@@ -160,24 +160,18 @@ export default function AdminLayout({ children }) {
   }
 
   async function loadPendingCounts() {
-    const [deposits, gameAccounts, gamLoads, redemptions, withdrawals, kyc, support] = await Promise.all([
-      supabase.from('deposits').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('game_accounts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('game_loads').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('redemptions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-    ])
-    setPendingCounts({
-      '/admin/deposits':      deposits.count      || 0,
-      '/admin/game-accounts': gameAccounts.count  || 0,
-      '/admin/game-loads':    gamLoads.count      || 0,
-      '/admin/redemptions':   redemptions.count   || 0,
-      '/admin/withdrawals':   withdrawals.count   || 0,
-      '/admin/kyc':           kyc.count           || 0,
-      '/admin/support':       support.count       || 0,
-    })
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/admin/pending-counts', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) return
+      const counts = await res.json()
+      setPendingCounts(counts)
+    } catch (e) {
+      console.error('Failed to load pending counts', e)
+    }
   }
 
   async function handleSignOut() {
