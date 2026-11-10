@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   if (!gate) return
 
   const supabaseAdmin = gate.db
+  const actor = gate.actor
   const admin = gate.actor
 
   const { deposit_id, action, rejection_reason } = req.body

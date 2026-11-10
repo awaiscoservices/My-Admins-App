@@ -1,18 +1,16 @@
-import { createClient } from '@supabase/supabase-js'
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
-  if (!user) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: staff } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (!['super_admin', 'marketing', 'finance'].includes(staff?.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.PROMOS_WRITE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
 
   const { id, name, description, bonus_pct, bonus_flat_cents, min_deposit_cents, max_bonus_cents, is_active, starts_at, ends_at } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
 
-  const payload = { name: name.trim(), description: description?.trim() || null, bonus_pct: bonus_pct || 0, bonus_flat_cents: bonus_flat_cents || 0, min_deposit_cents: min_deposit_cents || 0, max_bonus_cents: max_bonus_cents || null, is_active: !!is_active, starts_at: starts_at || null, ends_at: ends_at || null }
+  const payload = {
+    tenant_id: gate.tenantId, name: name.trim(), description: description?.trim() || null, bonus_pct: bonus_pct || 0, bonus_flat_cents: bonus_flat_cents || 0, min_deposit_cents: min_deposit_cents || 0, max_bonus_cents: max_bonus_cents || null, is_active: !!is_active, starts_at: starts_at || null, ends_at: ends_at || null }
 
   let data, error
   if (id) {

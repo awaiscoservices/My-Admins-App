@@ -4,37 +4,23 @@
  * PUT  /api/admin/bonus-rules        → update rule  (body: { id, ...fields })
  * DELETE /api/admin/bonus-rules?id=  → delete rule
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin']
-
-async function authenticate(req) {
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return null
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
-  if (!user) return null
-  const { data: actor } = await supabaseAdmin
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return null
-  return { user, actor }
-}
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
-  const auth = await authenticate(req)
-  if (!auth) return res.status(403).json({ error: 'Forbidden' })
-  const { user } = auth
+  const gate = await guardAdmin(req, res, { allow: PERMS.BONUSES_WRITE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const user = gate.actor
 
   // LIST
   if (req.method === 'GET') {
-    const { data, error } = await supabaseAdmin
-      .from('deposit_bonus_rules')
-      .select('*, min_level:player_levels!min_level_id(name), max_level:player_levels!max_level_id(name)')
-      .order('created_at', { ascending: false })
+    const { data, error } = await scopeToTenant(
+      supabaseAdmin
+        .from('deposit_bonus_rules')
+        .select('*, min_level:player_levels!min_level_id(name), max_level:player_levels!max_level_id(name)')
+        .order('created_at', { ascending: false }),
+      gate,
+    )
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rules: data })
   }

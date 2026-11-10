@@ -40,6 +40,7 @@ export default async function handler(req, res) {
   const gate = await guardAdmin(req, res, { allow: PERMS.GAME_ACCOUNTS_SETUP })
   if (!gate) return
   const supabaseAdmin = gate.db
+  const actor = gate.actor
   const admin = gate.actor
 
   const { account_id, game_username, game_password, game_id, admin_notes, action } = req.body

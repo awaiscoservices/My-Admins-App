@@ -2,24 +2,15 @@
  * POST /api/admin/bonuses/delete
  * Delete a player bonus tier. super_admin only.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || actor.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.BONUSES_WRITE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const user = gate.actor
 
   const { id } = req.body
   if (!id) return res.status(400).json({ error: 'id is required' })

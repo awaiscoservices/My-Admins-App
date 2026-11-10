@@ -1,24 +1,18 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: admin } = await supabaseAdmin.from('profiles').select('id, role').eq('id', user.id).single()
-  if (!admin || !['super_admin', 'marketing'].includes(admin.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.PROMOS_WRITE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { id, title, description, type, amount_cents, min_deposit_cents, expires_at, is_active } = req.body
   if (!title?.trim()) return res.status(400).json({ error: 'Title required' })
 
   const payload = {
+    tenant_id: gate.tenantId,
     title: title.trim(), description: description?.trim() || null,
     type: type || 'bonus',
     amount_cents: amount_cents || null,

@@ -19,17 +19,16 @@ function encrypt(text) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: admin } = await supabaseAdmin.from('profiles').select('id, role').eq('id', user.id).single()
-  if (!admin || !['super_admin', 'game_ops'].includes(admin.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.GAMES_WRITE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { id, name, code, description, is_active, credentials_json } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
 
   const payload = {
+    tenant_id: gate.tenantId,
     name: name.trim(), code: code?.trim() || null, description: description?.trim() || null,
     is_active: is_active !== false, updated_at: new Date().toISOString()
   }

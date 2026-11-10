@@ -6,24 +6,15 @@
  *         max_redeem_cap_cents, min_redeem_multiplier, max_redeem_multiplier,
  *         min_withdrawal_cents, max_withdrawal_cents }
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || actor.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.LEVELS_WRITE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const user = gate.actor
 
   const {
     id,
@@ -46,6 +37,7 @@ export default async function handler(req, res) {
   if (!name) return res.status(400).json({ error: 'name is required' })
 
   const payload = {
+    tenant_id: gate.tenantId,
     name,
     sort_order: sort_order ?? 0,
     xp_required: xp_required ?? 0,
