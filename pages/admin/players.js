@@ -77,11 +77,27 @@ export default function AdminPlayers() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(100)
-    if (filter !== 'all') q = q.eq('status', filter)
-    const { data } = await q
-    setRows(data || [])
-    setLoading(false)
+    // Goes through the API rather than querying profiles from the browser.
+    // The direct query returned every profile including staff, which is why
+    // Super Admin and Tenant Admin appeared in the player list, and it skipped
+    // the tenant filter the API route applies.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setRows([]); return }
+
+      const params = new URLSearchParams({ limit: '100' })
+      if (filter !== 'all') params.set('status', filter)
+
+      const res = await fetch(`/api/admin/players/list?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      setRows(res.ok ? (d.rows || []) : [])
+    } catch {
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAction(id, action) {

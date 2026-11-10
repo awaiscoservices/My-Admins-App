@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   let q = gate.db
     .from('ledger')
-    .select('id, type, direction, amount_cents, balance_after_cents, reference_id, description, created_at, profiles!ledger_user_id_fkey(full_name, email)', { count: 'exact' })
+    .select('id, type, direction, wallet_bucket, amount_cents, balance_after_cents, reference_id, description, created_at, profiles!ledger_user_id_fkey(full_name, email)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
 

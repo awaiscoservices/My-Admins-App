@@ -35,11 +35,26 @@ export default function AdminTransactions() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('ledger_entries').select('*, profiles!ledger_entries_user_id_fkey(full_name,email)').order('created_at', { ascending: false }).limit(200)
-    if (filter !== 'all') q = q.eq('entry_type', filter)
-    const { data } = await q
-    setRows(data || [])
-    setLoading(false)
+    // Was querying ledger_entries, which does not exist — the table is
+    // `ledger` — so this page always showed nothing. Now goes through the
+    // scoped API route, which also applies the tenant filter.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setRows([]); return }
+
+      const params = new URLSearchParams({ limit: '100' })
+      if (filter !== 'all') params.set('type', filter)
+
+      const res = await fetch(`/api/admin/transactions/list?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      setRows(res.ok ? (d.rows || []) : [])
+    } catch {
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filtered = rows.filter(r => {
@@ -81,7 +96,7 @@ export default function AdminTransactions() {
               {loading ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No transactions found</td></tr>
               : filtered.map(r => {
-                const color = TYPE_COLORS[r.entry_type] || 'rgba(255,255,255,.5)'
+                const color = TYPE_COLORS[r.type] || 'rgba(255,255,255,.5)'
                 const isCredit = r.amount_cents >= 0
                 return (
                   <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
@@ -93,11 +108,11 @@ export default function AdminTransactions() {
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
                     </td>
                     <td style={{ padding: '12px 14px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: color + '22', color, textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{TX_LABELS[r.entry_type] || r.entry_type?.replace(/_/g, ' ')}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: color + '22', color, textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{TX_LABELS[r.type] || r.type?.replace(/_/g, ' ')}</span>
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 800, color: isCredit ? '#22c55e' : '#ef4444' }}>{fmt(r.amount_cents)}</td>
                     <td style={{ padding: '12px 14px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: r.bucket === 'bonus' ? 'rgba(168,85,247,.15)' : 'rgba(255,255,255,.08)', color: r.bucket === 'bonus' ? '#a855f7' : 'rgba(255,255,255,.4)', textTransform: 'capitalize' }}>{r.bucket || 'cash'}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: r.wallet_bucket === 'bonus' ? 'rgba(168,85,247,.15)' : 'rgba(255,255,255,.08)', color: r.wallet_bucket === 'bonus' ? '#a855f7' : 'rgba(255,255,255,.4)', textTransform: 'capitalize' }}>{r.wallet_bucket || 'cash'}</span>
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)', fontFamily: 'monospace' }}>{r.balance_after_cents != null ? '$' + (r.balance_after_cents / 100).toFixed(2) : '—'}</td>
                     <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
