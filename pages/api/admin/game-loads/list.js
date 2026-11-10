@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     .from('game_loads')
     .select(`
       id, reference_id, amount_cents, status, created_at, admin_notes, reviewed_at,
+      wallet_bucket, game_account_username, game_panel_name,
       game_accounts ( id, game_username, game_panels ( name ) ),
       profiles!game_loads_user_id_fkey ( id, full_name, email )
     `)

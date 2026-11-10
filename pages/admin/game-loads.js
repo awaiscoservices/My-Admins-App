@@ -68,11 +68,24 @@ export default function AdminGameLoads() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('game_loads').select('*, profiles!game_loads_user_id_fkey(full_name,email)').order('created_at', { ascending: false }).limit(100)
-    if (filter !== 'all') q = q.eq('status', filter)
-    const { data } = await q
-    setRows(data || [])
-    setLoading(false)
+    // Through the scoped route: the direct query had no tenant filter.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setRows([]); return }
+
+      const params = new URLSearchParams()
+      if (filter !== 'all') params.set('status', filter)
+
+      const res = await fetch(`/api/admin/game-loads/list?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      setRows(res.ok ? (d.data || []) : [])
+    } catch {
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAction(id, action, notes) {

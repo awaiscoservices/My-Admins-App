@@ -1,31 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance', 'support', 'kyc_agent', 'risk']
+import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Invalid token' })
-
-  const { data: actor, error: actorErr } = await supabaseAdmin
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (actorErr || !actor || !ALLOWED_ROLES.includes(actor.role)) {
-    return res.status(403).json({ error: 'Forbidden' })
-  }
+  const gate = await guardAdmin(req, res, { allow: PERMS.PLAYER_DETAIL })
+  if (!gate) return
+  const supabaseAdmin = gate.db
 
   const { player_id } = req.query
   if (!player_id) return res.status(400).json({ error: 'player_id required' })
 
-  // Fetch all player data in parallel using service role (bypasses RLS)
+  // One scoped check gates the lot: confirm the player belongs to the caller's
+  // casino before loading their wallet, deposits, ledger and KYC. Everything
+  // below is keyed by this id, so it cannot reach another casino's data.
+  const { row: owned } = await loadOwnedRow(gate, 'profiles', player_id, 'id')
+  if (!owned) return res.status(404).json({ error: 'Player not found' })
+
+  // Ownership is already confirmed above, so these can run unscoped.
   const [
     { data: profile, error: profileErr },
     { data: wallet, error: walletErr },

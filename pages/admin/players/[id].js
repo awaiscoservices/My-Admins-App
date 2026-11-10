@@ -136,29 +136,35 @@ export default function AdminPlayerDetail() {
 
   async function loadPlayer() {
     setLoading(true)
-    const [
-      { data: prof },
-      { data: wal },
-      { data: deps },
-      { data: gas },
-      { data: txs },
-      { data: kycRec },
-    ] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', id).single(),
-      supabase.from('wallets').select('*').eq('user_id', id).single(),
-      supabase.from('deposits').select('*, payment_methods(name)').eq('user_id', id).order('created_at', { ascending: false }).limit(20),
-      supabase.from('game_accounts').select('*, game_panels(name, accent_color)').eq('user_id', id).order('created_at', { ascending: false }),
-      supabase.from('ledger').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(30),
-      supabase.from('kyc_records').select('*').eq('user_id', id).single(),
-    ])
+    // One scoped call replaces six direct browser queries. Those read this
+    // player's profile, wallet, deposits, game accounts, ledger and KYC with
+    // no tenant check at all.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setLoading(false); return }
 
-    setPlayer(prof)
-    setWallet(wal)
-    setDeposits(deps || [])
-    setGameAccounts(gas || [])
-    setTransactions(txs || [])
-    setKyc(kycRec)
-    setLoading(false)
+      const res = await fetch(`/api/admin/players/detail?player_id=${encodeURIComponent(id)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+
+      if (!res.ok) {
+        setPlayer(null)
+        setWallet(null); setDeposits([]); setGameAccounts([]); setTransactions([]); setKyc(null)
+        return
+      }
+
+      setPlayer(d.profile)
+      setWallet(d.wallet)
+      setDeposits(d.deposits || [])
+      setGameAccounts(d.game_accounts || [])
+      setTransactions(d.ledger || [])
+      setKyc(d.kyc)
+    } catch {
+      setPlayer(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAdjustment(form) {
