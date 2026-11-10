@@ -1,26 +1,14 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 const ALLOWED_ROLES = ['super_admin', 'admin', 'risk']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: admin, error: adminErr } = await supabaseAdmin
-    .from('profiles').select('id, role').eq('id', user.id).single()
-  if (adminErr || !admin || !ALLOWED_ROLES.includes(admin.role)) {
-    return res.status(403).json({ error: 'Forbidden' })
-  }
+  const gate = await guardAdmin(req, res, { allow: PERMS.RISK_ACTION })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { action, user_id, reason, note, flag_id } = req.body
 
@@ -29,6 +17,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'user_id and reason required' })
     }
     const { error } = await supabaseAdmin.from('risk_flags').insert({
+      tenant_id: gate.tenantId,
       user_id,
       reason: reason.trim(),
       note: note?.trim() || null,
@@ -52,8 +41,9 @@ export default async function handler(req, res) {
   if (action === 'unflag') {
     if (!flag_id) return res.status(400).json({ error: 'flag_id required' })
 
-    const { data: flag } = await supabaseAdmin
-      .from('risk_flags').select('user_id').eq('id', flag_id).single()
+    // Scoped: another casino's flag is not found, so it cannot be resolved.
+    const { row: flag } = await loadOwnedRow(gate, 'risk_flags', flag_id, 'user_id, tenant_id')
+    if (!flag) return res.status(404).json({ error: 'Risk flag not found' })
 
     const { error } = await supabaseAdmin.from('risk_flags').update({
       status: 'resolved',

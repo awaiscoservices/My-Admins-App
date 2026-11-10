@@ -1,29 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'support', 'finance', 'risk', 'kyc_agent', 'game_ops']
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Invalid token' })
-
-  const { data: profile, error: profileErr } = await supabaseAdmin
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profileErr || !profile) return res.status(401).json({ error: 'Profile not found' })
-  if (!ALLOWED_ROLES.includes(profile.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.NOTIFY_READ })
+  if (!gate) return
+  const supabaseAdmin = gate.db
 
   const { status, type, page = '1', limit = '50' } = req.query
   const pageNum = Math.max(1, parseInt(page))
@@ -35,6 +17,8 @@ export default async function handler(req, res) {
     .select('id, user_id, title, message, is_read, created_at, profiles!notifications_user_id_fkey(full_name, email)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
+
+  query = scopeToTenant(query, gate)
 
   if (status === 'unread') query = query.eq('is_read', false)
   if (status === 'read') query = query.eq('is_read', true)

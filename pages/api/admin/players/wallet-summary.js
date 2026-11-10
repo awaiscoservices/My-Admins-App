@@ -12,29 +12,24 @@
  *    on profiles join (multiple FKs to profiles → must name the constraint)
  *  - ledger.notes → description  (column was renamed)
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
+import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.WALLET_SUMMARY })
+  if (!gate) return
+  const supabaseAdmin = gate.db
 
   const { player_id, tab = 'summary', page = '1', limit = '25' } = req.query
   if (!player_id) return res.status(400).json({ error: 'player_id required' })
+
+  // Every query below is keyed by player_id, so confirming the player belongs
+  // to the caller's casino gates all of them. This route returns a player's
+  // whole financial picture — wallet, deposits, withdrawals, ledger — so it
+  // was the worst of the unscoped reads.
+  const { row: owned } = await loadOwnedRow(gate, 'profiles', player_id, 'id')
+  if (!owned) return res.status(404).json({ error: 'Player not found' })
 
   const pageNum  = Math.max(1, parseInt(page))
   const limitNum = Math.min(100, parseInt(limit))
