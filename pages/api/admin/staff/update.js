@@ -57,7 +57,7 @@ export default async function handler(req, res) {
     // Previously this set is_active alone: the Staff list greyed them out
     // while their login still worked and the panel still let them in.
     await supabaseAdmin.from('profiles')
-      .update({ is_active: false, status: 'suspended' })
+      .update({ status: 'suspended' })
       .eq('id', user_id)
 
     // Revoke the session itself, so an already-signed-in tab cannot keep

@@ -68,7 +68,7 @@ export default function AdminStaff() {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email, role, is_active, created_at')
+      .select('id, full_name, email, role, status, created_at')
       .in('role', ['super_admin', 'admin', 'finance', 'game_ops', 'support'])
       .order('created_at', { ascending: true })
 
@@ -241,7 +241,7 @@ export default function AdminStaff() {
             const color = ROLE_COLOR[member.role] || '#94a3b8'
             const isMe = member.id === myId
             return (
-              <div key={member.id} style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, opacity: member.is_active===false ? 0.4 : 1 }}>
+              <div key={member.id} style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:14, padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, opacity: member.status==='suspended' ? 0.4 : 1 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:14 }}>
                   <div style={{ width:38, height:38, borderRadius:'50%', background:`${color}22`, border:`1px solid ${color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color, flexShrink:0, fontFamily:"'Cinzel',serif" }}>
                     {member.full_name?.[0]?.toUpperCase() || '?'}
@@ -250,7 +250,7 @@ export default function AdminStaff() {
                     <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>
                       {member.full_name || '—'}
                       {isMe && <span style={{ marginLeft:8, fontSize:10, color:'rgba(255,255,255,.3)', fontWeight:400 }}>(you)</span>}
-                      {member.is_active === false && <span style={{ marginLeft:8, fontSize:10, color:'#f87171' }}>Deactivated</span>}
+                      {member.status === 'suspended' && <span style={{ marginLeft:8, fontSize:10, color:'#f87171' }}>Deactivated</span>}
                     </div>
                     <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>
                       {member.email} · Joined {fmtDate(member.created_at)}
@@ -261,7 +261,7 @@ export default function AdminStaff() {
                   <span style={{ padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${color}22`, color }}>
                     {member.role}
                   </span>
-                  {isSuperAdmin && !isMe && member.role !== 'super_admin' && member.is_active !== false && (
+                  {isSuperAdmin && !isMe && member.role !== 'super_admin' && member.status !== 'suspended' && (
                     <>
                       <button onClick={() => setModal({ type:'role', member })} style={{ padding:'7px 12px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.5)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                         Change Role

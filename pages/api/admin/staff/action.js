@@ -44,7 +44,7 @@ export default async function handler(req, res) {
 
   if (action === 'toggle_active') {
     if (!target_user_id) return res.status(400).json({ error: 'target_user_id required' })
-    const { error } = await supabaseAdmin.from('profiles').update({ is_active: !!active, updated_at: new Date().toISOString() }).eq('id', target_user_id)
+    const { error } = await supabaseAdmin.from('profiles').update({ status: active ? 'active' : 'suspended', updated_at: new Date().toISOString() }).eq('id', target_user_id)
     if (error) return res.status(500).json({ error: error.message })
     await supabaseAdmin.from('audit_logs').insert({
       action: active ? 'staff_activate' : 'staff_deactivate',

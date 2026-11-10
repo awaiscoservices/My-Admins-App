@@ -157,7 +157,6 @@ export default async function handler(req, res) {
             role:      'admin',
             tenant_id: tenant.id,
             status:    'active',
-            is_active: true,
           }, { onConflict: 'id', ignoreDuplicates: false })
 
           admin_invite = profileErr
