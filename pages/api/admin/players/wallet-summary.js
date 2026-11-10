@@ -54,7 +54,7 @@ export default async function handler(req, res) {
       { data: levelHistory },
     ] = await Promise.all([
       supabaseAdmin.from('wallets').select('*').eq('user_id', player_id).single(),
-      supabaseAdmin.from('profiles').select('id, player_level_id, current_level_id, player_levels(id,name,accent_color,min_xp,deposit_threshold_cents,display_order)').eq('id', player_id).single(),
+      supabaseAdmin.from('profiles').select('id, player_level_id, player_levels(id,name,accent_color,min_xp,deposit_threshold_cents,display_order)').eq('id', player_id).single(),
       supabaseAdmin.from('deposits').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('withdrawals').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('game_loads').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     const totalExcess = (redeems || []).reduce((s, r) => s + (r.excess_cents || 0), 0)
 
     const w = wallet || {}
-    const levelId = profile?.player_level_id || profile?.current_level_id
+    const levelId = profile?.player_level_id
     const currentLevel = profile?.player_levels || null
 
     // Next level

@@ -43,9 +43,10 @@ export default async function handler(req, res) {
       reviewed_by: actor.id,
     }).eq('id', kyc_id)
 
-    // Mark profile verified
+    // profiles has kyc_status, not kyc_verified. 'verified' is the value
+    // request_withdrawal() checks before allowing a payout.
     await supabaseAdmin.from('profiles').update({
-      kyc_verified: true,
+      kyc_status: 'verified',
     }).eq('id', kyc.user_id)
 
   } else {

@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   let query = gate.db
     .from('profiles')
-    .select('id, full_name, email, phone, status, kyc_status, vip_level_id, created_at, last_seen_at', { count: 'exact' })
+    .select('id, full_name, email, phone, status, kyc_status, player_level_id, created_at, last_login_at', { count: 'exact' })
     .eq('role', 'player')
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
