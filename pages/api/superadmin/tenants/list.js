@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   let q = supabaseAdmin
     .from('tenants')
-    .select('id, name, slug, status, plan, contact_email, created_at', { count: 'exact' })
+    .select('id, name, slug, status, plan, owner_email, created_at', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to)
 

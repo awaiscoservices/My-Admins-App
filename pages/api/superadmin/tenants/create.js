@@ -1,7 +1,12 @@
 /**
  * POST /api/superadmin/tenants/create
  * Creates a new tenant. Optionally invites an admin user.
- * Body: { name, slug, plan?, contact_email?, admin_email? }
+ * Body: { name, slug, plan?, admin_email?, brand_name?, primary_domain? }
+ *
+ * Columns on `tenants`: id, name, slug, status, owner_email, brand_name,
+ * primary_domain, plan, settings, created_at, updated_at. There is no
+ * contact_email, notes or created_by — earlier versions wrote all three and
+ * the insert failed outright.
  */
 import { guardSuperAdmin, supabaseAdmin } from '../_guard'
 
@@ -11,7 +16,7 @@ export default async function handler(req, res) {
   const admin = await guardSuperAdmin(req, res)
   if (!admin) return
 
-  const { name, slug, plan = 'free', contact_email, admin_email, notes } = req.body
+  const { name, slug, plan = 'free', admin_email, brand_name, primary_domain } = req.body
 
   if (!name?.trim())  return res.status(400).json({ error: 'name is required' })
   if (!slug?.trim())  return res.status(400).json({ error: 'slug is required' })
@@ -30,10 +35,11 @@ export default async function handler(req, res) {
       name: name.trim(),
       slug: slug.trim(),
       plan,
-      contact_email: contact_email?.trim() || null,
-      notes: notes?.trim() || null,
       status: 'active',
-      created_by: admin.id,
+      owner_email:    admin_email?.trim() || null,
+      brand_name:     brand_name?.trim() || null,
+      primary_domain: primary_domain?.trim() || null,
+      settings:       {},   // NOT NULL on this table
     })
     .select()
     .single()

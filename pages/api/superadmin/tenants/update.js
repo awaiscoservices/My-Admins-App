@@ -1,7 +1,7 @@
 /**
  * POST /api/superadmin/tenants/update
- * Updates tenant name, plan, contact_email, notes.
- * Body: { tenant_id, name?, plan?, contact_email?, notes? }
+ * Updates tenant name, plan, owner email, brand name and primary domain.
+ * Body: { tenant_id, name?, plan?, owner_email?, brand_name?, primary_domain? }
  */
 import { guardSuperAdmin, supabaseAdmin } from '../_guard'
 
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const admin = await guardSuperAdmin(req, res)
   if (!admin) return
 
-  const { tenant_id, name, plan, contact_email, notes } = req.body
+  const { tenant_id, name, plan, owner_email, brand_name, primary_domain } = req.body
   if (!tenant_id) return res.status(400).json({ error: 'tenant_id is required' })
 
   // Load current state for audit
@@ -21,8 +21,9 @@ export default async function handler(req, res) {
   const updates = {}
   if (name         !== undefined) updates.name          = name.trim()
   if (plan         !== undefined) updates.plan          = plan
-  if (contact_email !== undefined) updates.contact_email = contact_email?.trim() || null
-  if (notes        !== undefined) updates.notes         = notes?.trim() || null
+  if (owner_email    !== undefined) updates.owner_email    = owner_email?.trim() || null
+  if (brand_name     !== undefined) updates.brand_name     = brand_name?.trim() || null
+  if (primary_domain !== undefined) updates.primary_domain = primary_domain?.trim() || null
   updates.updated_at = new Date().toISOString()
 
   const { data: tenant, error } = await supabaseAdmin

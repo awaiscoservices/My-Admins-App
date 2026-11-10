@@ -40,8 +40,9 @@ export default function TenantDetail() {
         setForm({
           name: data.tenant.name || '',
           plan: data.tenant.plan || 'free',
-          contact_email: data.tenant.contact_email || '',
-          notes: data.tenant.notes || '',
+          owner_email:    data.tenant.owner_email || '',
+          brand_name:     data.tenant.brand_name || '',
+          primary_domain: data.tenant.primary_domain || '',
         })
         setLoading(false)
       })
@@ -148,7 +149,9 @@ export default function TenantDetail() {
           <div style={{ maxWidth: 500 }}>
             {[
               { key: 'name',          label: 'Tenant Name' },
-              { key: 'contact_email', label: 'Contact Email' },
+              { key: 'owner_email',    label: 'Owner Email' },
+              { key: 'brand_name',     label: 'Brand Name' },
+              { key: 'primary_domain', label: 'Primary Domain' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>{f.label}</label>
@@ -165,11 +168,6 @@ export default function TenantDetail() {
                 <option value="pro">Pro</option>
                 <option value="enterprise">Enterprise</option>
               </select>
-            </div>
-            <div style={{ marginBottom: 24 }}>
-              <label style={labelStyle}>Internal Notes</label>
-              <textarea value={form.notes || ''} onChange={e => setForm(x => ({ ...x, notes: e.target.value }))}
-                rows={3} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
             </div>
             <button onClick={save} disabled={saving} style={{ ...goldBtn, opacity: saving ? .6 : 1 }}>
               {saving ? 'Saving…' : 'Save Changes'}

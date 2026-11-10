@@ -182,13 +182,13 @@ function CreateTenantModal({ token, onClose, onCreated }) {
               placeholder={f.placeholder} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
           </div>
         ))}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Plan</label>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', margin: '-6px 0 16px', lineHeight: 1.5 }}>
             An invite email is sent to this address. They set their own password
             from the link and become this casino's admin. Leave it blank to
             invite someone later from Staff &amp; Roles.
           </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Plan</label>
 
           <select value={form.plan} onChange={e => setForm(x => ({ ...x, plan: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}>
             <option value="free">Free</option>
