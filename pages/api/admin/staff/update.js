@@ -54,7 +54,16 @@ export default async function handler(req, res) {
   }
 
   if (action === 'deactivate') {
-    await supabaseAdmin.from('profiles').update({ is_active: false }).eq('id', user_id)
+    // Previously this set is_active alone: the Staff list greyed them out
+    // while their login still worked and the panel still let them in.
+    await supabaseAdmin.from('profiles')
+      .update({ is_active: false, status: 'suspended' })
+      .eq('id', user_id)
+
+    // Revoke the session itself, so an already-signed-in tab cannot keep
+    // working until the token expires.
+    await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: '876600h' })
+      .then(() => {}, () => {})
 
     await supabaseAdmin.from('audit_logs').insert({
       actor_id: user.id, actor_role: actor.role,
