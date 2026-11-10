@@ -454,13 +454,13 @@ function QuickAction({ href, icon, label, desc, color }) {
   return (
     <Link href={href} style={{ textDecoration: 'none', display: 'block' }}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
-      <div style={{ position: 'relative', overflow: 'hidden', padding: '20px', borderRadius: 20, height: '100%', background: hov ? `linear-gradient(145deg,${color}28,#0e1627 72%)` : 'linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.016))', border: `1px solid ${hov ? color + '88' : 'rgba(255,255,255,.08)'}`, transform: hov ? 'translateY(-5px)' : 'none', boxShadow: hov ? `0 20px 40px rgba(0,0,0,.42), 0 0 30px ${color}24` : '0 8px 20px rgba(0,0,0,.22)', transition: 'all .3s cubic-bezier(.2,.8,.2,1)', cursor: 'pointer' }}>
+      <div className="qa" style={{ position: 'relative', overflow: 'hidden', padding: '20px', borderRadius: 20, height: '100%', background: hov ? `linear-gradient(145deg,${color}28,#0e1627 72%)` : 'linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.016))', border: `1px solid ${hov ? color + '88' : 'rgba(255,255,255,.08)'}`, transform: hov ? 'translateY(-5px)' : 'none', boxShadow: hov ? `0 20px 40px rgba(0,0,0,.42), 0 0 30px ${color}24` : '0 8px 20px rgba(0,0,0,.22)', transition: 'all .3s cubic-bezier(.2,.8,.2,1)', cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <span style={{ width: 46, height: 46, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0a0a0a', background: `linear-gradient(135deg,${color},${color}bb)`, boxShadow: `0 8px 22px ${color}44`, transform: hov ? 'rotate(-6deg) scale(1.05)' : 'none', transition: 'transform .3s' }}><I name={icon} size={22} stroke={2} /></span>
           <span style={{ color, opacity: hov ? 1 : 0.3, transform: hov ? 'translateX(0)' : 'translateX(-8px)', transition: 'all .3s' }}><I name="arrow" size={20} stroke={2.2} /></span>
         </div>
         <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 5 }}>{label}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', lineHeight: 1.55 }}>{desc}</div>
+        <div className="qa-desc" style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', lineHeight: 1.55 }}>{desc}</div>
       </div>
     </Link>
   )
@@ -524,40 +524,6 @@ function PromoBanner() {
         </div>
       </div>
     </Link>
-  )
-}
-
-// ─── STATS ROW ────────────────────────────────────────────────────────────────
-function StatsRow({ wallet, transactions }) {
-  const totalIn  = transactions.filter(t => t.direction === 'credit').reduce((s, t) => s + t.amount_cents, 0)
-  const totalOut = transactions.filter(t => t.direction === 'debit').reduce((s, t) => s + t.amount_cents, 0)
-  const balance  = (wallet?.cash_balance_cents || 0) + (wallet?.bonus_balance_cents || 0)
-
-  const stats = [
-    { label: 'Balance',         cents: balance,                              color: '#fbbf24', icon: 'wallet' },
-    { label: 'Total Deposited', cents: wallet?.total_deposited_cents || 0,   color: '#10b981', icon: 'plus' },
-    { label: 'Total Withdrawn', cents: wallet?.total_withdrawn_cents || 0,   color: '#60a5fa', icon: 'out' },
-    { label: 'Money In',        cents: totalIn,                              color: '#34d399', icon: 'down' },
-    { label: 'Money Out',       cents: totalOut,                             color: '#f87171', icon: 'up' },
-    { label: 'Transactions',    count: transactions.length,                  color: '#a78bfa', icon: 'list' },
-  ]
-  return (
-    <div style={{ marginBottom: 26 }}>
-      <div style={{ ...LABEL, marginBottom: 12 }}>Overview</div>
-      <div style={{ ...PANEL, borderRadius: 22, overflow: 'hidden', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(170px,100%),1fr))', gap: 1, background: 'rgba(251,191,36,.12)' }}>
-        {stats.map(s => (
-          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '16px 16px', background: 'linear-gradient(180deg,#0f192c,#0b1322)' }}>
-            <span style={{ width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color, background: `${s.color}1c`, border: `1px solid ${s.color}3d`, flexShrink: 0 }}><I name={s.icon} size={17} /></span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', lineHeight: 1.3, textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 3 }}>{s.label}</div>
-              {s.count !== undefined
-                ? <div style={{ fontSize: 20, fontWeight: 800, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.count}</div>
-                : <MoneyDisplay cents={s.cents} size="lg" color={s.color} />}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -675,13 +641,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* STATS ROW */}
-      <StatsRow wallet={wallet} transactions={transactions} />
 
       {/* QUICK ACTIONS */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ ...LABEL, marginBottom: 12 }}>Quick Actions</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px,100%),1fr))', gap: 12 }}>
+        <div className="qa-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px,100%),1fr))', gap: 12 }}>
           <QuickAction href="/dashboard/deposit"   icon="plus" label="Add Money"  desc="Deposit funds to your wallet"   color="#10b981" />
           <QuickAction href="/dashboard/load-game" icon="gamepad" label="Load Game"  desc="Send credits to a game room"    color="#fbbf24" />
           <QuickAction href="/dashboard/redeem"    icon="trophy" label="Redeem"     desc="Request a redemption from game" color="#f59e0b" />
@@ -729,7 +693,7 @@ export default function Dashboard() {
       )}
 
       {/* MAIN GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20 }}>
+      <div className="dash-main-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20 }}>
 
         {/* Recent Transactions */}
         <div style={{ ...PANEL, borderRadius: 18, overflow: 'hidden' }}>
@@ -818,7 +782,7 @@ export default function Dashboard() {
       </div>
 
       <style>{`
-        @media (max-width: 900px) {
+        @media (max-width: 1080px) {
           .dash-main-grid { grid-template-columns: 1fr !important; }
         }
         .hg{position:relative;flex:0 0 150px;display:block;text-decoration:none;color:#fff;border-radius:18px;overflow:hidden;background:linear-gradient(165deg,var(--g1) 0%,var(--g2) 62%,#0a1222 100%);border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 22px rgba(0,0,0,.35);transition:transform .3s cubic-bezier(.2,.9,.3,1.35),box-shadow .3s,border-color .3s}
@@ -830,7 +794,7 @@ export default function Dashboard() {
         .hg-b{position:absolute;top:0;right:0;z-index:2;background:#e5484d;color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-bottom-left-radius:10px}
         .hg:hover{transform:translateY(-8px) scale(1.05);border-color:#fbbf24;box-shadow:0 22px 40px rgba(0,0,0,.55),0 0 0 1px #fbbf24,0 0 30px rgba(251,191,36,.35);z-index:3}
         .hg:hover::after{left:135%}.hg:hover .hg-art img{transform:scale(1.1) translateY(-3px)}
-        @media(max-width:560px){.wl-grid{grid-template-columns:1fr 1fr!important}.wl-grid .wc{padding:16px 14px 14px!important}.wc-num *{font-size:22px!important}}
+        @media(max-width:560px){.qa-grid{grid-template-columns:1fr 1fr!important;gap:10px!important}.qa{padding:14px!important}.qa-desc{font-size:12px!important}.wl-grid{grid-template-columns:1fr 1fr!important}.wl-grid .wc{padding:16px 14px 14px!important}.wc-num *{font-size:22px!important}}
         @media(prefers-reduced-motion:reduce){.hg,.hg-art img{transition:none}.hg:hover{transform:none}}
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
