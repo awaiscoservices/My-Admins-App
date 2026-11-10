@@ -29,8 +29,10 @@ export default function SupportLogin() {
 
   const validate = () => {
     const e = {}
-    if (!email.trim()) e.email = 'Email is required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email'
+    if (!email.trim()) e.email = 'Username or email is required'
+    // Only check the shape when it looks like an address; a bare username
+    // is resolved server-side instead.
+    else if (email.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email'
     if (!password) e.password = 'Password is required'
     return e
   }
@@ -42,7 +44,21 @@ export default function SupportLogin() {
     setErrors({})
     setLoading(true)
     try {
-      const data = await signInWithEmail({ email, password })
+      // A bare username is turned into the address behind it first; anything
+      // with an @ is treated as the address itself.
+      let loginEmail = email.trim()
+      if (!loginEmail.includes('@')) {
+        const r = await fetch('/api/auth/resolve-username', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: loginEmail }),
+        })
+        const j = await r.json()
+        if (!r.ok) { showToast(j.error || 'Invalid username or password'); return }
+        loginEmail = j.email
+      }
+
+      const data = await signInWithEmail({ email: loginEmail, password })
       const { supabase: sb } = await import('../../lib/supabase')
       const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single()
       if (prof?.role && STAFF_ROLES.includes(prof.role)) {
@@ -126,8 +142,8 @@ export default function SupportLogin() {
 
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Email Address</label>
-              <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (errors.email) setErrors(p => ({ ...p, email: '' })) }} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} placeholder="staff@casinozoesupport.com" style={inp('email')} autoComplete="email" />
+              <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Username or Email</label>
+              <input type="text" value={email} onChange={e => { setEmail(e.target.value); if (errors.email) setErrors(p => ({ ...p, email: '' })) }} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} placeholder="username or email" style={inp('email')} autoComplete="username" />
               {errors.email && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}>⚠ {errors.email}</p>}
             </div>
 

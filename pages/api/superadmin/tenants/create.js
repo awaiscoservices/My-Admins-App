@@ -10,6 +10,10 @@
  */
 import { guardSuperAdmin, supabaseAdmin } from '../_guard'
 
+// Addresses for username-only staff accounts. Never receives mail; it exists
+// because Supabase Auth requires an address.
+const INTERNAL_EMAIL_DOMAIN = 'staff.casinoze.local'
+
 /**
  * profiles.full_name is NOT NULL, so an invite that does not set it fails
  * after the auth user has already been created. Derive something readable
@@ -49,7 +53,7 @@ export default async function handler(req, res) {
   const admin = await guardSuperAdmin(req, res)
   if (!admin) return
 
-  const { name, slug, plan = 'free', admin_email, brand_name, primary_domain } = req.body
+  const { name, slug, plan = 'free', admin_email, admin_username, admin_password, brand_name, primary_domain } = req.body
 
   if (!name?.trim())  return res.status(400).json({ error: 'name is required' })
   if (!slug?.trim())  return res.status(400).json({ error: 'slug is required' })
@@ -90,63 +94,86 @@ export default async function handler(req, res) {
     after_state: { name: tenant.name, slug: tenant.slug, plan },
   }).then(() => {}, () => {})
 
-  // Invite the first admin, if one was given.
+  // Create the first admin, if credentials were given.
   //
-  // This field existed on the form and in this handler's signature but was
-  // never used — no account was created, no email sent, and the address was
-  // not even stored. A new casino was created with no way into it.
+  // Supabase Auth still needs an address, but a username-only account never
+  // receives mail, so one is synthesised from the username. profiles.username
+  // holds the real username and /api/auth/resolve-username maps it back at
+  // sign-in. An admin_email may still be given instead, for an account that
+  // should be reachable by email.
   //
-  // The tenant itself is already saved, so a failed invite is reported back
-  // rather than failing the whole request: the casino exists either way and
-  // an admin can be invited separately from Staff & Roles.
+  // The tenant is already saved, so a failure here is reported rather than
+  // failing the whole request: the casino exists and an admin can be added
+  // from Staff & Roles.
   let admin_invite = null
 
-  if (admin_email?.trim()) {
-    const email = admin_email.trim()
+  if (admin_username?.trim() || admin_email?.trim()) {
+    const username = admin_username?.trim().toLowerCase() || null
+    const password = admin_password
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      admin_invite = { ok: false, error: 'Casino created, but the admin email is not a valid address.' }
+    if (username && !/^[a-z0-9._-]{3,32}$/.test(username)) {
+      admin_invite = { ok: false, error: 'Casino created, but the username must be 3-32 characters: letters, numbers, dot, dash or underscore.' }
+    } else if (!password || password.length < 8) {
+      admin_invite = { ok: false, error: 'Casino created, but the admin password must be at least 8 characters.' }
     } else {
-      // Reuse an existing account rather than failing on "already registered".
-      const existing = await findUserByEmail(supabaseAdmin, email)
+      // Username-only accounts get an internal address that is never emailed.
+      const loginEmail = admin_email?.trim() || `${username}@${INTERNAL_EMAIL_DOMAIN}`
 
-      let invited = existing ? { user: existing } : null
-      let inviteErr = null
+      const taken = username
+        ? await supabaseAdmin.from('profiles').select('id').ilike('username', username).maybeSingle()
+        : { data: null }
 
-      if (!existing) {
-        const r = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-          data: { invited_role: 'admin', is_staff: true, tenant_id: tenant.id },
-        })
-        invited = r.data
-        inviteErr = r.error
-      }
-
-      if (inviteErr) {
-        admin_invite = { ok: false, error: `Casino created, but the invite failed: ${inviteErr.message}` }
+      if (taken.data) {
+        admin_invite = { ok: false, error: 'Casino created, but that username is already taken.' }
       } else {
-        // Pre-create the profile so the role and casino are right on first
-        // login. Without tenant_id, adminGuard locks the account out.
-        const { error: profileErr } = await supabaseAdmin.from('profiles').upsert({
-          id:        invited.user.id,
-          email,
-          full_name: nameFromEmail(email),
-          role:      'admin',
-          tenant_id: tenant.id,
-        }, { onConflict: 'id', ignoreDuplicates: false })
+        const existing = await findUserByEmail(supabaseAdmin, loginEmail)
+        let userId = existing?.id || null
+        let createErr = null
 
-        admin_invite = profileErr
-          ? { ok: false, error: `Invite sent, but the profile could not be created: ${profileErr.message}` }
-          : { ok: true, email, reused: !!existing }
+        if (existing) {
+          // Repair a half-made account from an earlier attempt, and reset the
+          // password to what was just typed.
+          const r = await supabaseAdmin.auth.admin.updateUserById(existing.id, { password })
+          createErr = r.error
+        } else {
+          const r = await supabaseAdmin.auth.admin.createUser({
+            email: loginEmail,
+            password,
+            email_confirm: true,   // no confirmation mail; these are handed over directly
+            user_metadata: { is_staff: true, tenant_id: tenant.id, username },
+          })
+          createErr = r.error
+          userId = r.data?.user?.id || null
+        }
 
-        await supabaseAdmin.from('audit_logs').insert({
-          tenant_id:   tenant.id,
-          actor_id:    admin.id,
-          actor_role:  admin.role,
-          action:      'staff_invited',
-          target_type: 'profile',
-          target_id:   invited.user.id,
-          description: `Invited ${email} as admin of ${tenant.name}`,
-        }).then(() => {}, () => {})
+        if (createErr || !userId) {
+          admin_invite = { ok: false, error: `Casino created, but the admin account failed: ${createErr?.message || 'unknown error'}` }
+        } else {
+          const { error: profileErr } = await supabaseAdmin.from('profiles').upsert({
+            id:        userId,
+            email:     loginEmail,
+            username,
+            full_name: username ? nameFromEmail(username) : nameFromEmail(loginEmail),
+            role:      'admin',
+            tenant_id: tenant.id,
+            status:    'active',
+            is_active: true,
+          }, { onConflict: 'id', ignoreDuplicates: false })
+
+          admin_invite = profileErr
+            ? { ok: false, error: `Admin account created, but its profile failed: ${profileErr.message}` }
+            : { ok: true, username, email: loginEmail, reused: !!existing }
+
+          await supabaseAdmin.from('audit_logs').insert({
+            tenant_id:   tenant.id,
+            actor_id:    admin.id,
+            actor_role:  admin.role,
+            action:      'staff_created',
+            target_type: 'profile',
+            target_id:   userId,
+            description: `Created admin ${username || loginEmail} for ${tenant.name}`,
+          }).then(() => {}, () => {})
+        }
       }
     }
   }

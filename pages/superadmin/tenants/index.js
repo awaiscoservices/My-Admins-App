@@ -139,7 +139,7 @@ export default function TenantsPage() {
 }
 
 function CreateTenantModal({ token, onClose, onCreated }) {
-  const [form, setForm] = useState({ name: '', slug: '', plan: 'free', admin_email: '' })
+  const [form, setForm] = useState({ name: '', slug: '', plan: 'free', admin_username: '', admin_password: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -174,18 +174,20 @@ function CreateTenantModal({ token, onClose, onCreated }) {
         {[
           { key: 'name',        label: 'Tenant Name',  placeholder: 'Acme Casino' },
           { key: 'slug',        label: 'Slug',         placeholder: 'acme-casino' },
-          { key: 'admin_email', label: 'Admin Email (optional)',  placeholder: 'admin@acme.com' },
+          { key: 'admin_username', label: 'Admin Username', placeholder: 'acmeadmin' },
+          { key: 'admin_password', label: 'Admin Password', placeholder: 'at least 8 characters', type: 'password' },
         ].map(f => (
           <div key={f.key} style={{ marginBottom: 14 }}>
             <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>{f.label}</label>
-            <input value={form[f.key]} onChange={e => setForm(x => ({ ...x, [f.key]: e.target.value }))}
-              placeholder={f.placeholder} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+            <input type={f.type || 'text'} value={form[f.key]} onChange={e => setForm(x => ({ ...x, [f.key]: e.target.value }))}
+              placeholder={f.placeholder} autoComplete="off"
+              style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
           </div>
         ))}
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', margin: '-6px 0 16px', lineHeight: 1.5 }}>
-            An invite email is sent to this address. They set their own password
-            from the link and become this casino's admin. Leave it blank to
-            invite someone later from Staff &amp; Roles.
+            Sets up this casino's admin straight away — no email involved. They
+            sign in with this username and password on the staff login. Leave
+            both blank to add someone later from Staff &amp; Roles.
           </div>
         <div style={{ marginBottom: 20 }}>
           <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Plan</label>
