@@ -1,34 +1,20 @@
 /**
  * GET /api/admin/deposits/list
- * Returns deposits with player info. Uses service role to bypass RLS.
+ * Returns deposits for the caller's own casino, with player info.
+ * Super admins see deposits across all casinos.
  * Roles: super_admin, admin, finance
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance']
+import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role))
-    return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.DEPOSITS_READ })
+  if (!gate) return
 
   const { status } = req.query
 
-  let q = supabaseAdmin
+  let q = gate.db
     .from('deposits')
     .select(`
       id, reference_id, amount_cents, bonus_cents, total_credit_cents,
@@ -39,6 +25,8 @@ export default async function handler(req, res) {
     `)
     .order('created_at', { ascending: false })
     .limit(100)
+
+  q = scopeToTenant(q, gate)
 
   if (status && status !== 'all') q = q.eq('status', status)
 
