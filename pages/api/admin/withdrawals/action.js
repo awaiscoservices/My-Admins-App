@@ -19,28 +19,15 @@
  *   1. Mark rejected with reason
  *   2. Audit log
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance']
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin
-    .from('profiles').select('role, full_name').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role))
-    return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.WITHDRAWALS_ACTION })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
 
   const { withdrawal_id, action, rejection_reason, proof_screenshot_url } = req.body
   if (!withdrawal_id) return res.status(400).json({ error: 'withdrawal_id required' })
@@ -48,9 +35,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'action must be approve or reject' })
 
   // Fetch withdrawal
-  const { data: withdrawal, error: wErr } = await supabaseAdmin
-    .from('withdrawals').select('*').eq('id', withdrawal_id).single()
+  // Scoped to the caller's casino: another casino's withdrawal is not found.
+  const { row: withdrawal, error: wErr } = await loadOwnedRow(gate, 'withdrawals', withdrawal_id)
   if (wErr || !withdrawal) return res.status(404).json({ error: 'Withdrawal not found' })
+  const tenantId = tenantOf(withdrawal, gate)
   if (!['pending', 'under_review'].includes(withdrawal.status)) {
     return res.status(409).json({ error: `Withdrawal is already ${withdrawal.status}` })
   }
@@ -66,7 +54,7 @@ export default async function handler(req, res) {
       .update({
         status:           'rejected',
         rejection_reason: rejection_reason || 'Rejected by admin',
-        reviewed_by:      user.id,
+        reviewed_by:      actor.id,
         reviewed_at:      now,
         updated_at:       now,
       })
@@ -75,7 +63,7 @@ export default async function handler(req, res) {
     if (rejErr) return res.status(500).json({ error: rejErr.message })
 
     await supabaseAdmin.from('audit_logs').insert({
-      actor_id:    user.id,
+      actor_id:    actor.id,
       actor_role:  actor.role,
       action:      'withdrawal_rejected',
       target_type: 'withdrawal',
@@ -164,6 +152,7 @@ export default async function handler(req, res) {
     }).eq('user_id', playerId).eq('version', wallet.version),
 
     supabaseAdmin.from('ledger').insert({
+      tenant_id: tenantId,
       reference_id:        idempKey,
       user_id:             playerId,
       type:                'withdrawal',
@@ -173,15 +162,15 @@ export default async function handler(req, res) {
       balance_after_cents: newCashBalance,
       withdrawal_id:       withdrawal_id,
       description:         `Withdrawal ${withdrawal.reference_id} approved`,
-      created_by:          user.id,
+      created_by:          actor.id,
       idempotency_key:     idempKey,
     }),
 
     supabaseAdmin.from('withdrawals').update({
       status:                 'approved',
-      reviewed_by:            user.id,
+      reviewed_by:            actor.id,
       reviewed_at:            now,
-      processed_by:           user.id,
+      processed_by:           actor.id,
       processed_at:           now,
       updated_at:             now,
       level_id_at_time:       levelId,
@@ -205,7 +194,7 @@ export default async function handler(req, res) {
   }, { onConflict: 'user_id' })
 
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id:    user.id,
+    actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'withdrawal_approved',
     target_type: 'withdrawal',

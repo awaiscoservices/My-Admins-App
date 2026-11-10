@@ -19,39 +19,29 @@
  *   1. Mark load rejected with reason
  *   2. Write audit log
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance', 'game_ops']
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role, full_name').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.GAME_LOADS_ACTION })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
 
   const { load_id, action, rejection_reason } = req.body
   if (!load_id) return res.status(400).json({ error: 'load_id required' })
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'action must be approve or reject' })
 
   // Fetch the load with game account info
-  const { data: load, error: loadErr } = await supabaseAdmin
-    .from('game_loads')
-    .select('*, game_accounts(id, user_id, game_username, game_panels(name))')
-    .eq('id', load_id)
-    .single()
+  // Scoped to the caller's casino: another casino's load is not found.
+  const { row: load, error: loadErr } = await loadOwnedRow(
+    gate, 'game_loads', load_id,
+    '*, game_accounts(id, user_id, game_username, game_panels(name))'
+  )
 
   if (loadErr || !load) return res.status(404).json({ error: 'Game load not found' })
+  const tenantId = tenantOf(load, gate)
   if (!['pending', 'processing'].includes(load.status)) {
     return res.status(409).json({ error: `Load is already ${load.status}` })
   }
@@ -69,7 +59,7 @@ export default async function handler(req, res) {
       .update({
         status:           'rejected',
         rejection_reason: rejection_reason || 'Rejected by admin',
-        reviewed_by:      user.id,
+        reviewed_by:      actor.id,
         reviewed_at:      new Date().toISOString(),
         updated_at:       new Date().toISOString(),
       })
@@ -78,7 +68,7 @@ export default async function handler(req, res) {
     if (rejectErr) return res.status(500).json({ error: rejectErr.message })
 
     await supabaseAdmin.from('audit_logs').insert({
-      actor_id:    user.id,
+      actor_id:    actor.id,
       actor_role:  actor.role,
       action:      'game_load_rejected',
       target_type: 'game_load',
@@ -140,6 +130,7 @@ export default async function handler(req, res) {
   const ledgerRows = []
   if (cashUsed > 0) {
     ledgerRows.push({
+      tenant_id:         tenantId,
       reference_id:      `${idempKey}-cash`,
       user_id:           playerId,
       type:              'game_load',
@@ -149,12 +140,13 @@ export default async function handler(req, res) {
       balance_after_cents: walletUpdate.cash_balance_cents,
       game_load_id:      load_id,
       description:       `Game load ${load.reference_id} — cash`,
-      created_by:        user.id,
+      created_by:        actor.id,
       idempotency_key:   `${idempKey}-cash`,
     })
   }
   if (bonusUsed > 0) {
     ledgerRows.push({
+      tenant_id:         tenantId,
       reference_id:      `${idempKey}-bonus`,
       user_id:           playerId,
       type:              'game_load',
@@ -164,7 +156,7 @@ export default async function handler(req, res) {
       balance_after_cents: walletUpdate.bonus_balance_cents,
       game_load_id:      load_id,
       description:       `Game load ${load.reference_id} — bonus`,
-      created_by:        user.id,
+      created_by:        actor.id,
       idempotency_key:   `${idempKey}-bonus`,
     })
   }
@@ -175,9 +167,9 @@ export default async function handler(req, res) {
     supabaseAdmin.from('ledger').insert(ledgerRows),
     supabaseAdmin.from('game_loads').update({
       status:                'completed',
-      reviewed_by:           user.id,
+      reviewed_by:           actor.id,
       reviewed_at:           now,
-      processed_by:          user.id,
+      processed_by:          actor.id,
       processed_at:          now,
       updated_at:            now,
       game_panel_name:       panelName,
@@ -203,7 +195,7 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id:    user.id,
+    actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'game_load_approved',
     target_type: 'game_load',

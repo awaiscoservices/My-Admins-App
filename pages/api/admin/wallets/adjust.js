@@ -1,24 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'finance']
+import { guardAdmin, scopeToTenant, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role, full_name').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.WALLETS_ADJUST })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
 
   const { user_id, amount_cents, direction, reason } = req.body
   if (!user_id || !amount_cents || !direction || !reason?.trim()) return res.status(400).json({ error: 'user_id, amount_cents, direction, reason required' })
@@ -31,9 +20,13 @@ export default async function handler(req, res) {
   const idempotency_key = randomUUID()
 
   // Fetch wallet with optimistic lock
-  const { data: wallet, error: walletErr } = await supabaseAdmin
-    .from('wallets').select('id, cash_balance_cents, version').eq('user_id', user_id).single()
+  // Scoped: a wallet in another casino is not found, so it cannot be adjusted.
+  let walletQ = supabaseAdmin
+    .from('wallets').select('id, cash_balance_cents, version, tenant_id').eq('user_id', user_id)
+  walletQ = scopeToTenant(walletQ, gate)
+  const { data: wallet, error: walletErr } = await walletQ.maybeSingle()
   if (walletErr || !wallet) return res.status(404).json({ error: 'Wallet not found' })
+  const tenantId = tenantOf(wallet, gate)
 
   if (direction === 'debit' && wallet.cash_balance_cents < amount_cents) {
     return res.status(400).json({ error: 'Insufficient balance for debit' })
@@ -54,6 +47,7 @@ export default async function handler(req, res) {
 
   // Ledger entry
   await supabaseAdmin.from('ledger').insert({
+    tenant_id: tenantId,
     user_id,
     type: 'adjustment',
     direction,
@@ -62,13 +56,14 @@ export default async function handler(req, res) {
     reference_id,
     idempotency_key,
     description: `Admin adjustment: ${reason}`,
-    metadata: { admin_id: user.id, admin_name: actor.full_name, reason },
+    metadata: { admin_id: actor.id, admin_name: actor.full_name, reason },
   })
 
   // wallet_adjustments record
   await supabaseAdmin.from('wallet_adjustments').insert({
+    tenant_id: tenantId,
     user_id,
-    admin_id: user.id,
+    admin_id: actor.id,
     amount_cents,
     direction,
     reason,
@@ -79,7 +74,8 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id: user.id,
+    tenant_id: tenantId,
+    actor_id: actor.id,
     action: 'wallet_adjustment',
     target_type: 'wallet',
     target_id: wallet.id,
@@ -88,6 +84,7 @@ export default async function handler(req, res) {
 
   // Notify player
   await supabaseAdmin.from('notifications').insert({
+    tenant_id: tenantId,
     user_id,
     title: direction === 'credit' ? '💰 Wallet Credited' : '💸 Wallet Debited',
     message: `Your wallet has been ${direction === 'credit' ? 'credited' : 'debited'} $${(amount_cents / 100).toFixed(2)}. Ref: ${reference_id}`,

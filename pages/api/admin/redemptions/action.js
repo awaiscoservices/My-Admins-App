@@ -22,40 +22,30 @@
  *   1. Mark rejected with reason
  *   2. Audit log
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'finance', 'game_ops']
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 const XP_PER_DOLLAR_EXCESS = 1  // 1 XP per $1 of excess scores
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role, full_name').eq('id', user.id).single()
-  if (!actor || !ALLOWED_ROLES.includes(actor.role)) return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.REDEMPTIONS_ACTION })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
 
   const { redemption_id, action, approved_cents, rejection_reason } = req.body
   if (!redemption_id) return res.status(400).json({ error: 'redemption_id required' })
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'action must be approve or reject' })
 
   // Fetch redemption with game account info
-  const { data: redemption, error: redemptionErr } = await supabaseAdmin
-    .from('redemptions')
-    .select('*, game_accounts(id, user_id, game_username, game_panels(name, redeem_multiplier))')
-    .eq('id', redemption_id)
-    .single()
+  // Scoped to the caller's casino: another casino's redemption is not found.
+  const { row: redemption, error: redemptionErr } = await loadOwnedRow(
+    gate, 'redemptions', redemption_id,
+    '*, game_accounts(id, user_id, game_username, game_panels(name, redeem_multiplier))'
+  )
 
   if (redemptionErr || !redemption) return res.status(404).json({ error: 'Redemption not found' })
+  const tenantId = tenantOf(redemption, gate)
   if (!['pending', 'under_review'].includes(redemption.status)) {
     return res.status(409).json({ error: `Redemption is already ${redemption.status}` })
   }
@@ -73,7 +63,7 @@ export default async function handler(req, res) {
       .update({
         status:           'rejected',
         rejection_reason: rejection_reason || 'Rejected by admin',
-        reviewed_by:      user.id,
+        reviewed_by:      actor.id,
         reviewed_at:      new Date().toISOString(),
         updated_at:       new Date().toISOString(),
         game_panel_name:       panelName,
@@ -87,7 +77,7 @@ export default async function handler(req, res) {
     await _recalculateLevelOnReject(playerId)
 
     await supabaseAdmin.from('audit_logs').insert({
-      actor_id:    user.id,
+      actor_id:    actor.id,
       actor_role:  actor.role,
       action:      'redemption_rejected',
       target_type: 'redemption',
@@ -171,6 +161,7 @@ export default async function handler(req, res) {
     }).eq('user_id', playerId).eq('version', wallet.version),
 
     supabaseAdmin.from('ledger').insert({
+      tenant_id: tenantId,
       reference_id:        idempKey,
       user_id:             playerId,
       type:                'redeem',
@@ -180,7 +171,7 @@ export default async function handler(req, res) {
       balance_after_cents: newCashBalance,
       redeem_id:           redemption_id,
       description:         `Redeem ${redemption.reference_id} approved`,
-      created_by:          user.id,
+      created_by:          actor.id,
       idempotency_key:     idempKey,
     }),
 
@@ -191,9 +182,9 @@ export default async function handler(req, res) {
       approved_amount_cents: finalApproved,
       excess_cents:          excessCents,
       rule_snapshot:         ruleSnapshot,
-      reviewed_by:           user.id,
+      reviewed_by:           actor.id,
       reviewed_at:           now,
-      processed_by:          user.id,
+      processed_by:          actor.id,
       processed_at:          now,
       updated_at:            now,
       game_panel_name:       panelName,
@@ -233,7 +224,7 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
-    actor_id:    user.id,
+    actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'redemption_approved',
     target_type: 'redemption',

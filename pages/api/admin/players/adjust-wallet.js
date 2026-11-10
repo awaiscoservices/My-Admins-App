@@ -3,28 +3,15 @@
  * Apply a manual wallet adjustment with full ledger entry + audit log.
  * Admin CANNOT set a balance directly — only adjust with a reason.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, scopeToTenant, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: admin } = await supabaseAdmin
-    .from('profiles').select('id, role, full_name').eq('id', user.id).single()
-
-  const allowedRoles = ['super_admin', 'admin', 'finance']
-  if (!admin || !allowedRoles.includes(admin.role))
-    return res.status(403).json({ error: 'Insufficient permissions. Finance role required.' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.PLAYER_WALLET_ADJUST })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { player_id, direction, wallet_bucket, amount_cents, reason, case_reference } = req.body
 
@@ -37,10 +24,13 @@ export default async function handler(req, res) {
   if (!reason?.trim()) return res.status(400).json({ error: 'Reason is required' })
 
   // Load wallet with version lock
-  const { data: wallet } = await supabaseAdmin
-    .from('wallets').select('*').eq('user_id', player_id).single()
+  // Scoped: a wallet in another casino is not found, so it cannot be adjusted.
+  let walletQ = supabaseAdmin.from('wallets').select('*').eq('user_id', player_id)
+  walletQ = scopeToTenant(walletQ, gate)
+  const { data: wallet } = await walletQ.maybeSingle()
 
   if (!wallet) return res.status(404).json({ error: 'Wallet not found' })
+  const tenantId = tenantOf(wallet, gate)
 
   // Calculate new balance
   const balanceField = wallet_bucket === 'cash' ? 'cash_balance_cents' : 'bonus_balance_cents'
@@ -76,6 +66,7 @@ export default async function handler(req, res) {
   // Create adjustment record
   const refId = `ADJ-${Date.now()}`
   await supabaseAdmin.from('wallet_adjustments').insert({
+    tenant_id: tenantId,
     reference_id: refId,
     user_id: player_id,
     wallet_bucket,
@@ -92,6 +83,7 @@ export default async function handler(req, res) {
   // Create ledger entry
   const txType = direction === 'credit' ? 'adjustment_credit' : 'adjustment_debit'
   await supabaseAdmin.from('ledger').insert({
+    tenant_id: tenantId,
     reference_id: `${refId}-${direction.toUpperCase()}`,
     user_id: player_id,
     type: txType,
@@ -106,6 +98,7 @@ export default async function handler(req, res) {
 
   // Notify player
   await supabaseAdmin.from('notifications').insert({
+    tenant_id: tenantId,
     user_id: player_id,
     title: `Wallet ${direction === 'credit' ? 'Credited' : 'Adjusted'}`,
     message: `Your ${wallet_bucket} wallet has been ${direction === 'credit' ? 'credited' : 'debited'} $${(amount_cents / 100).toFixed(2)}. Reference: ${refId}.`,
@@ -113,6 +106,7 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id: tenantId,
     actor_id: admin.id, actor_role: admin.role,
     action: `wallet_adjustment_${direction}`,
     target_type: 'wallet', target_id: wallet.id,

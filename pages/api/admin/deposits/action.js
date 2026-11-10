@@ -4,32 +4,17 @@
  * On approval: creates ledger entries + updates wallet balance.
  * All financial math is server-side only.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // ── Auth: must be staff ────────────────────────────────────
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
+  // Verifies the token, checks the role, and resolves the caller's casino.
+  const gate = await guardAdmin(req, res, { allow: PERMS.DEPOSITS_ACTION })
+  if (!gate) return
 
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: admin } = await supabaseAdmin
-    .from('profiles')
-    .select('id, role, full_name')
-    .eq('id', user.id)
-    .single()
-
-  const allowedRoles = ['super_admin', 'finance']
-  if (!admin || !allowedRoles.includes(admin.role))
-    return res.status(403).json({ error: 'Insufficient permissions' })
+  const supabaseAdmin = gate.db
+  const admin = gate.actor
 
   const { deposit_id, action, rejection_reason } = req.body
 
@@ -39,14 +24,15 @@ export default async function handler(req, res) {
   if (action === 'rejected' && !rejection_reason?.trim())
     return res.status(400).json({ error: 'Rejection reason is required' })
 
-  // ── Load deposit ───────────────────────────────────────────
-  const { data: deposit, error: depErr } = await supabaseAdmin
-    .from('deposits')
-    .select('*')
-    .eq('id', deposit_id)
-    .single()
+  // ── Load deposit — only if it belongs to the caller's casino ───
+  // This single filter secures the whole route: everything below works from
+  // `deposit`, so another casino's deposit is simply not found.
+  const { row: deposit, error: depErr } = await loadOwnedRow(gate, 'deposits', deposit_id)
 
   if (depErr || !deposit) return res.status(404).json({ error: 'Deposit not found' })
+
+  // Stamp child rows (ledger, notifications) with the same casino.
+  const tenantId = tenantOf(deposit, gate)
   if (!['pending', 'under_review'].includes(deposit.status))
     return res.status(409).json({ error: `Deposit is already ${deposit.status}` })
 
@@ -73,6 +59,7 @@ export default async function handler(req, res) {
 
     // Notify player
     await supabaseAdmin.from('notifications').insert({
+      tenant_id: tenantId,
       user_id: deposit.user_id,
       type: 'deposit_rejected',
       title: 'Deposit Rejected',
@@ -123,6 +110,7 @@ export default async function handler(req, res) {
   // Create ledger entry: deposit (cash)
   const depositLedgerRef = `${deposit.reference_id}-CASH`
   await supabaseAdmin.from('ledger').insert({
+    tenant_id:           tenantId,
     reference_id:        depositLedgerRef,
     user_id:             deposit.user_id,
     type:                'deposit',
@@ -140,6 +128,7 @@ export default async function handler(req, res) {
   if (deposit.bonus_cents > 0) {
     const bonusLedgerRef = `${deposit.reference_id}-BONUS`
     await supabaseAdmin.from('ledger').insert({
+      tenant_id:           tenantId,
       reference_id:        bonusLedgerRef,
       user_id:             deposit.user_id,
       type:                'deposit_bonus',
@@ -170,11 +159,12 @@ export default async function handler(req, res) {
 
   // Referral bonus — credit referrer on referee's 1st/2nd/3rd approved deposit
   // Non-critical: runs async, never blocks the approval response
-  triggerReferralBonus(supabaseAdmin, deposit.user_id, deposit.id, deposit.amount_cents)
+  triggerReferralBonus(supabaseAdmin, deposit.user_id, deposit.id, deposit.amount_cents, tenantId)
     .catch(err => console.error('[deposits/action] referral bonus error:', err))
 
   // Notify player
   await supabaseAdmin.from('notifications').insert({
+    tenant_id:    tenantId,
     user_id:      deposit.user_id,
     type:         'deposit_approved',
     title:        'Deposit Approved! 🎉',
@@ -200,7 +190,7 @@ export default async function handler(req, res) {
 // ── Referral bonus on deposit approval ───────────────────────────────────────
 // Credits the referrer a % of the referee's deposit amount based on
 // referral_bonus_tiers (deposit_number 1, 2, 3).
-async function triggerReferralBonus(client, userId, depositId, amountCents) {
+async function triggerReferralBonus(client, userId, depositId, amountCents, tenantId) {
   // Find referral row where this user is the referee
   const { data: referral } = await client
     .from('referrals')
@@ -253,6 +243,7 @@ async function triggerReferralBonus(client, userId, depositId, amountCents) {
 
   // Ledger entry for referrer
   await client.from('ledger').insert({
+    tenant_id:    tenantId,
     user_id:      referral.referrer_id,
     type:         'referral_bonus',
     amount_cents: bonusCents,
@@ -276,6 +267,7 @@ async function triggerReferralBonus(client, userId, depositId, amountCents) {
 
   // Notify referrer
   await client.from('notifications').insert({
+    tenant_id: tenantId,
     user_id: referral.referrer_id,
     type:    'bonus',
     title:   '🎉 Referral Bonus Earned!',
