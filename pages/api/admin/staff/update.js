@@ -4,28 +4,18 @@
  * Body: { user_id, action: 'change_role'|'deactivate', role? }
  * super_admin only. Cannot act on another super_admin or self.
  */
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 const ASSIGNABLE_ROLES = ['admin', 'finance', 'game_ops', 'support']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { data: actor } = await supabaseAdmin
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!actor || actor.role !== 'super_admin')
-    return res.status(403).json({ error: 'super_admin required' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.STAFF_MANAGE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
+  const user = gate.actor
 
   const { user_id, action, role } = req.body
   if (!user_id || !['change_role', 'deactivate'].includes(action))
@@ -33,8 +23,8 @@ export default async function handler(req, res) {
   if (user_id === user.id)
     return res.status(400).json({ error: 'Cannot modify your own account' })
 
-  const { data: target } = await supabaseAdmin
-    .from('profiles').select('id, role, full_name').eq('id', user_id).single()
+  // Scoped: an admin can only act on staff in their own casino.
+  const { row: target } = await loadOwnedRow(gate, 'profiles', user_id, 'id, role, full_name, tenant_id')
   if (!target) return res.status(404).json({ error: 'Staff member not found' })
   if (target.role === 'super_admin') return res.status(403).json({ error: 'Cannot modify another super_admin' })
 

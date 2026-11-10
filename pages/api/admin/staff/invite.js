@@ -59,8 +59,8 @@ export default async function handler(req, res) {
 
   const { data: actor } = await supabaseAdmin
     .from('profiles').select('role, tenant_id').eq('id', user.id).single()
-  if (!actor || actor.role !== 'super_admin')
-    return res.status(403).json({ error: 'super_admin required' })
+  if (!actor || !['super_admin', 'admin'].includes(actor.role))
+    return res.status(403).json({ error: 'Not allowed to invite staff' })
 
   const { email, role, tenant_id } = req.body
   if (!email || !role) return res.status(400).json({ error: 'email and role required' })
@@ -70,7 +70,11 @@ export default async function handler(req, res) {
   // Every one of these roles works inside a single casino, and adminGuard
   // refuses a non-super-admin with no tenant_id. Without this the invite
   // succeeded and the new account was locked out of the panel on first login.
-  const targetTenant = tenant_id || actor.tenant_id
+  // Only a super admin may staff a casino other than their own; an admin's
+  // request is pinned to theirs whatever it asks for.
+  const targetTenant = actor.role === 'super_admin'
+    ? (tenant_id || actor.tenant_id)
+    : actor.tenant_id
   if (!targetTenant) {
     return res.status(400).json({
       error: 'No casino to assign this account to. Pass tenant_id, or set one on your own profile.',

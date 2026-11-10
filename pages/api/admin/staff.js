@@ -8,11 +8,13 @@ import { STAFF_ROLES } from '../../../lib/adminSchemas'
 
 export default async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' })
-  const admin = await requireStaff(req, res, ['super_admin'])
+  const admin = await requireStaff(req, res, ['super_admin', 'admin'])
   if (!admin) return
 
   if (req.method === 'GET') {
-    const { data, error } = await supabaseAdmin.from('profiles').select('*').neq('role', 'player').order('full_name', { ascending: true })
+    let lq = admin.scope(supabaseAdmin.from('profiles').select('*').neq('role', 'player').order('full_name', { ascending: true }))
+    if (!admin.isSuperAdmin) lq = lq.neq('role', 'super_admin')
+    const { data, error } = await lq
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rows: (data || []).map(p => ({ id: p.id, name: p.full_name, email: p.email || null, role: p.role })), me: admin.id })
   }
@@ -21,9 +23,9 @@ export default async function handler(req, res) {
   if (![...STAFF_ROLES, 'player'].includes(role)) return res.status(400).json({ error: 'Invalid role' })
 
   let target
-  if (user_id) target = (await supabaseAdmin.from('profiles').select('*').eq('id', user_id).single()).data
+  if (user_id) target = (await admin.scope(supabaseAdmin.from('profiles').select('*').eq('id', user_id)).maybeSingle()).data
   else if (email) {
-    const { data } = await supabaseAdmin.from('profiles').select('*').eq('email', String(email).trim().toLowerCase()).single()
+    const { data } = await admin.scope(supabaseAdmin.from('profiles').select('*').eq('email', String(email).trim().toLowerCase())).maybeSingle()
     target = data
   }
   if (!target) return res.status(404).json({ error: 'No account found with that email. They need to register first.' })

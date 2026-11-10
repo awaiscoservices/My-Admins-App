@@ -1,16 +1,18 @@
 import crypto from 'crypto'
-import { createClient } from '@supabase/supabase-js'
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
-const VALID_ROLES = ['super_admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
+// super_admin is not here on purpose: the platform-owner role is not handed
+// out through staff management.
+const VALID_ROLES = ['admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
-  if (!user) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: actor } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-  if (actor?.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' })
+
+  const gate = await guardAdmin(req, res, { allow: PERMS.STAFF_MANAGE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const actor = gate.actor
+  const user = gate.actor
 
   const { action, staff_id, role, email, full_name } = req.body
 
@@ -26,7 +28,7 @@ export default async function handler(req, res) {
       user_metadata: { full_name: full_name?.trim() || email.split('@')[0] }
     })
     if (createErr) return res.status(400).json({ error: createErr.message })
-    await supabaseAdmin.from('profiles').update({ role, full_name: full_name?.trim() || email.split('@')[0] }).eq('id', newUser.user.id)
+    await supabaseAdmin.from('profiles').update({ role, tenant_id: gate.tenantId, full_name: full_name?.trim() || email.split('@')[0] }).eq('id', newUser.user.id)
     await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: 'staff_invited', target_type: 'profiles', target_id: newUser.user.id, details: { email, role } }).then(() => {}, () => {})
     return res.status(201).json({ message: 'Staff invited', temp_password: tempPassword })
   }
@@ -37,8 +39,7 @@ export default async function handler(req, res) {
 
     // staff/update.js refuses to touch another super_admin; this route did not,
     // so the rule could simply be bypassed by calling this one instead.
-    const { data: target } = await supabaseAdmin
-      .from('profiles').select('role').eq('id', staff_id).maybeSingle()
+    const { row: target } = await loadOwnedRow(gate, 'profiles', staff_id, 'id, role')
     if (!target) return res.status(404).json({ error: 'Staff member not found' })
     if (target.role === 'super_admin')
       return res.status(403).json({ error: 'Cannot modify another super admin' })
@@ -53,8 +54,7 @@ export default async function handler(req, res) {
 
     // Same hole: this banned the account for 100 years with no super_admin
     // check, so one super admin could lock out every other one.
-    const { data: target } = await supabaseAdmin
-      .from('profiles').select('role').eq('id', staff_id).maybeSingle()
+    const { row: target } = await loadOwnedRow(gate, 'profiles', staff_id, 'id, role')
     if (!target) return res.status(404).json({ error: 'Staff member not found' })
     if (target.role === 'super_admin')
       return res.status(403).json({ error: 'Cannot deactivate another super admin' })

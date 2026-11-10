@@ -1,27 +1,39 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' })
-  const { data: caller } = await supabaseAdmin.from('profiles').select('id, role').eq('id', user.id).single()
-  if (!caller || caller.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden — super_admin only' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.STAFF_MANAGE })
+  if (!gate) return
+  const supabaseAdmin = gate.db
+  const caller = gate.actor
 
   const { action, email, role, target_user_id, active } = req.body
+
+  // Nobody hands out the platform-owner role through this route.
+  const ASSIGNABLE = ['admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
+  if (role && !ASSIGNABLE.includes(role)) {
+    return res.status(400).json({ error: `role must be one of: ${ASSIGNABLE.join(', ')}` })
+  }
+
+  // Any action naming a target must stay inside the caller's casino, and no
+  // admin may act on a super admin.
+  if (target_user_id) {
+    const { row: t } = await loadOwnedRow(gate, 'profiles', target_user_id, 'id, role')
+    if (!t) return res.status(404).json({ error: 'Staff member not found' })
+    if (t.role === 'super_admin' && !gate.isSuperAdmin) {
+      return res.status(403).json({ error: 'Cannot modify a super admin' })
+    }
+    if (target_user_id === caller.id) {
+      return res.status(400).json({ error: 'Cannot modify your own account' })
+    }
+  }
 
   if (action === 'invite') {
     if (!email?.trim() || !role) return res.status(400).json({ error: 'email and role required' })
     const { data: invited, error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email.trim())
     if (invErr) return res.status(500).json({ error: invErr.message })
-    await supabaseAdmin.from('profiles').update({ role }).eq('id', invited.user.id)
+    await supabaseAdmin.from('profiles').update({ role, tenant_id: gate.tenantId }).eq('id', invited.user.id)
     await supabaseAdmin.from('audit_logs').insert({
       action: 'staff_invite', performed_by: caller.id,
       target_type: 'profile', target_id: invited.user.id,
