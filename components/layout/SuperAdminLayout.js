@@ -44,6 +44,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
       { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
+      { href: '/superadmin/defaults', icon: 'shield',  label: 'New Casino Defaults' },
     ],
   },
   {
@@ -58,7 +59,7 @@ const NAV_SECTIONS = [
 
 // Only these pages exist. The rest render as disabled rows rather than links,
 // because a nav item that 404s is worse than one that says "soon".
-const BUILT = new Set(['/superadmin', '/superadmin/tenants'])
+const BUILT = new Set(['/superadmin', '/superadmin/tenants', '/superadmin/defaults'])
 
 export default function SuperAdminLayout({ children, title }) {
   const router = useRouter()

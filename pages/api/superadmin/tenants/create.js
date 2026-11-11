@@ -9,6 +9,7 @@
  * the insert failed outright.
  */
 import { guardSuperAdmin, supabaseAdmin } from '../_guard'
+import { readDefaultLevels, readDefaultSettings } from '../defaults/levels'
 
 // Addresses for username-only staff accounts. Never receives mail; it exists
 // because Supabase Auth requires an address.
@@ -101,12 +102,21 @@ export default async function handler(req, res) {
   // Give the new casino a working set of settings, copied from the first
   // casino. Without this a new casino has no rows at all, and the withdrawal
   // path reads withdrawal_daily_limit_enabled while approving a payout.
-  const { data: template } = await supabaseAdmin
-    .from('platform_settings')
-    .select('key, value, description')
-    .eq('tenant_id', TEMPLATE_TENANT_ID)
+  // From the platform defaults when they are set. The fallback to the first
+  // casino is only for the gap before any defaults have been saved — once
+  // Super Admin → New Casino Defaults has been filled in, no casino is
+  // involved and any of them can be deleted safely.
+  let template = await readDefaultSettings()
 
-  if (template?.length) {
+  if (!template.length) {
+    const { data: fallback } = await supabaseAdmin
+      .from('platform_settings')
+      .select('key, value, description')
+      .eq('tenant_id', TEMPLATE_TENANT_ID)
+    template = fallback || []
+  }
+
+  if (template.length) {
     await supabaseAdmin.from('platform_settings').upsert(
       template.map(r => ({ ...r, tenant_id: tenant.id })),
       { onConflict: 'tenant_id,key' },
@@ -117,29 +127,19 @@ export default async function handler(req, res) {
   //
   // A casino with no levels cannot be configured at all: the deposit bonus
   // grid is one row per level, so it came up empty, and players have no rank
-  // to earn. The rows are copied from the template casino rather than written
-  // out here — selecting * and dropping only the identity columns means no
-  // column is named in this file, so the copy cannot go stale when the table
-  // changes.
+  // to earn.
+  //
+  // The levels come from the platform defaults, which belong to no casino —
+  // Super Admin → New Casino Defaults. They used to be copied from the first
+  // casino, which meant deleting that casino would quietly stop every future
+  // casino getting levels.
+  // The stored defaults already have id, tenant_id and the timestamps
+  // removed, so each one only needs the new casino stamped on it.
   let levels_seeded = 0
-  const { data: tmplLevels } = await supabaseAdmin
-    .from('player_levels')
-    .select('*')
-    .eq('tenant_id', TEMPLATE_TENANT_ID)
-    .order('sort_order', { ascending: true })
+  const { levels: defaultLevels } = await readDefaultLevels()
 
-  if (tmplLevels?.length) {
-    // Drop only the primary key, which the table fills itself. The timestamps
-    // are refreshed in place rather than removed: dropping a column that is
-    // NOT NULL without a default would fail the whole insert, and a new
-    // casino would silently get no levels again.
-    const now = new Date().toISOString()
-    const copies = tmplLevels.map(({ id: _id, ...rest }) => ({
-      ...rest,
-      tenant_id: tenant.id,
-      ...('created_at' in rest ? { created_at: now } : {}),
-      ...('updated_at' in rest ? { updated_at: now } : {}),
-    }))
+  if (defaultLevels.length) {
+    const copies = defaultLevels.map(l => ({ ...l, tenant_id: tenant.id }))
     const { error: levelErr } = await supabaseAdmin.from('player_levels').insert(copies)
     if (!levelErr) levels_seeded = copies.length
     else console.error('[tenants/create] level seed failed:', levelErr)
