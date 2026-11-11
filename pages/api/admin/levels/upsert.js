@@ -52,14 +52,22 @@ export default async function handler(req, res) {
     max_redeem_multiplier: max_redeem_multiplier ?? null,
     min_withdrawal_cents: min_withdrawal_cents ?? null,
     max_withdrawal_cents: max_withdrawal_cents ?? null,
-    updated_at: new Date().toISOString(),
+    // No updated_at: player_levels has created_at only. Sending a column
+    // that does not exist failed every save on the Player Levels page.
   }
 
   let result
   if (id) {
+    // Scoped: the update filtered on id alone, so a level belonging to
+    // another casino could be overwritten — and payload carries tenant_id,
+    // which would have moved that row to the caller's casino.
+    const { row: existing } = await loadOwnedRow(gate, 'player_levels', id, 'id')
+    if (!existing) return res.status(404).json({ error: 'Level not found' })
+
+    const { tenant_id: _owner, ...changes } = payload
     result = await supabaseAdmin
       .from('player_levels')
-      .update(payload)
+      .update(changes)
       .eq('id', id)
       .select('id')
       .single()
