@@ -197,6 +197,12 @@ export default async function handler(req, res) {
   const [walletRes, ledgerRes, redemptionRes] = await Promise.all([
     supabaseAdmin.from('wallets').update({
       cash_balance_cents:    newCashBalance,
+      // Winnings are withdrawable. Only deposits raised this before, while
+      // loading a game lowered it, so a player who deposited $25, played it
+      // through and redeemed $100 had $95 of cash and nothing they could
+      // withdraw. Redeemed money has already been played through, which is
+      // exactly what this figure is meant to mean.
+      withdrawable_cents:    (wallet.withdrawable_cents || 0) + finalApproved,
       total_redeemed_cents:  (wallet.total_redeemed_cents || 0) + finalApproved,
       updated_at:            now,
       version:               wallet.version + 1,
