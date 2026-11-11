@@ -49,6 +49,42 @@ export default async function handler(req, res) {
 
   // ── REJECT ───────────────────────────────────────────────────
   if (action === 'reject') {
+    // Give the money back. reserve_withdrawal took it out of cash and held it
+    // the moment the player asked, so a rejection that only changed the
+    // status left them short and the hold stuck on the wallet for ever.
+    const { data: rw } = await supabaseAdmin
+      .from('wallets').select('*').eq('user_id', playerId).single()
+
+    if (rw) {
+      // The split recorded on the withdrawal, so a bonus-funded part goes
+      // back where it came from rather than all landing in cash.
+      const cashBack  = withdrawal.cash_deduct_cents  ?? amountCents
+      const bonusBack = withdrawal.bonus_deduct_cents ?? 0
+
+      await supabaseAdmin.from('wallets').update({
+        cash_balance_cents:  rw.cash_balance_cents  + cashBack,
+        bonus_balance_cents: rw.bonus_balance_cents + bonusBack,
+        reserved_cents:      Math.max(0, (rw.reserved_cents || 0) - (cashBack + bonusBack)),
+        updated_at:          now,
+        version:             rw.version + 1,
+      }).eq('user_id', playerId).eq('version', rw.version)
+
+      await supabaseAdmin.from('ledger').insert({
+        tenant_id:           tenantId,
+        reference_id:        `wd-refund-${withdrawal_id}`,
+        user_id:             playerId,
+        type:                'withdrawal_refund',
+        wallet_bucket:       'cash',
+        amount_cents:        cashBack + bonusBack,
+        direction:           'credit',
+        balance_after_cents: rw.cash_balance_cents + cashBack,
+        withdrawal_id:       withdrawal_id,
+        description:         `Withdrawal ${withdrawal.reference_id} rejected — refunded`,
+        created_by:          actor.id,
+        idempotency_key:     `wd-refund-${withdrawal_id}`,
+      }).then(() => {}, () => {})
+    }
+
     const { error: rejErr } = await supabaseAdmin
       .from('withdrawals')
       .update({
@@ -135,7 +171,16 @@ export default async function handler(req, res) {
     .from('ledger').select('id').eq('idempotency_key', idempKey).maybeSingle()
   if (existing) return res.status(200).json({ ok: true, status: 'paid', idempotent: true })
 
-  const newCashBalance = wallet.cash_balance_cents - amountCents
+  // The money already left cash when the player asked.
+  //
+  // reserve_withdrawal subtracts the amount from cash_balance_cents and holds
+  // it in reserved_cents at request time. This route then subtracted it from
+  // cash a second time and never released the hold, so a $20 withdrawal cost
+  // the player $40 and left $20 reserved for ever — and withdrawable_cents,
+  // which nothing reduced, ended up larger than the cash behind it.
+  //
+  // Approving releases the hold and records the payout. Cash is untouched.
+  const newCashBalance = wallet.cash_balance_cents
 
   const dailyLimitSnapshot = {
     level_id:              levelId,
@@ -149,10 +194,13 @@ export default async function handler(req, res) {
   // Write wallet + ledger + withdrawal update in parallel
   const [walletRes, ledgerRes, withdrawalRes] = await Promise.all([
     supabaseAdmin.from('wallets').update({
-      cash_balance_cents:   newCashBalance,
+      reserved_cents:        Math.max(0, (wallet.reserved_cents || 0) - amountCents),
+      // Paid out money is no longer withdrawable. Nothing reduced this, so it
+      // kept counting money the player had already been sent.
+      withdrawable_cents:    Math.max(0, (wallet.withdrawable_cents || 0) - amountCents),
       total_withdrawn_cents: (wallet.total_withdrawn_cents || 0) + amountCents,
-      updated_at:           now,
-      version:              wallet.version + 1,
+      updated_at:            now,
+      version:               wallet.version + 1,
     }).eq('user_id', playerId).eq('version', wallet.version),
 
     supabaseAdmin.from('ledger').insert({
