@@ -99,6 +99,11 @@ export default async function handler(req, res) {
   }
 
   if (game_password?.trim()) {
+    // Saving a password answers an outstanding request, so clear the flag.
+    // Without this the row would sit under Password requests for ever.
+    updates.password_change_requested = false
+    updates.password_change_requested_at = null
+
     // No fallback. This used to store `UNENCRYPTED:<password>` when the key was
     // missing, which looked like success while writing the password in clear
     // text. Refusing the save is the safe outcome.
@@ -122,12 +127,23 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to update game account', detail: updateErr.message })
   }
 
-  // Notify player
+  // Notify player.
+  //
+  // tenant_id was missing here, which left the row NULL and invisible to
+  // every scoped read — the player was never told their account was ready.
+  //
+  // An account that was already active and has just had its password
+  // replaced is a different message: nothing was "set up".
+  const wasPasswordChange = account.status === 'active' && !!account.game_username
+
   await supabaseAdmin.from('notifications').insert({
-    user_id: account.user_id,
-    type: 'game_account_created',
-    title: `${panel?.name || 'Game'} Account Ready! 🎮`,
-    message: `Your ${panel?.name || 'game'} account has been set up. Username: ${game_username.trim()}. You can now load credits and start playing!`,
+    tenant_id:    tenantId,
+    user_id:      account.user_id,
+    type:         'game_account_created',
+    title:        wasPasswordChange ? `New ${panel?.name || 'game'} password ready` : `${panel?.name || 'Game'} account ready`,
+    message:      wasPasswordChange
+      ? `Your ${panel?.name || 'game'} password has been changed. Open Games → My Games to see it.`
+      : `Your ${panel?.name || 'game'} account has been set up. Username: ${game_username.trim()}. You can now load credits and start playing.`,
     reference_id: account.reference_id,
   }).then(() => {}, () => {})
 

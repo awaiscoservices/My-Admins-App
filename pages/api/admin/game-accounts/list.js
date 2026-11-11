@@ -21,7 +21,13 @@ export default async function handler(req, res) {
 
   query = scopeToTenant(query, gate)
 
-  if (status && status !== 'all') query = query.eq('status', status)
+  // 'password' is not a status — it is the players waiting on a new game
+  // password, which leaves the account active while it is outstanding.
+  if (status === 'password') {
+    query = query.eq('password_change_requested', true)
+  } else if (status && status !== 'all') {
+    query = query.eq('status', status)
+  }
 
   const { data, error } = await query
   if (error) {

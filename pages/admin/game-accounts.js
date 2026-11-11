@@ -82,6 +82,48 @@ function SetupModal({ account, onClose, onSave }) {
   )
 }
 
+/**
+ * What this row is asking staff to do.
+ *
+ * A player can ask for two different things and they used to look identical
+ * in this table: a brand-new account, where staff create the account in the
+ * game panel and type both credentials, and a new password on an account
+ * that already exists, where the username is already known and only the
+ * password changes. Showing the username on a password request is the whole
+ * point — it tells staff which account to go and change.
+ */
+function RequestChip({ account }) {
+  const base = {
+    display: 'inline-block', fontSize: 9, fontWeight: 800, padding: '3px 8px',
+    borderRadius: 99, letterSpacing: '.06em', whiteSpace: 'nowrap',
+  }
+
+  if (account.password_change_requested) {
+    return (
+      <div>
+        <span style={{ ...base, background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>PASSWORD CHANGE</span>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,.45)', fontFamily: 'monospace', marginTop: 3 }}>
+          @{account.game_username}
+        </div>
+      </div>
+    )
+  }
+
+  if (account.status === 'pending') {
+    return <span style={{ ...base, background: 'rgba(59,130,246,.15)', color: '#3b82f6' }}>NEW ACCOUNT</span>
+  }
+
+  return <span style={{ fontSize: 11, color: 'rgba(255,255,255,.25)' }}>—</span>
+}
+
+const FILTER_LABELS = {
+  all: 'All',
+  pending: 'Pending',
+  password: 'Password requests',
+  active: 'Active',
+  suspended: 'Suspended',
+}
+
 export default function AdminGameAccounts() {
   const [accounts, setAccounts] = useState([])
   const [filter, setFilter] = useState('pending')
@@ -169,7 +211,7 @@ export default function AdminGameAccounts() {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10 }}>
-          {['all', 'pending', 'active', 'suspended'].map(s => (
+          {['all', 'pending', 'password', 'active', 'suspended'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>
               {s}
             </button>
@@ -190,16 +232,16 @@ export default function AdminGameAccounts() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Player', 'Game', 'Username', 'KYC', 'Status', 'Requested', 'Actions'].map(h => (
+                {['Reference', 'Player', 'Game', 'Username', 'Request', 'KYC', 'Status', 'Requested', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
                   {filter === 'pending' ? '✅ No pending game accounts!' : 'No accounts found'}
                 </td></tr>
               ) : filtered.map((a, i) => (
@@ -222,6 +264,7 @@ export default function AdminGameAccounts() {
                   <td style={{ padding: '12px 14px', fontSize: 12, color: a.game_username ? '#10b981' : 'rgba(255,255,255,.3)', fontFamily: 'monospace' }}>
                     {a.game_username || '—'}
                   </td>
+                  <td style={{ padding: '12px 14px' }}><RequestChip account={a} /></td>
                   <td style={{ padding: '12px 14px' }}>
                     <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, textTransform: 'uppercase', background: a.profiles?.kyc_status === 'verified' ? 'rgba(16,185,129,.15)' : 'rgba(245,158,11,.15)', color: a.profiles?.kyc_status === 'verified' ? '#10b981' : '#f59e0b' }}>
                       {a.profiles?.kyc_status?.replace('_', ' ')}
