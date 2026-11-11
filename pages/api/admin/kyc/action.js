@@ -3,7 +3,7 @@
  *
  * Body: { kyc_id, action: 'approve'|'reject', rejection_reason? }
  *
- * approve: sets kyc_records.status='approved', profiles.kyc_verified=true
+ * approve: sets kyc_records.status='verified' and profiles.kyc_status='verified'
  * reject:  sets kyc_records.status='rejected' + rejection_reason
  *
  * Roles: super_admin, admin
@@ -31,23 +31,43 @@ export default async function handler(req, res) {
   )
   if (kycErr || !kyc) return res.status(404).json({ error: 'KYC record not found' })
   const tenantId = tenantOf(kyc, gate)
-  if (kyc.status !== 'pending') return res.status(409).json({ error: `Already ${kyc.status}` })
+  // A record waiting on staff can be in any of these. Only 'pending' was
+  // accepted, so anything moved to under review, or sent back for more
+  // information, could never be decided afterwards.
+  const DECIDABLE = ['pending', 'under_review', 'more_info_required']
+  if (!DECIDABLE.includes(kyc.status)) {
+    return res.status(409).json({ error: `This verification is ${kyc.status} and cannot be changed.` })
+  }
 
   const now = new Date().toISOString()
 
   if (action === 'approve') {
-    // Update KYC record
-    await supabaseAdmin.from('kyc_records').update({
-      status: 'approved',
+    // 'verified', not 'approved'. The column's check constraint allows
+    // not_started, pending, under_review, verified, rejected,
+    // more_info_required and expired — so this write was rejected every
+    // time. Nothing checked the error, so approving looked like it worked
+    // while the record stayed pending and only the profile moved.
+    const { error: recordErr } = await supabaseAdmin.from('kyc_records').update({
+      status: 'verified',
       reviewed_at: now,
       reviewed_by: actor.id,
     }).eq('id', kyc_id)
 
-    // profiles has kyc_status, not kyc_verified. 'verified' is the value
-    // request_withdrawal() checks before allowing a payout.
-    await supabaseAdmin.from('profiles').update({
+    if (recordErr) {
+      console.error('[kyc/action] approve failed:', recordErr)
+      return res.status(500).json({ error: `Could not approve: ${recordErr.message}` })
+    }
+
+    // profiles has kyc_status, not kyc_verified. 'verified' is the value the
+    // withdraw page and the withdrawal route both check before a payout.
+    const { error: profileErr } = await supabaseAdmin.from('profiles').update({
       kyc_status: 'verified',
     }).eq('id', kyc.user_id)
+
+    if (profileErr) {
+      console.error('[kyc/action] profile update failed:', profileErr)
+      return res.status(500).json({ error: 'KYC approved, but the player is still blocked from withdrawing. Tell a developer.' })
+    }
 
   } else {
     await supabaseAdmin.from('kyc_records').update({
