@@ -60,6 +60,7 @@ const NAV_SECTIONS = [
     icon: 'chat',
     items: [
       { href: '/admin/support',      icon: 'chat',    label: 'Support Tickets', roles: ['admin','super_admin','support'] },
+      { href: '/admin/chat',         icon: 'chat',    label: 'Live Chat',       roles: ['admin','super_admin','support'] },
       { href: '/admin/notifications',icon: 'bell',    label: 'Notifications',   roles: ['admin','super_admin','support'] },
     ],
   },
