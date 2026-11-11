@@ -49,7 +49,10 @@ const NAV_SECTIONS = [
     items: [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
       { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
-      { href: '/superadmin/defaults', icon: 'shield',  label: 'Levels'     },
+      // Named Levels while it only held levels. It now holds everything a new
+      // casino starts with — levels, games, payment methods, referral tiers
+      // and settings — so the old name pointed at a fifth of the page.
+      { href: '/superadmin/defaults', icon: 'shield',  label: 'Defaults'   },
       { href: '/superadmin/admins',   icon: 'user',    label: 'Super Admins' },
     ],
   },
