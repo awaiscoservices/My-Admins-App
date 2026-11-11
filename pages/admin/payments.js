@@ -121,10 +121,13 @@ export default function AdminPayments() {
 
   async function handleSave(id, form) {
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/admin/payments/' + (id ? 'update' : 'create'), {
+    // One route handles both: /create and /update never existed, so adding a
+    // payment method 404'd. save.js inserts when there is no id and updates
+    // when there is — and it reads `id`, not `method_id`.
+    const res = await fetch('/api/admin/payments/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(id ? { method_id: id, ...form } : form),
+      body: JSON.stringify(id ? { id, ...form } : form),
     })
     const d = await res.json()
     if (!res.ok) return { error: d.error }
