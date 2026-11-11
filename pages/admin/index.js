@@ -65,20 +65,22 @@ function StatCard({ label, value, sub, color = gold, icon, trend }) {
       // the same height whatever lands next to it.
       minHeight: 132,
     }}>
-      {/* subtle glow strip at top */}
+      {/* accent strip at top */}
       <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg,${color}00,${color}80,${color}00)`, borderRadius:'16px 16px 0 0' }} />
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:4 }}>
-        <span style={{ fontSize:12, color:'rgba(255,255,255,.45)', letterSpacing:'.05em', textTransform:'uppercase', fontWeight:600, lineHeight:1.3 }}>{label}</span>
+      {/* Icon badge first, then the label beside it — the same arrangement as
+          the player wallet cards, so the two sides of the product read alike. */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
         <span style={{
-          width:32, height:32, borderRadius:9, flexShrink:0,
-          background:`${color}18`, border:`1px solid ${color}33`, color,
+          width:38, height:38, borderRadius:11, flexShrink:0,
+          background:`${color}1a`, border:`1px solid ${color}40`, color,
           display:'flex', alignItems:'center', justifyContent:'center',
         }}>
-          <Icon name={icon} size={17} />
+          <Icon name={icon} size={18} />
         </span>
+        <span style={{ fontSize:11.5, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.75)', lineHeight:1.3 }}>{label}</span>
       </div>
       <div style={{ fontSize:30, fontWeight:800, color, fontFamily:"'Outfit',sans-serif", letterSpacing:'-.5px' }}>{value}</div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'auto' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'auto', paddingTop:8 }}>
         {sub && <div style={{ fontSize:12, color:'rgba(255,255,255,.35)' }}>{sub}</div>}
         {trend != null && (
           <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color: trend >= 0 ? green : red }}>
@@ -185,6 +187,15 @@ export default function AdminDashboard() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* Four across. Inline styles cannot carry media queries, which is why
+           the breakpoints live here rather than on the element. */
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        @media (max-width: 1180px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 620px)  { .stat-grid { grid-template-columns: 1fr; } }
+
+        .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
       `}</style>
 
       <div style={{ fontFamily:"'Outfit',sans-serif", color:'#fff' }}>
@@ -210,11 +221,12 @@ export default function AdminDashboard() {
         ) : (
           <>
             {/* ══ Stat cards ══
-                One grid rather than four rows of exactly four. The fixed rows
-                left dead space on a wide screen and squeezed four cards into
-                a phone's width; auto-fill puts as many as fit on each line
-                and the last line stretches to the edge. */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(232px, 1fr))', gap:16, marginBottom:28 }}>
+                Four across, four rows deep. An auto-fitting grid was tried
+                here and gave 5/5/5/1 — the sixteen cards are four groups of
+                four, so the row length has to be four for the grouping to
+                survive. It drops to two columns on a tablet and one on a
+                phone, which is the only place a fixed four does not work. */}
+            <div className="stat-grid" style={{ marginBottom:28 }}>
               {/* Players & money */}
               <StatCard icon="users"     label="Total Players"        value={fmtNum(s.total_players)}        sub={`${fmtNum(s.new_players_today)} new today`}        color={blue}   />
               <StatCard icon="dollar"    label="Total Deposits"       value={fmt(s.total_deposits_cents)}    sub={`${fmtNum(s.deposits_count)} transactions`}        color={green}  />
@@ -241,7 +253,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* ══ Charts Row ══ */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:24 }}>
+            <div className="chart-row" style={{ marginBottom:24 }}>
               {/* Deposits chart */}
               <div style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, padding:'20px 20px 16px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>

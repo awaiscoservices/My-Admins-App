@@ -32,26 +32,32 @@ function Icon({ name, size = 18 }) {
   )
 }
 
+/**
+ * The same card as the admin dashboard and the player wallet: accent strip,
+ * icon badge, label beside it, the number, then one line of context.
+ */
 function StatCard({ icon, label, value, sub, color }) {
   const tint = color || '#94a3b8'
   return (
     <div style={{
-      background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)',
-      borderRadius: 12, padding: '20px 24px',
-      display: 'flex', flexDirection: 'column', minHeight: 132,
+      background: 'rgba(255,255,255,.03)', border: `1px solid ${tint}28`,
+      borderRadius: 16, padding: '20px 22px',
+      display: 'flex', flexDirection: 'column', minHeight: 136,
+      position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${tint}00,${tint}80,${tint}00)`, borderRadius: '16px 16px 0 0' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <span style={{
-          width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-          background: `${tint}18`, border: `1px solid ${tint}33`, color: tint,
+          width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+          background: `${tint}1a`, border: `1px solid ${tint}40`, color: tint,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon name={icon} size={17} />
+          <Icon name={icon} size={18} />
         </span>
-        <span style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', lineHeight: 1.3 }}>{label}</span>
+        <span style={{ color: 'rgba(255,255,255,.75)', fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.1em', lineHeight: 1.3 }}>{label}</span>
       </div>
-      <div style={{ color: color || '#fff', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12, marginTop: 'auto', paddingTop: 6 }}>{sub}</div>}
+      <div style={{ color: color || '#fff', fontSize: 30, fontWeight: 800, lineHeight: 1, fontFamily: "'Outfit',sans-serif", letterSpacing: '-.5px' }}>{value}</div>
+      {sub && <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12, marginTop: 'auto', paddingTop: 8 }}>{sub}</div>}
     </div>
   )
 }
@@ -91,6 +97,12 @@ export default function SuperAdminDashboard() {
 
   return (
     <SuperAdminLayout title="Platform Dashboard">
+      {/* Inline styles cannot carry media queries, so the breakpoints live here. */}
+      <style>{`
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        @media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 620px)  { .stat-grid { grid-template-columns: 1fr; } }
+      `}</style>
       <div>
         {loading && <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>Loading…</div>}
         {error  && <div style={{ color: '#ef4444', fontSize: 14 }}>{error}</div>}
@@ -98,9 +110,9 @@ export default function SuperAdminDashboard() {
         {stats && (
           <>
             {/* Stat cards */}
-            {/* auto-fit rather than auto-fill: the last line stretches to the
-                edge instead of leaving an empty column behind. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 16, marginBottom: 32 }}>
+            {/* Six cards as three across, two deep — fixed, not auto-fitting,
+                so the rows stay even instead of breaking 4 and 2. */}
+            <div className="stat-grid" style={{ marginBottom: 32 }}>
               <StatCard icon="building" label="Total Tenants"  value={stats.total}                  sub="All time"       color={G} />
               <StatCard icon="check"    label="Active"         value={stats.active}                 sub="Operational"    color="#22c55e" />
               <StatCard icon="pause"    label="Suspended"      value={stats.suspended}              sub="Access blocked" color="#ef4444" />
