@@ -81,7 +81,7 @@ export default async function handler(req, res) {
         direction:           'credit',
         balance_after_cents: rw.cash_balance_cents + amountCents,
         game_load_id:        load_id,
-        description:         `Game load ${load.reference_id} rejected — refunded`,
+        description:         panelName ? `Game load refunded — ${panelName} (${load.reference_id})` : `Game load ${load.reference_id} rejected — refunded`,
         created_by:          actor.id,
         idempotency_key:     `gl-refund-${load_id}`,
       }).then(() => {}, () => {})
@@ -179,7 +179,10 @@ export default async function handler(req, res) {
       // Unchanged by this step: the debit happened at request time.
       balance_after_cents: wallet.cash_balance_cents,
       game_load_id:      load_id,
-      description:       `Game load ${load.reference_id} — cash`,
+      // The game's name, not just the reference. A player looking at their
+      // wallet wants to know which game the money went into; LOAD-001008
+      // told them nothing.
+      description:       panelName ? `Game load — ${panelName} (${load.reference_id})` : `Game load ${load.reference_id}`,
       created_by:        actor.id,
       idempotency_key:   `${idempKey}-cash`,
     })

@@ -212,7 +212,9 @@ export default async function handler(req, res) {
       direction:           'credit',
       balance_after_cents: newCashBalance,
       redeem_id:           redemption_id,
-      description:         `Redeem ${redemption.reference_id} approved`,
+      // Name the game, same as a game load does: a wallet line that says
+      // only REDEEM-000123 does not tell the player where it came from.
+      description:         panelName ? `Redeem — ${panelName} (${redemption.reference_id})` : `Redeem ${redemption.reference_id} approved`,
       created_by:          actor.id,
       idempotency_key:     idempKey,
     }),
