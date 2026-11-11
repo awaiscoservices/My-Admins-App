@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       id, reference_id, amount_cents, bonus_cents, total_credit_cents,
       status, player_reference, screenshot_url, player_notes, admin_notes,
       rejection_reason, created_at, reviewed_at,
-      payment_method_id,
+      payment_method_id, user_id,
       profiles!deposits_user_id_fkey ( id, full_name, email )
     `)
     .order('created_at', { ascending: false })

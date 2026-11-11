@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
+import PlayerWalletModal from '../../components/PlayerWalletModal'
 
 const fmt = c => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
@@ -60,6 +61,7 @@ export default function AdminDeposits() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
+  const [walletFor, setWalletFor] = useState(null)
   const [toast, setToast] = useState(null)
 
   useEffect(() => { load() }, [filter])
@@ -112,6 +114,17 @@ export default function AdminDeposits() {
       <Head><title>Deposits — Admin</title></Head>
       {toast && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
       {selected && <ReviewModal deposit={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
+
+      {/* The same player panel the Players page uses. Deciding a request
+          without seeing what the player has deposited, played and taken out
+          means deciding on a name and an amount. */}
+      {walletFor && (
+        <PlayerWalletModal
+          playerId={walletFor.user_id || walletFor.profiles?.id}
+          playerName={walletFor.profiles?.full_name}
+          onClose={() => setWalletFor(null)}
+        />
+      )}
 
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Deposits</h1>
@@ -168,13 +181,20 @@ export default function AdminDeposits() {
                   <td style={{ padding: '12px 14px' }}><StatusBadge status={d.status} size="xs" /></td>
                   <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.3)', whiteSpace: 'nowrap' }}>{fmtDate(d.created_at)}</td>
                   <td style={{ padding: '12px 14px' }}>
-                    {d.status === 'pending' ? (
-                      <button onClick={() => setSelected(d)} style={{ padding: '6px 14px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 8, color: '#050505', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap' }}>
-                        ⚡ Review
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button onClick={() => setWalletFor(d)}
+                        title="See this player's balances and history"
+                        style={{ padding: '6px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 8, color: 'rgba(255,255,255,.75)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap' }}>
+                        Wallet
                       </button>
-                    ) : (
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.25)' }}>{d.rejection_reason ? 'Rejected' : 'Done'}</span>
-                    )}
+                      {d.status === 'pending' ? (
+                        <button onClick={() => setSelected(d)} style={{ padding: '6px 14px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 8, color: '#050505', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap' }}>
+                          ⚡ Review
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.25)', alignSelf: 'center' }}>{d.rejection_reason ? 'Rejected' : 'Done'}</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
