@@ -17,12 +17,16 @@ export default async function handler(req, res) {
   // Explicit FK hint resolves "more than one relationship" error:
   //   kyc_records_user_id_fkey     → the player
   //   kyc_records_reviewed_by_fkey → the reviewer (not embedded here)
+  // !inner + role = player: a KYC record is created for every account by the
+  // signup trigger, staff included, so without this the list showed admins
+  // and super admins who never submitted anything. KYC is a player process.
   let q = gate.db
     .from('kyc_records')
     .select(`
       id, status, doc_type, doc_front_url, doc_back_url, selfie_url, submitted_at, reviewed_at, rejection_reason, admin_notes,
-      profiles!kyc_records_user_id_fkey ( id, full_name, email, kyc_status )
+      profiles!kyc_records_user_id_fkey!inner ( id, full_name, email, kyc_status, role )
     `)
+    .eq('profiles.role', 'player')
     .order('submitted_at', { ascending: false })
     .limit(100)
 
