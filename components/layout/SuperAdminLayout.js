@@ -73,6 +73,8 @@ export default function SuperAdminLayout({ children, title }) {
   const [ready, setReady]             = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [signingOut, setSigningOut]   = useState(false)
+  const [me, setMe]                   = useState(null)
+  const [menuOpen, setMenuOpen]       = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -95,6 +97,26 @@ export default function SuperAdminLayout({ children, title }) {
       }
     })()
   }, [])
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const res = await fetch('/api/admin/me', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        if (res.ok) setMe(await res.json())
+      } catch (e) {
+        console.error('Failed to load account details', e)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = () => setMenuOpen(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [menuOpen])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -153,8 +175,37 @@ export default function SuperAdminLayout({ children, title }) {
             back the other way: the two portals are separate places, and a
             door between them in the chrome invites a wrong turn. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ padding: '7px 12px', background: '#ef444418', border: '1px solid #ef444455', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>
-            super admin
+          {/* Same menu as the admin panel: who you are, what you are looking
+              at, and the way out. A super admin manages every casino, which
+              is what Managing says here. */}
+          <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setMenuOpen(o => !o)} title="Your account"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px 5px 5px', background: menuOpen ? 'rgba(239,68,68,.14)' : 'rgba(255,255,255,.05)', border: `1px solid ${menuOpen ? '#ef4444aa' : '#ef444455'}`, borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', transition: 'background .15s, border-color .15s' }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#ef4444,#b91c1c)', color: '#fff', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {(me?.full_name || me?.email || 'S').trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="hide-sm" style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>super admin</span>
+            </button>
+
+            {menuOpen && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 260, zIndex: 300, background: '#0b1626', border: '1px solid rgba(239,68,68,.3)', borderRadius: 14, boxShadow: '0 20px 48px rgba(0,0,0,.6)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', wordBreak: 'break-word' }}>{me?.full_name || profile?.full_name || '—'}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', wordBreak: 'break-all', marginTop: 2 }}>{me?.email || profile?.email || '—'}</div>
+                  <div style={{ display: 'inline-block', marginTop: 8, padding: '3px 9px', borderRadius: 99, background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.35)', fontSize: 9.5, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '.08em' }}>super admin</div>
+                </div>
+
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Managing</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>All casinos</div>
+                </div>
+
+                <button onClick={handleSignOut} disabled={signingOut}
+                  style={{ width: '100%', padding: '12px 16px', background: 'transparent', border: 'none', color: '#f87171', fontSize: 13, fontWeight: 700, cursor: signingOut ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>
+                  <Icon name="logout" size={15} /> {signingOut ? 'Signing out…' : 'Sign out'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

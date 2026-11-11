@@ -149,6 +149,8 @@ export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [signingOut, setSigningOut]       = useState(false)
   const [authorized, setAuthorized]       = useState(false)
+  const [me, setMe]                       = useState(null)
+  const [menuOpen, setMenuOpen]           = useState(false)
 
   useEffect(() => { loadAdminData() }, [])
 
@@ -160,7 +162,29 @@ export default function AdminLayout({ children }) {
     setProfile(prof)
     setAuthorized(true)
     loadPendingCounts()
+    loadMe()
   }
+
+  // The casino's name is not readable from the browser, so it comes from
+  // the server along with the rest of the account's details.
+  async function loadMe() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/admin/me', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      if (res.ok) setMe(await res.json())
+    } catch (e) {
+      console.error('Failed to load account details', e)
+    }
+  }
+
+  // Click anywhere else and the menu closes.
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = () => setMenuOpen(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [menuOpen])
 
   async function loadPendingCounts() {
     try {
@@ -283,12 +307,45 @@ export default function AdminLayout({ children }) {
           <button onClick={loadPendingCounts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, color: 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Icon name="refresh" size={14} /> <span className="hide-sm">Refresh</span>
           </button>
-          {/* Shows which portal you are in, not your account's role. A super
-              admin working inside a tenant's panel is acting as an admin here;
-              their real role is in the tooltip and on the Super Admin portal. */}
-          <div title={`Signed in as ${profile?.role?.replace('_', ' ')}`}
-            style={{ padding: '7px 12px', background: `${GOLD}18`, border: `1px solid ${GOLD}55`, borderRadius: 10, fontSize: 10, fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap', cursor: 'default' }}>
-            admin
+          {/* The role badge used to sit here and do nothing. It is a menu
+              now: who you are, which casino this panel is for, and the way
+              out. The casino's name matters most — staff who work across
+              more than one need to know which panel they are looking at
+              before they approve anything. */}
+          <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setMenuOpen(o => !o)} title="Your account"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px 5px 5px', background: menuOpen ? `${GOLD}1f` : 'rgba(255,255,255,.05)', border: `1px solid ${menuOpen ? GOLD + '88' : GOLD + '40'}`, borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', transition: 'background .15s, border-color .15s' }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg,${GOLD},#f59e0b)`, color: '#050505', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {(me?.full_name || me?.email || 'A').trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="hide-sm" style={{ fontSize: 11, fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>
+                {me?.role?.replace('_', ' ') || 'admin'}
+              </span>
+            </button>
+
+            {menuOpen && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 260, zIndex: 300, background: '#0b1626', border: '1px solid rgba(251,191,36,.25)', borderRadius: 14, boxShadow: '0 20px 48px rgba(0,0,0,.6)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', wordBreak: 'break-word' }}>{me?.full_name || '—'}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', wordBreak: 'break-all', marginTop: 2 }}>{me?.email || '—'}</div>
+                  <div style={{ display: 'inline-block', marginTop: 8, padding: '3px 9px', borderRadius: 99, background: `${GOLD}18`, border: `1px solid ${GOLD}44`, fontSize: 9.5, fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                    {me?.role?.replace('_', ' ') || 'admin'}
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Managing</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>
+                    {me?.tenant_name || (me?.is_super_admin ? 'All casinos' : '—')}
+                  </div>
+                </div>
+
+                <button onClick={handleSignOut} disabled={signingOut}
+                  style={{ width: '100%', padding: '12px 16px', background: 'transparent', border: 'none', color: '#f87171', fontSize: 13, fontWeight: 700, cursor: signingOut ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>
+                  <Icon name="logout" size={15} /> {signingOut ? 'Signing out…' : 'Sign out'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
