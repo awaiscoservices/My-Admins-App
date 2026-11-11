@@ -215,12 +215,15 @@ async function triggerReferralBonus(client, userId, depositId, amountCents, tena
   // Only pay out on deposit 1, 2, or 3
   if (depositNumber > 3) return
 
+  // This casino's tier. Unscoped, another casino's percentage could decide
+  // what this one pays out.
   const { data: tier } = await client
     .from('referral_bonus_tiers')
     .select('bonus_percent')
     .eq('deposit_number', depositNumber)
     .eq('is_active', true)
-    .single()
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
 
   if (!tier) return
 

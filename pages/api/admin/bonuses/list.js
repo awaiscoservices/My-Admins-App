@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
     sq('player_bonuses', 'id, payment_method_id, player_level_id, day_number, bonus_percent'),
 
-    sq('referral_bonus_tiers', 'id, deposit_number, bonus_percent, is_active')
+    sq('referral_bonus_tiers', 'deposit_number, bonus_percent, is_active')
       .order('deposit_number', { ascending: true }),
   ])
 

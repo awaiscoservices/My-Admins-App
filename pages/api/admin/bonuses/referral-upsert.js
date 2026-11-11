@@ -17,14 +17,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'deposit_number must be 1, 2, or 3' })
   }
 
-  const { error } = await supabaseAdmin
-    .from('referral_bonus_tiers')
-    .update({ bonus_percent: bonus_percent ?? 0, is_active: is_active ?? true, updated_at: new Date().toISOString() })
-    .eq('deposit_number', deposit_number)
+  // Scoped: deposit_number is not unique across casinos, so an unscoped
+  // update rewrote every casino's tier for that deposit number.
+  const { error } = await scopeToTenant(
+    supabaseAdmin
+      .from('referral_bonus_tiers')
+      .update({ bonus_percent: bonus_percent ?? 0, is_active: is_active ?? true, updated_at: new Date().toISOString() })
+      .eq('deposit_number', deposit_number),
+    gate,
+  )
 
   if (error) return res.status(500).json({ error: error.message })
 
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id: gate.tenantId,
     action: 'referral_bonus_update',
     performed_by: user.id,
     target_type: 'referral_bonus_tier',
