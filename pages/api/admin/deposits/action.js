@@ -17,12 +17,27 @@ export default async function handler(req, res) {
   const actor = gate.actor
   const admin = gate.actor
 
-  const { deposit_id, action, rejection_reason } = req.body
+  const { deposit_id, rejection_reason, notes } = req.body
 
-  if (!deposit_id || !action) return res.status(400).json({ error: 'deposit_id and action required' })
-  if (!['approved', 'rejected', 'under_review'].includes(action))
-    return res.status(400).json({ error: 'Invalid action' })
-  if (action === 'rejected' && !rejection_reason?.trim())
+  // Every admin page sends approve/reject, and the other four action routes
+  // take exactly that. This one alone demanded the past tense and answered
+  // "Invalid action" to the button on its own page. Both are accepted, and
+  // the past tense is what gets stored, because it is the deposit's status.
+  const ACTIONS = {
+    approve: 'approved', approved: 'approved',
+    reject: 'rejected',  rejected: 'rejected',
+    under_review: 'under_review',
+  }
+  const action = ACTIONS[req.body?.action]
+
+  if (!deposit_id || !req.body?.action) return res.status(400).json({ error: 'deposit_id and action required' })
+  if (!action) return res.status(400).json({ error: 'Invalid action' })
+
+  // The page calls this field notes; this route called it rejection_reason,
+  // so a rejection would have failed on the next line even once the action
+  // was accepted.
+  const reason = (rejection_reason ?? notes ?? '').trim()
+  if (action === 'rejected' && !reason)
     return res.status(400).json({ error: 'Rejection reason is required' })
 
   // ── Load deposit — only if it belongs to the caller's casino ───
@@ -55,7 +70,7 @@ export default async function handler(req, res) {
       status: 'rejected',
       reviewed_by: admin.id,
       reviewed_at: new Date().toISOString(),
-      rejection_reason,
+      rejection_reason: reason,
     }).eq('id', deposit_id)
 
     // Notify player
@@ -64,11 +79,11 @@ export default async function handler(req, res) {
       user_id: deposit.user_id,
       type: 'deposit_rejected',
       title: 'Deposit Rejected',
-      message: `Your deposit ${deposit.reference_id} was rejected. Reason: ${rejection_reason}`,
+      message: `Your deposit ${deposit.reference_id} was rejected. Reason: ${reason}`,
       reference_id: deposit.reference_id,
     })
 
-    await logAudit(supabaseAdmin, admin, 'deposit_rejected', 'deposit', deposit_id, deposit, { status: 'rejected', rejection_reason })
+    await logAudit(supabaseAdmin, admin, 'deposit_rejected', 'deposit', deposit_id, deposit, { status: 'rejected', rejection_reason: reason })
     return res.status(200).json({ message: 'Deposit rejected' })
   }
 
