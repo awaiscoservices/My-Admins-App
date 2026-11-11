@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
+import TwoFactorSetup from '../TwoFactorSetup'
 
 const NAV_SECTIONS = [
   {
@@ -151,6 +152,8 @@ export default function AdminLayout({ children }) {
   const [authorized, setAuthorized]       = useState(false)
   const [me, setMe]                       = useState(null)
   const [menuOpen, setMenuOpen]           = useState(false)
+  const [show2fa, setShow2fa]             = useState(false)
+  const [force2fa, setForce2fa]           = useState(false)
 
   useEffect(() => { loadAdminData() }, [])
 
@@ -163,6 +166,25 @@ export default function AdminLayout({ children }) {
     setAuthorized(true)
     loadPendingCounts()
     loadMe()
+    enforce2fa()
+  }
+
+  // If the casino requires 2FA and this account has not set it up, make them
+  // do it before they can use the panel. The modal cannot be dismissed. A
+  // super admin is not forced — they manage the requirement itself.
+  async function enforce2fa() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/admin/settings/get', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      if (!res.ok) return
+      const { settings } = await res.json()
+      const req = settings.find(s => s.key === 'two_factor_required')?.value
+      if (!(req === true || req === 'true')) return
+      const { data: fl } = await supabase.auth.mfa.listFactors()
+      const hasFactor = (fl?.totp || []).some(f => f.status === 'verified')
+      if (!hasFactor) { setForce2fa(true); setShow2fa(true) }
+    } catch { /* never block the panel on a failed check */ }
   }
 
   // The casino's name is not readable from the browser, so it comes from
@@ -275,6 +297,13 @@ export default function AdminLayout({ children }) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-gradient,#060b18)', backgroundAttachment: 'fixed', fontFamily: "'Outfit', sans-serif", color: '#fff' }}>
+      {show2fa && (
+        <TwoFactorSetup
+          forced={force2fa}
+          onClose={() => { if (!force2fa) setShow2fa(false) }}
+          onChange={() => { if (force2fa) { setForce2fa(false); setShow2fa(false) } }}
+        />
+      )}
       <Head>
         <title>Casinoze Support</title>
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -380,6 +409,11 @@ export default function AdminLayout({ children }) {
                     {me?.tenant_name || (me?.is_super_admin ? 'All casinos' : '—')}
                   </div>
                 </div>
+
+                <button onClick={() => { setMenuOpen(false); setShow2fa(true) }}
+                  style={{ width: '100%', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,.07)', color: 'rgba(255,255,255,.75)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>
+                  <Icon name="shield" size={15} /> Two-factor authentication
+                </button>
 
                 <button onClick={handleSignOut} disabled={signingOut}
                   style={{ width: '100%', padding: '12px 16px', background: 'transparent', border: 'none', color: '#f87171', fontSize: 13, fontWeight: 700, cursor: signingOut ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>

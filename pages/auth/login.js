@@ -19,6 +19,8 @@ export default function SupportLogin() {
   const [toast, setToast]       = useState(null)
   const [focused, setFocused]   = useState(null)
   const [mounted, setMounted]   = useState(false)
+  const [mfa, setMfa]           = useState(null)   // { factorId } when a code is needed
+  const [mfaCode, setMfaCode]   = useState('')
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -35,6 +37,37 @@ export default function SupportLogin() {
     else if (email.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email'
     if (!password) e.password = 'Password is required'
     return e
+  }
+
+  // After a full sign-in, send staff to their portal and everyone else away.
+  async function routeByRole(sb) {
+    const { data: { user } } = await sb.auth.getUser()
+    const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
+    if (prof?.role && STAFF_ROLES.includes(prof.role)) {
+      router.push(prof.role === 'super_admin' ? '/superadmin' : '/admin')
+    } else {
+      await sb.auth.signOut()
+      showToast('Access denied. This portal is for staff only.')
+    }
+  }
+
+  async function verifyMfa(ev) {
+    ev.preventDefault()
+    if (mfaCode.trim().length < 6) { showToast('Enter the 6-digit code from your app'); return }
+    setLoading(true)
+    try {
+      const { supabase: sb } = await import('../../lib/supabase')
+      const { data: ch, error: chErr } = await sb.auth.mfa.challenge({ factorId: mfa.factorId })
+      if (chErr) throw chErr
+      const { error } = await sb.auth.mfa.verify({ factorId: mfa.factorId, challengeId: ch.id, code: mfaCode.trim() })
+      if (error) { showToast('That code did not match. Try the current one.'); setLoading(false); return }
+      setMfa(null); setMfaCode('')
+      await routeByRole(sb)
+    } catch (err) {
+      showToast(err.message || 'Could not verify the code')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSubmit = async (ev) => {
@@ -58,17 +91,20 @@ export default function SupportLogin() {
         loginEmail = j.email
       }
 
-      const data = await signInWithEmail({ email: loginEmail, password })
+      await signInWithEmail({ email: loginEmail, password })
       const { supabase: sb } = await import('../../lib/supabase')
-      const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single()
-      if (prof?.role && STAFF_ROLES.includes(prof.role)) {
-        // Super admins manage tenants, so they land on their own portal.
-        // Every other staff role works inside a single tenant's admin panel.
-        router.push(prof.role === 'super_admin' ? '/superadmin' : '/admin')
-      } else {
-        await sb.auth.signOut()
-        showToast('Access denied. This portal is for staff only.')
+
+      // Second step for anyone who has set up 2FA. Supabase signs the
+      // password in at aal1; a verified factor raises the required level to
+      // aal2, which a code from their app satisfies.
+      const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+        const { data: fl } = await sb.auth.mfa.listFactors()
+        const factor = (fl?.totp || [])[0]
+        if (factor) { setMfa({ factorId: factor.id }); setLoading(false); return }
       }
+
+      await routeByRole(sb)
     } catch (err) {
       showToast(err.message || 'Invalid email or password')
     } finally {
@@ -145,6 +181,21 @@ export default function SupportLogin() {
             </p>
           )}
 
+          {mfa ? (
+            <form onSubmit={verifyMfa} noValidate>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,.55)', textAlign: 'center', lineHeight: 1.6, marginBottom: 18 }}>
+                Enter the 6-digit code from your authenticator app.
+              </p>
+              <input value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoFocus
+                placeholder="123456" style={{ width: '100%', padding: '14px', textAlign: 'center', letterSpacing: 8, fontSize: 22, fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', outline: 'none', boxSizing: 'border-box', marginBottom: 18 }} />
+              <button type="submit" disabled={loading} style={{ width: '100%', padding: 14, background: loading ? 'rgba(245,158,11,.35)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+                {loading ? 'Verifying…' : 'Verify & continue'}
+              </button>
+              <button type="button" onClick={() => { setMfa(null); setMfaCode('') }} style={{ width: '100%', marginTop: 10, padding: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 12, cursor: 'pointer' }}>
+                Back
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Username or Email</label>
@@ -166,6 +217,7 @@ export default function SupportLogin() {
                 : '🔐 Sign In to Portal'}
             </button>
           </form>
+          )}
 
           <div style={{ marginTop: 24, padding: '12px 16px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 10 }}>
             <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, textAlign: 'center', lineHeight: 1.6 }}>
