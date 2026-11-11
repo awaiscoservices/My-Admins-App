@@ -17,7 +17,9 @@ export default async function handler(req, res) {
   const user = gate.actor
 
   const {
-    id,
+    // The page sent level_id for a while, which this route never read, so an
+    // edit silently created a second level. Both are accepted now.
+    id = req.body?.level_id,
     name,
     sort_order,
     xp_required,

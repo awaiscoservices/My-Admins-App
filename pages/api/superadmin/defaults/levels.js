@@ -16,7 +16,8 @@ export const DEFAULTS_KEY = 'player_levels'
 export const SETTINGS_KEY = 'platform_settings'
 
 /** Columns that identify one casino's row and must never be stored. */
-const STRIP = ['id', 'tenant_id', 'created_at', 'updated_at']
+// __index is the editor's own row marker, never part of a level.
+const STRIP = ['id', 'tenant_id', 'created_at', 'updated_at', '__index']
 
 export function stripRow(row) {
   const out = { ...row }

@@ -44,7 +44,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
       { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
-      { href: '/superadmin/defaults', icon: 'shield',  label: 'New Casino Defaults' },
+      { href: '/superadmin/defaults', icon: 'shield',  label: 'Levels'     },
     ],
   },
   {
