@@ -8,17 +8,24 @@ const fmt = c => c != null ? '$' + (c / 100).toLocaleString('en-US', { minimumFr
 
 function MethodModal({ method, onClose, onSave }) {
   const isNew = !method
+  // Every key here is a real column on payment_methods. The old form used
+  // min_amount_cents, fee_percent, fee_fixed_cents, processing_time and
+  // supports_deposit/withdrawal — none of which exist on the table.
   const [form, setForm] = useState({
     name: method?.name || '',
     type: method?.type || 'bank_transfer',
-    min_amount_cents: method?.min_amount_cents ? (method.min_amount_cents / 100).toFixed(2) : '',
-    max_amount_cents: method?.max_amount_cents ? (method.max_amount_cents / 100).toFixed(2) : '',
-    fee_percent: method?.fee_percent || '',
-    fee_fixed_cents: method?.fee_fixed_cents ? (method.fee_fixed_cents / 100).toFixed(2) : '',
-    processing_time: method?.processing_time || '',
+    min_deposit_cents: method?.min_deposit_cents != null ? (method.min_deposit_cents / 100).toFixed(2) : '5.00',
+    max_deposit_cents: method?.max_deposit_cents != null ? (method.max_deposit_cents / 100).toFixed(2) : '1000.00',
+    default_bonus_pct: method?.default_bonus_pct ?? '',
+    sort_order: method?.sort_order ?? 0,
+    description: method?.description || '',
+    instructions: method?.instructions || '',
     is_active: method?.is_active ?? true,
-    supports_deposit: method?.supports_deposit ?? true,
-    supports_withdrawal: method?.supports_withdrawal ?? true,
+    is_auto: method?.is_auto ?? false,
+    allow_deposit: method?.allow_deposit ?? true,
+    allow_withdraw: method?.allow_withdraw ?? true,
+    requires_proof: method?.requires_proof ?? true,
+    requires_reference: method?.requires_reference ?? true,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -26,12 +33,16 @@ function MethodModal({ method, onClose, onSave }) {
   async function submit() {
     if (!form.name.trim()) { setError('Method name is required'); return }
     setSaving(true); setError('')
+    // min/max are NOT NULL on the table, so fall back to the column defaults
+    // rather than sending null.
     const body = {
       ...form,
-      min_amount_cents: form.min_amount_cents ? Math.round(parseFloat(form.min_amount_cents) * 100) : null,
-      max_amount_cents: form.max_amount_cents ? Math.round(parseFloat(form.max_amount_cents) * 100) : null,
-      fee_percent: form.fee_percent ? parseFloat(form.fee_percent) : 0,
-      fee_fixed_cents: form.fee_fixed_cents ? Math.round(parseFloat(form.fee_fixed_cents) * 100) : 0,
+      min_deposit_cents: form.min_deposit_cents ? Math.round(parseFloat(form.min_deposit_cents) * 100) : 500,
+      max_deposit_cents: form.max_deposit_cents ? Math.round(parseFloat(form.max_deposit_cents) * 100) : 100000,
+      default_bonus_pct: form.default_bonus_pct ? parseFloat(form.default_bonus_pct) : 0,
+      sort_order: parseInt(form.sort_order, 10) || 0,
+      description: form.description.trim() || null,
+      instructions: form.instructions.trim() || null,
     }
     const result = await onSave(method?.id, body)
     if (result?.error) { setError(result.error); setSaving(false) }
@@ -67,7 +78,7 @@ function MethodModal({ method, onClose, onSave }) {
               {['bank_transfer', 'crypto', 'card', 'ewallet', 'cash'].map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
             </select>
           </div>
-          {[['min_amount_cents', 'Min Amount ($)'], ['max_amount_cents', 'Max Amount ($)'], ['fee_percent', 'Fee %'], ['fee_fixed_cents', 'Fixed Fee ($)']].map(([key, label]) => (
+          {[['min_deposit_cents', 'Min Deposit ($)'], ['max_deposit_cents', 'Max Deposit ($)'], ['default_bonus_pct', 'Default Bonus %'], ['sort_order', 'Sort Order']].map(([key, label]) => (
             <div key={key}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
               <input type="number" min="0" step="0.01" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder="0"
@@ -75,13 +86,21 @@ function MethodModal({ method, onClose, onSave }) {
             </div>
           ))}
           <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Processing Time</label>
-            <input value={form.processing_time} onChange={e => setForm(p => ({ ...p, processing_time: e.target.value }))} placeholder="e.g. 1-3 business days"
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Description</label>
+            <input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Short line players see under the name"
               style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }} />
           </div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Player Instructions</label>
+            <textarea rows={3} value={form.instructions} onChange={e => setForm(p => ({ ...p, instructions: e.target.value }))} placeholder="How to pay — where to send it, what to include"
+              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
+          </div>
           <Toggle field="is_active" label="Active" />
-          <Toggle field="supports_deposit" label="Deposits" />
-          <Toggle field="supports_withdrawal" label="Withdrawals" />
+          <Toggle field="is_auto" label="Auto-approve" />
+          <Toggle field="allow_deposit" label="Deposits" />
+          <Toggle field="allow_withdraw" label="Withdrawals" />
+          <Toggle field="requires_proof" label="Needs proof" />
+          <Toggle field="requires_reference" label="Needs reference" />
         </div>
         {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
@@ -139,8 +158,8 @@ export default function AdminPayments() {
   const TYPE_COLOR = { bank_transfer: '#06b6d4', crypto: '#a855f7', card: '#fbbf24', ewallet: '#22c55e', cash: '#f97316' }
 
   const filtered = rows.filter(r => {
-    if (filter === 'deposits') return r.supports_deposit
-    if (filter === 'withdrawals') return r.supports_withdrawal
+    if (filter === 'deposits') return r.allow_deposit
+    if (filter === 'withdrawals') return r.allow_withdraw
     const s = search.toLowerCase()
     return !search || r.name?.toLowerCase().includes(s) || r.type?.toLowerCase().includes(s)
   })
@@ -174,7 +193,7 @@ export default function AdminPayments() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Method', 'Type', 'Min / Max', 'Fee', 'Processing', 'Channels', 'Status', 'Actions'].map(h => (
+                {['Method', 'Type', 'Min / Max', 'Bonus', 'Requires', 'Channels', 'Status', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -192,13 +211,19 @@ export default function AdminPayments() {
                     <td style={{ padding: '12px 14px' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: tc + '22', color: tc, textTransform: 'capitalize' }}>{r.type?.replace(/_/g, ' ')}</span>
                     </td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.5)', whiteSpace: 'nowrap' }}>{fmt(r.min_amount_cents)} — {r.max_amount_cents ? fmt(r.max_amount_cents) : '∞'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24' }}>{r.fee_percent ? r.fee_percent + '%' : ''}{r.fee_percent && r.fee_fixed_cents ? ' + ' : ''}{r.fee_fixed_cents ? fmt(r.fee_fixed_cents) : ''}{!r.fee_percent && !r.fee_fixed_cents ? 'Free' : ''}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{r.processing_time || '—'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.5)', whiteSpace: 'nowrap' }}>{fmt(r.min_deposit_cents)} — {r.max_deposit_cents ? fmt(r.max_deposit_cents) : '∞'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24' }}>{Number(r.default_bonus_pct) > 0 ? Number(r.default_bonus_pct) + '%' : '—'}</td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {r.supports_deposit && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(34,197,94,.15)', color: '#22c55e' }}>DEP</span>}
-                        {r.supports_withdrawal && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7' }}>WD</span>}
+                        {r.requires_proof && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(251,191,36,.15)', color: '#fbbf24' }}>PROOF</span>}
+                        {r.requires_reference && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(6,182,212,.15)', color: '#06b6d4' }}>REF</span>}
+                        {!r.requires_proof && !r.requires_reference && <span style={{ fontSize: 11, color: 'rgba(255,255,255,.3)' }}>—</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {r.allow_deposit && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(34,197,94,.15)', color: '#22c55e' }}>DEP</span>}
+                        {r.allow_withdraw && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7' }}>WD</span>}
                       </div>
                     </td>
                     <td style={{ padding: '12px 14px' }}><StatusBadge status={r.is_active ? 'active' : 'inactive'} size="xs" /></td>
