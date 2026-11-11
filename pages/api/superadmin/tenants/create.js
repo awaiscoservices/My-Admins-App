@@ -129,9 +129,16 @@ export default async function handler(req, res) {
     .order('sort_order', { ascending: true })
 
   if (tmplLevels?.length) {
-    const copies = tmplLevels.map(({ id: _id, created_at: _c, updated_at: _u, ...rest }) => ({
+    // Drop only the primary key, which the table fills itself. The timestamps
+    // are refreshed in place rather than removed: dropping a column that is
+    // NOT NULL without a default would fail the whole insert, and a new
+    // casino would silently get no levels again.
+    const now = new Date().toISOString()
+    const copies = tmplLevels.map(({ id: _id, ...rest }) => ({
       ...rest,
       tenant_id: tenant.id,
+      ...('created_at' in rest ? { created_at: now } : {}),
+      ...('updated_at' in rest ? { updated_at: now } : {}),
     }))
     const { error: levelErr } = await supabaseAdmin.from('player_levels').insert(copies)
     if (!levelErr) levels_seeded = copies.length
