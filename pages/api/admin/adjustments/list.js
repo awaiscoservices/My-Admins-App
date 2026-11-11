@@ -10,7 +10,10 @@ export default async function handler(req, res) {
   const offset = parseInt(page) * parseInt(limit)
 
   let q = scopeToTenant(supabaseAdmin.from('wallet_adjustments')
-    .select('id, amount_cents, direction, reason, reference_id, created_at, profiles!wallet_adjustments_user_id_fkey(full_name, email), staff:profiles!wallet_adjustments_admin_id_fkey(full_name)', { count: 'exact' })
+    // wallet_adjustments has created_by and approved_by. There is no
+    // admin_id, so this join named a key that does not exist and the route
+    // failed outright — as did the page, which asked for actor_id.
+    .select('id, reference_id, amount_cents, direction, wallet_bucket, reason, case_reference, status, created_at, user_id, profiles!wallet_adjustments_user_id_fkey(full_name, email), actor:profiles!wallet_adjustments_created_by_fkey(full_name)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + parseInt(limit) - 1), gate)
 

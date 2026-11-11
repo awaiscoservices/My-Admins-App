@@ -47,19 +47,16 @@ export default function AdminAdjustments() {
       return
     }
 
-    const { data, error } = await supabase
-      .from('wallet_adjustments')
-      .select(`
-        id, reference_id, amount_cents, direction, bucket, reason, notes, created_at,
-        user_id,
-        profiles!wallet_adjustments_user_id_fkey ( full_name, email ),
-        actor:profiles!wallet_adjustments_actor_id_fkey ( full_name )
-      `)
-      .order('created_at', { ascending: false })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+    // Through the guarded route: read from the browser, this showed every
+    // casino's adjustments to every casino's staff. It also asked for an
+    // actor_id key that does not exist, so it never loaded at all.
+    const res = await fetch(`/api/admin/adjustments/list?page=${page + 1}&limit=${PAGE_SIZE}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const d = await res.json()
 
-    if (error) { showToast(error.message, 'error'); setLoading(false); return }
-    setItems(data || [])
+    if (!res.ok) { showToast(d.error || 'Could not load adjustments', 'error'); setLoading(false); return }
+    setItems(d.rows || [])
     setLoading(false)
   }
 
@@ -109,7 +106,7 @@ export default function AdminAdjustments() {
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {filtered.map(item => {
               const ts = TYPE_STYLE[item.direction] || TYPE_STYLE.credit
-              const bucketColor = item.bucket === 'cash' ? '#22c55e' : '#818cf8'
+              const bucketColor = item.wallet_bucket === 'cash' ? '#22c55e' : '#818cf8'
               return (
                 <div key={item.id} style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.06)', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:14, minWidth:0 }}>
@@ -125,7 +122,7 @@ export default function AdminAdjustments() {
                       <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>
                         {item.profiles?.full_name || '—'}
                         <span style={{ marginLeft:8, padding:'2px 6px', borderRadius:10, fontSize:10, fontWeight:700, background:`${bucketColor}22`, color:bucketColor }}>
-                          {item.bucket}
+                          {item.wallet_bucket}
                         </span>
                       </div>
                       <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:2 }}>
@@ -140,9 +137,9 @@ export default function AdminAdjustments() {
                     <div style={{ fontSize:18, fontWeight:900, color:ts.color }}>
                       {ts.prefix}{fmt(item.amount_cents)}
                     </div>
-                    {item.notes && (
+                    {item.case_reference && (
                       <div style={{ fontSize:11, color:'rgba(255,255,255,.3)', marginTop:4, maxWidth:200, textAlign:'right' }}>
-                        {item.notes}
+                        {item.case_reference}
                       </div>
                     )}
                   </div>

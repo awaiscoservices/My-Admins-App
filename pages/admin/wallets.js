@@ -37,19 +37,21 @@ export default function AdminWallets() {
     const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
     setRole(p?.role || '')
 
-    const { data, error } = await supabase
-      .from('wallets')
-      .select(`
-        id, user_id, cash_balance_cents, bonus_balance_cents,
-        total_deposited_cents, total_withdrawn_cents, total_loaded_cents, total_redeemed_cents,
-        updated_at,
-        profiles ( full_name, email, player_levels ( name, accent_color ) )
-      `)
-      .order('cash_balance_cents', { ascending: false })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+    // Through the API, not straight from the table.
+    //
+    // This page used to query `wallets` from the browser, so the only thing
+    // deciding what you saw was row-level security — which lets any staff
+    // member read any wallet. A casino's admin was shown every other
+    // casino's players, and staff accounts' empty wallets along with them.
+    // The route checks the role, pins the query to the caller's own casino
+    // and returns players only.
+    const res = await fetch(`/api/admin/wallets/list?page=${page + 1}&limit=${PAGE_SIZE}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const d = await res.json()
 
-    if (error) { showToast(error.message, 'error'); setLoading(false); return }
-    setWallets(data || [])
+    if (!res.ok) { showToast(d.error || 'Could not load wallets', 'error'); setLoading(false); return }
+    setWallets(d.rows || [])
     setLoading(false)
   }
 

@@ -66,14 +66,15 @@ export default function AdminStaff() {
     const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
     setRole(p?.role || '')
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, role, status, created_at')
-      .in('role', ['super_admin', 'admin', 'finance', 'game_ops', 'support'])
-      .order('created_at', { ascending: true })
+    // Through the guarded route. Read straight from the browser, this listed
+    // every casino's staff to every casino's admin.
+    const res = await fetch('/api/admin/staff/list', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const d = await res.json()
 
-    if (error) { showToast(error.message, 'error'); setLoading(false); return }
-    setStaff(data || [])
+    if (!res.ok) { showToast(d.error || 'Could not load staff', 'error'); setLoading(false); return }
+    setStaff(d.staff || d.rows || [])
     setLoading(false)
   }
 

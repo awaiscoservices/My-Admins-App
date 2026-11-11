@@ -53,17 +53,16 @@ export default function AdminAuditLogs() {
       showToast('super_admin only', 'error'); setLoading(false); return
     }
 
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select(`
-        id, action, actor_role, target_type, target_id, description, created_at,
-        actor:profiles!audit_logs_actor_id_fkey ( full_name, email )
-      `)
-      .order('created_at', { ascending: false })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+    // Through the guarded route, not the table. Querying from the browser
+    // left row-level security as the only thing deciding what you saw, and
+    // it lets any staff member read any casino's rows.
+    const res = await fetch(`/api/admin/audit-logs/list?page=${page + 1}&limit=${PAGE_SIZE}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const d = await res.json()
 
-    if (error) { showToast(error.message, 'error'); setLoading(false); return }
-    setItems(data || [])
+    if (!res.ok) { showToast(d.error || 'Could not load the audit log', 'error'); setLoading(false); return }
+    setItems(d.rows || d.logs || [])
     setLoading(false)
   }
 
