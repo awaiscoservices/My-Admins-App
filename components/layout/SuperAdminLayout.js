@@ -240,9 +240,13 @@ export default function SuperAdminLayout({ children, title }) {
         .admin-sidebar:hover .rail-btn,
         .admin-sidebar:focus-within .rail-btn { gap: 8px !important; padding-left: 12px !important; padding-right: 12px !important; }
 
-        .admin-sidebar .rail-section { height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; transition: height .18s ease, padding .18s ease; }
-        .admin-sidebar:hover .rail-section,
-        .admin-sidebar:focus-within .rail-section { height: 22px; padding: 4px 12px 8px !important; }
+        /* The section heading keeps its height whether the rail is narrow or
+           wide. It used to be height:0 collapsed and 22px expanded, so the
+           moment the rail widened every row below a heading was pushed down
+           and slid out from under the cursor — you hovered Deposits and
+           ended up pointing at Withdrawals. Only the text fades now; the
+           space it occupies never changes, so nothing moves. */
+        .admin-sidebar .rail-section { height: 22px; padding: 4px 12px 8px !important; overflow: hidden; }
 
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }
