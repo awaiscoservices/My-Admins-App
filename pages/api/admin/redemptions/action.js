@@ -103,11 +103,53 @@ export default async function handler(req, res) {
 
   // Admin can override amount, but cap at requested
   const rawApproved   = approved_cents ? Math.min(approved_cents, requestedCents) : requestedCents
-  // The eligible portion (what reduces future eligibility)
-  const eligiblePortion = Math.min(rawApproved, remainingEligible)
-  // Excess = amount above what's eligible (this becomes XP)
-  const excessCents   = Math.max(0, rawApproved - eligiblePortion)
-  const finalApproved = rawApproved  // admin approves the full amount regardless
+  // ── The player level's redeem cap ───────────────────────────────
+  //
+  // This line used to read `const finalApproved = rawApproved` with the
+  // comment "admin approves the full amount regardless", so Max Redeem
+  // Limit — set per level on Player Levels, and shown to players on their
+  // Rewards page — decided nothing. The level rules were decoration.
+  //
+  // The Levels form describes the cap as a hard ceiling per game per day
+  // that overrides the multiplier, so redemptions already approved today on
+  // the same game account count against it.
+  const { data: capProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('player_levels(name, max_redeem_cap_cents)')
+    .eq('id', playerId)
+    .maybeSingle()
+
+  const levelName = capProfile?.player_levels?.name || 'This level'
+  const dailyCap  = capProfile?.player_levels?.max_redeem_cap_cents ?? null
+
+  let finalApproved = rawApproved
+
+  if (dailyCap != null && dailyCap >= 0) {
+    const dayStart = new Date()
+    dayStart.setHours(0, 0, 0, 0)
+
+    const { data: todays } = await supabaseAdmin
+      .from('redemptions')
+      .select('approved_cents')
+      .eq('game_account_id', gameAccountId)
+      .eq('status', 'completed')
+      .gte('updated_at', dayStart.toISOString())
+
+    const alreadyToday = (todays || []).reduce((sum, r) => sum + (r.approved_cents || 0), 0)
+    finalApproved = Math.min(rawApproved, Math.max(0, dailyCap - alreadyToday))
+
+    // Approving zero would mark the request completed and pay nothing, so
+    // say what happened instead.
+    if (finalApproved <= 0) {
+      return res.status(409).json({
+        error: `${levelName} allows $${(dailyCap / 100).toFixed(2)} per game per day, and this game's allowance is already used up today.`,
+      })
+    }
+  }
+
+  // Split what is actually being paid, not what was asked for.
+  const eligiblePortion = Math.min(finalApproved, remainingEligible)
+  const excessCents     = Math.max(0, finalApproved - eligiblePortion)
 
   // Fetch wallet
   const { data: wallet, error: walletErr } = await supabaseAdmin
