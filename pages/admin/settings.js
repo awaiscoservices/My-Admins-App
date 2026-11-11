@@ -66,7 +66,11 @@ export default function AdminSettings() {
     setSaving(false)
   }
 
-  const TABS = ['general', 'limits', 'kyc', 'security', 'maintenance']
+  // 'limits' and 'kyc' are gone: deposit limits live on Payment Methods,
+  // withdrawal and redeem limits on Player Levels (per level), and whether a
+  // level needs KYC is set on the level itself. Keeping global copies here
+  // meant two places to change one rule, and the copy here changed nothing.
+  const TABS = ['general', 'security', 'maintenance']
 
   const inputStyle = { width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }
   const labelStyle = { display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }
@@ -82,17 +86,6 @@ export default function AdminSettings() {
       <button onClick={() => update(field, !settings?.[field])} style={{ flexShrink: 0, marginLeft: 20, width: 44, height: 24, borderRadius: 99, border: 'none', cursor: 'pointer', background: settings?.[field] ? '#22c55e' : 'rgba(255,255,255,.15)', position: 'relative', transition: 'background .2s' }}>
         <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: settings?.[field] ? 23 : 3, transition: 'left .2s' }} />
       </button>
-    </div>
-  )
-
-  const CentsField = ({ field, label }) => (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 13 }}>$</span>
-        <input type="number" min="0" step="0.01" value={settings?.[field] != null ? (settings[field] / 100).toFixed(2) : ''} onChange={e => update(field, Math.round(parseFloat(e.target.value || 0) * 100))}
-          style={{ ...inputStyle, flex: 1 }} />
-      </div>
     </div>
   )
 
@@ -147,59 +140,13 @@ export default function AdminSettings() {
                 <Toggle field="registrations_enabled" label="New Registrations" desc="Allow new players to create accounts" />
                 <Toggle field="deposits_enabled" label="Deposits" desc="Allow players to make deposits" />
                 <Toggle field="withdrawals_enabled" label="Withdrawals" desc="Allow players to request withdrawals" />
-                <Toggle field="promotions_enabled" label="Promotions" desc="Apply bonuses to eligible deposits" />
               </div>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', margin: '0 0 20px', lineHeight: 1.6 }}>
+                Deposit bonuses and referral rewards are set on <strong style={{ color: '#fbbf24' }}>Player Bonuses</strong>,
+                deposit limits on <strong style={{ color: '#fbbf24' }}>Payment Methods</strong>, and withdrawal
+                and redeem limits per level on <strong style={{ color: '#fbbf24' }}>Player Levels</strong>.
+              </p>
             </>
-          )}
-
-          {activeTab === 'limits' && (
-            <>
-              <div style={sectionStyle}>
-                <div style={sectionTitle}>Deposit Limits</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <CentsField field="min_deposit_cents" label="Minimum Deposit" />
-                  <CentsField field="max_deposit_cents" label="Maximum Deposit" />
-                  <CentsField field="daily_deposit_limit_cents" label="Daily Deposit Limit" />
-                  <CentsField field="monthly_deposit_limit_cents" label="Monthly Deposit Limit" />
-                </div>
-              </div>
-              <div style={sectionStyle}>
-                <div style={sectionTitle}>Withdrawal Limits</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <CentsField field="min_withdrawal_cents" label="Minimum Withdrawal" />
-                  <CentsField field="max_withdrawal_cents" label="Maximum Withdrawal" />
-                  <CentsField field="daily_withdrawal_limit_cents" label="Daily Withdrawal Limit" />
-                  <CentsField field="weekly_withdrawal_limit_cents" label="Weekly Withdrawal Limit" />
-                </div>
-              </div>
-              <div style={sectionStyle}>
-                <div style={sectionTitle}>Score Limits</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <CentsField field="min_game_load_cents" label="Minimum Score" />
-                  <CentsField field="max_game_load_cents" label="Maximum Score" />
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'kyc' && (
-            <div style={sectionStyle}>
-              <div style={sectionTitle}>KYC Requirements</div>
-              <Toggle field="kyc_required_for_withdrawal" label="KYC Required for Withdrawals" desc="Players must complete KYC before withdrawing" />
-              <Toggle field="kyc_required_for_high_deposits" label="KYC Required for High Deposits" desc="KYC required above the deposit threshold" />
-              <div style={{ marginTop: 16 }}>
-                <CentsField field="kyc_deposit_threshold_cents" label="KYC Deposit Threshold" />
-              </div>
-              <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={labelStyle}>Document Types Required</label>
-                  <select multiple value={settings?.required_doc_types || []} onChange={e => update('required_doc_types', Array.from(e.target.selectedOptions, o => o.value))}
-                    style={{ ...inputStyle, height: 120 }}>
-                    {['passport', 'drivers_license', 'national_id', 'selfie', 'utility_bill'].map(d => <option key={d} value={d} style={{ background: '#0e1a2e' }}>{d.replace(/_/g, ' ')}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
           )}
 
           {activeTab === 'security' && (
