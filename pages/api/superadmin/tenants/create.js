@@ -14,6 +14,10 @@ import { guardSuperAdmin, supabaseAdmin } from '../_guard'
 // because Supabase Auth requires an address.
 const INTERNAL_EMAIL_DOMAIN = 'staff.casinoze.local'
 
+// The first casino. Its settings and player levels are the template every new
+// casino starts from, so a new casino is usable the moment it is created.
+const TEMPLATE_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+
 /**
  * profiles.full_name is NOT NULL, so an invite that does not set it fails
  * after the auth user has already been created. Derive something readable
@@ -100,13 +104,38 @@ export default async function handler(req, res) {
   const { data: template } = await supabaseAdmin
     .from('platform_settings')
     .select('key, value, description')
-    .eq('tenant_id', '00000000-0000-0000-0000-000000000001')
+    .eq('tenant_id', TEMPLATE_TENANT_ID)
 
   if (template?.length) {
     await supabaseAdmin.from('platform_settings').upsert(
       template.map(r => ({ ...r, tenant_id: tenant.id })),
       { onConflict: 'tenant_id,key' },
     ).then(() => {}, () => {})
+  }
+
+  // Give it the standard set of player levels too.
+  //
+  // A casino with no levels cannot be configured at all: the deposit bonus
+  // grid is one row per level, so it came up empty, and players have no rank
+  // to earn. The rows are copied from the template casino rather than written
+  // out here — selecting * and dropping only the identity columns means no
+  // column is named in this file, so the copy cannot go stale when the table
+  // changes.
+  let levels_seeded = 0
+  const { data: tmplLevels } = await supabaseAdmin
+    .from('player_levels')
+    .select('*')
+    .eq('tenant_id', TEMPLATE_TENANT_ID)
+    .order('sort_order', { ascending: true })
+
+  if (tmplLevels?.length) {
+    const copies = tmplLevels.map(({ id: _id, created_at: _c, updated_at: _u, ...rest }) => ({
+      ...rest,
+      tenant_id: tenant.id,
+    }))
+    const { error: levelErr } = await supabaseAdmin.from('player_levels').insert(copies)
+    if (!levelErr) levels_seeded = copies.length
+    else console.error('[tenants/create] level seed failed:', levelErr)
   }
 
   // Create the first admin, if credentials were given.
@@ -199,5 +228,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(201).json({ tenant, admin_invite })
+  return res.status(201).json({ tenant, admin_invite, levels_seeded })
 }
