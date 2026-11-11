@@ -45,7 +45,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/admin/games',        icon: 'games',   label: 'Game Panels',     roles: ['admin','super_admin'] },
       { href: '/admin/payments',     icon: 'coin',    label: 'Payment Methods', roles: ['admin','super_admin','finance'] },
-      { href: '/admin/promotions',   icon: 'gift',    label: 'Promotions',      roles: ['admin','super_admin','marketing'] },
+      { href: '/admin/promotions',   icon: 'gift',    label: 'Player Bonuses',  roles: ['admin','super_admin','marketing'] },
       { href: '/admin/levels',       icon: 'star',    label: 'Player Levels',   roles: ['admin','super_admin','marketing'] },
     ],
   },
