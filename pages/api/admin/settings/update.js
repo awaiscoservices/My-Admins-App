@@ -18,8 +18,8 @@ export default async function handler(req, res) {
   for (const { key, value } of updates) {
     if (!key) continue
     await supabaseAdmin.from('platform_settings').upsert(
-      { key, value, updated_at: new Date().toISOString(), updated_by: admin.id },
-      { onConflict: 'key' }
+      { tenant_id: gate.tenantId, key, value, updated_at: new Date().toISOString(), updated_by: admin.id },
+      { onConflict: 'tenant_id,key' }
     )
   }
 
