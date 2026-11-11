@@ -142,11 +142,11 @@ export default function SuperAdminLayout({ children, title }) {
           </div>
         </div>
 
-        {/* Right — back to admin + role badge */}
+        {/* Right — role badge.
+            There is deliberately no link to the admin panel here, and none
+            back the other way: the two portals are separate places, and a
+            door between them in the chrome invites a wrong turn. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Link href="/admin" className="hide-sm" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, color: 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-            <Icon name="back" size={14} /> Admin Panel
-          </Link>
           <div style={{ padding: '7px 12px', background: '#ef444418', border: '1px solid #ef444455', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>
             super admin
           </div>
