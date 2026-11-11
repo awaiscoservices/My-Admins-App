@@ -212,12 +212,16 @@ export default function AdminChat() {
     <AdminLayout title="Chat">
       <Head><title>Chat — Casinoze Support</title></Head>
 
-      <div style={{ padding: '24px 32px 32px', minHeight: '100vh', boxSizing: 'border-box' }}>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 24 }}>
+      {/* The page itself does not scroll — it fits the viewport and only the
+          conversation list and the message thread scroll inside their panels.
+          minHeight:100vh here forced the whole body taller than the screen on
+          top of the layout's own top bar and padding. */}
+      <div style={{ boxSizing: 'border-box' }}>
+        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 20 }}>
           Live Chat
         </h1>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, height: 'calc(100vh - 160px)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, height: 'calc(100vh - 180px)', minHeight: 360 }}>
           {/* Left — conversation list */}
           <div style={{ ...PANEL, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
