@@ -230,26 +230,26 @@ export default function AdminDashboard() {
               {/* Players & money */}
               <StatCard icon="users"     label="Total Players"        value={fmtNum(s.total_players)}        sub={`${fmtNum(s.new_players_today)} new today`}        color={blue}   />
               <StatCard icon="dollar"    label="Total Deposits"       value={fmt(s.total_deposits_cents)}    sub={`${fmtNum(s.deposits_count)} transactions`}        color={green}  />
-              <StatCard icon="upload"    label="Total Withdrawals"    value={fmt(s.total_withdrawals_cents)} sub={`${fmtNum(s.withdrawals_count)} paid out`}         color={red}    />
+              <StatCard icon="upload"    label="Total Withdraw"    value={fmt(s.total_withdrawals_cents)} sub={`${fmtNum(s.withdrawals_count)} paid out`}         color={red}    />
               <StatCard icon="trendUp"   label="Net Revenue"          value={fmt(totalRevenue)}              sub="Deposits minus withdrawals"                        color={gold}   />
 
               {/* Pending queues */}
               <StatCard icon="clock"     label="Pending Deposits"     value={fmtNum(s.pending_deposits)}     sub="Awaiting approval"                                 color={orange} />
-              <StatCard icon="clock"     label="Pending Withdrawals"  value={fmtNum(s.pending_withdrawals)}  sub="Awaiting approval"                                 color={orange} />
+              <StatCard icon="clock"     label="Pending Withdraw"  value={fmtNum(s.pending_withdrawals)}  sub="Awaiting approval"                                 color={orange} />
               <StatCard icon="id"        label="KYC Pending"          value={fmtNum(s.pending_kyc)}          sub="Needs review"                                      color={pink}   />
               <StatCard icon="ticket"    label="Open Tickets"         value={fmtNum(s.open_tickets)}         sub="Support queue"                                     color={cyan}   />
 
               {/* Games & scores */}
               <StatCard icon="gamepad"   label="Active Game Accounts" value={fmtNum(s.active_game_accounts)} sub={`${fmtNum(s.pending_game_accounts)} pending setup`} color={purple} />
               <StatCard icon="trophy"    label="Score Loads (7d)"     value={fmtNum(s.game_loads_7d)}        sub={`${fmtNum(s.pending_game_loads)} awaiting`}         color={gold}   />
-              <StatCard icon="gift"      label="Redemptions (7d)"     value={fmtNum(s.redemptions_7d)}       sub={`${fmtNum(s.pending_redemptions)} pending`}         color={pink}   />
+              <StatCard icon="gift"      label="Redeem (7d)"     value={fmtNum(s.redemptions_7d)}       sub={`${fmtNum(s.pending_redemptions)} pending`}         color={pink}   />
               <StatCard icon="check"     label="Deposit Approval %"   value={`${approvalRate}%`}             sub="Approved of total submitted"                       color={green}  />
 
               {/* Growth & finance */}
               <StatCard icon="userPlus"  label="New Players (7d)"     value={fmtNum(s.new_players_7d)}       sub="Registrations this week"                           color={blue}   />
               <StatCard icon="card"      label="Avg Deposit"          value={fmt(avgDeposit)}                sub="Per transaction"                                   color={cyan}   />
               <StatCard icon="bars"      label="Deposits (7d)"        value={fmt(s.deposits_7d_cents)}       sub="Revenue this week"                                 color={green}  />
-              <StatCard icon="trendDown" label="Withdrawals (7d)"     value={fmt(s.withdrawals_7d_cents)}    sub="Paid out this week"                                color={red}    />
+              <StatCard icon="trendDown" label="Withdraw (7d)"     value={fmt(s.withdrawals_7d_cents)}    sub="Paid out this week"                                color={red}    />
             </div>
 
             {/* ══ Charts Row ══ */}
@@ -270,7 +270,7 @@ export default function AdminDashboard() {
               {/* Withdrawals chart */}
               <div style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, padding:'20px 20px 16px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-                  <h3 style={{ fontSize:13, fontWeight:700, color:red, margin:0, textTransform:'uppercase', letterSpacing:'.06em' }}>Withdrawals — Last 7 Days</h3>
+                  <h3 style={{ fontSize:13, fontWeight:700, color:red, margin:0, textTransform:'uppercase', letterSpacing:'.06em' }}>Withdraw — Last 7 Days</h3>
                   <span style={{ fontSize:20, fontWeight:800, color:red }}>{fmt(s.withdrawals_7d_cents)}</span>
                 </div>
                 <BarChart color={red} height={110}

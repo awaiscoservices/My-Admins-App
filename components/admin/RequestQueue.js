@@ -17,13 +17,13 @@ const KINDS = {
     ok: { id: 'completed', label: '✓ Mark loaded' }, canReject: true,
   },
   redemptions: {
-    title: 'Redemptions', sub: 'Approve to credit the amount to the player’s wallet. You can change the amount.',
+    title: 'Redeem', sub: 'Approve to credit the amount to the player’s wallet. You can change the amount.',
     amount: r => r.amount_cents, amountInput: true,
     fields: r => [['Game', r._game?.name], ['Game username', r._game?.username], ['Player note', r.player_notes]],
     ok: { id: 'completed', label: '✓ Approve & credit wallet' }, canReject: true,
   },
   withdrawals: {
-    title: 'Withdrawals', sub: 'Send the money to the player first, then mark it paid.',
+    title: 'Withdraw', sub: 'Send the money to the player first, then mark it paid.',
     amount: r => r.amount_cents, refInput: true,
     fields: r => [['Method', r.method], ['Pay to', r.destination], ['Payout reference', r.payout_reference]],
     ok: { id: 'completed', label: '✓ Mark paid' }, canReject: true,

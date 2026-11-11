@@ -4,7 +4,7 @@
  * Usage:
  *   <PlayerWalletModal playerId={id} playerName={name} onClose={() => setWalletOpen(false)} />
  *
- * Tabs: Summary | Deposits | Withdrawals | Scores | Redeems | Transactions | Player Level | Bonuses
+ * Tabs: Summary | Deposits | Withdraw | Scores | Redeem | Transactions | Player Level | Bonuses
  *
  * Fix notes:
  *  - r.notes → r.description in Transactions and Bonuses tabs (ledger col renamed)
@@ -379,9 +379,9 @@ function TabTransactions({ playerId }) {
           style={{ padding: '6px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, color: '#fff', fontSize: 12, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
           <option value="">All Types</option>
           <option value="deposit">Deposits</option>
-          <option value="withdrawal">Withdrawals</option>
+          <option value="withdrawal">Withdraw</option>
           <option value="game_load">Game Loads</option>
-          <option value="redemption">Redemptions</option>
+          <option value="redemption">Redeem</option>
           <option value="bonus">Bonuses</option>
           <option value="adjustment">Adjustments</option>
         </select>
@@ -542,7 +542,7 @@ function TabBonuses({ playerId }) {
 const TABS = [
   { key: 'summary',      label: '📊 Summary'     },
   { key: 'deposits',     label: '💵 Deposits'    },
-  { key: 'withdrawals',  label: '🏦 Withdrawals' },
+  { key: 'withdrawals',  label: '🏦 Withdraw' },
   { key: 'scores',       label: '🎮 Scores'      },
   { key: 'redeems',      label: '💰 Redeems'     },
   { key: 'transactions', label: '📋 Transactions' },

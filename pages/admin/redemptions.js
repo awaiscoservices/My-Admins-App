@@ -114,12 +114,12 @@ export default function AdminRedemptions() {
 
   return (
     <AdminLayout>
-      <Head><title>Redeems — Admin</title></Head>
+      <Head><title>Redeem — Admin</title></Head>
       {toast && <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999, background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600, fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
       {selected && <ReviewModal item={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
 
       <div style={{ marginBottom:20 }}>
-        <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', marginBottom:4 }}>Redeems</h1>
+        <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', marginBottom:4 }}>Redeem</h1>
         <p style={{ color:'rgba(255,255,255,.35)', fontSize:13 }}>Review and approve player redemption requests</p>
       </div>
 

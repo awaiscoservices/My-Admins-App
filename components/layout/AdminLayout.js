@@ -31,8 +31,8 @@ const NAV_SECTIONS = [
       { href: '/admin/game-accounts',icon: 'cards',   label: 'Games',           roles: ['admin','super_admin','game_ops'] },
       { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['admin','super_admin','finance'] },
       { href: '/admin/game-loads',   icon: 'refresh', label: 'Scores',          roles: ['admin','super_admin','game_ops'] },
-      { href: '/admin/redemptions',  icon: 'trophy',  label: 'Redemptions',     roles: ['admin','super_admin','game_ops','finance'] },
-      { href: '/admin/withdrawals',  icon: 'out',     label: 'Withdrawals',     roles: ['admin','super_admin','finance'] },
+      { href: '/admin/redemptions',  icon: 'trophy',  label: 'Redeem',          roles: ['admin','super_admin','game_ops','finance'] },
+      { href: '/admin/withdrawals',  icon: 'out',     label: 'Withdraw',        roles: ['admin','super_admin','finance'] },
     ],
   },
   {
@@ -137,8 +137,8 @@ const TOPBAR_TABS = [
   { href: '/admin/game-accounts', label: 'Games',       color: '#06b6d4' },
   { href: '/admin/deposits',      label: 'Deposits',    color: '#10b981' },
   { href: '/admin/game-loads',    label: 'Scores',      color: '#fbbf24' },
-  { href: '/admin/redemptions',   label: 'Redemptions', color: '#f59e0b' },
-  { href: '/admin/withdrawals',   label: 'Withdrawals', color: '#3b82f6' },
+  { href: '/admin/redemptions',   label: 'Redeem', color: '#f59e0b' },
+  { href: '/admin/withdrawals',   label: 'Withdraw', color: '#3b82f6' },
   { href: '/admin/kyc',           label: 'KYC',         color: '#ec4899' },
 ]
 
