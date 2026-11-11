@@ -72,3 +72,22 @@ main [style*="251,191,36,.14"]:hover{border-color:rgba(251,191,36,.34)!important
 
 /* headings across the logged-in side use the same display font as the public site */
 .player-content h1{font-family:'Fraunces',serif!important}
+
+/* ── NATIVE SELECT DROPDOWNS ──
+   An open <select> was white text on a white list: every option invisible
+   except the highlighted one. The popup is drawn by the operating system,
+   so it does not pick up the dark panel behind the control — but the option
+   text DOES inherit the page's white colour, which is how the two ended up
+   the same.
+
+   background-color and color on option/optgroup are the two properties that
+   reliably reach that popup, and this is set globally rather than per
+   control because every <select> in the app has the same problem. */
+select option,
+select optgroup {
+  background-color: #0e1a2e;
+  color: #fff;
+}
+select option:disabled {
+  color: rgba(255, 255, 255, .4);
+}
