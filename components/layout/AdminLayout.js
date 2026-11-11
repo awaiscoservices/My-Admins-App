@@ -218,6 +218,47 @@ export default function AdminLayout({ children }) {
     router.push('/auth/login')
   }
 
+  // Idle logout. When the casino turns on Session Timeout in Settings →
+  // Security, a staff member with no mouse or keyboard activity for the set
+  // number of minutes is signed out. The setting is per casino.
+  useEffect(() => {
+    if (!authorized) return
+    let timer = null
+    let listeners = []
+    let cancelled = false
+
+    async function signOutIdle() {
+      await supabase.auth.signOut()
+      router.push('/auth/login?reason=timeout')
+    }
+
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const res = await fetch('/api/admin/settings/get', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        if (!res.ok) return
+        const { settings } = await res.json()
+        const val = k => settings.find(s => s.key === k)?.value
+        const on = val('session_timeout_enabled') === 'true' || val('session_timeout_enabled') === true
+        const mins = parseInt(val('session_timeout_minutes'), 10)
+        if (cancelled || !on || !mins || mins < 1) return
+
+        const reset = () => { if (timer) clearTimeout(timer); timer = setTimeout(signOutIdle, mins * 60 * 1000) }
+        const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
+        events.forEach(e => window.addEventListener(e, reset, { passive: true }))
+        listeners = events.map(e => [e, reset])
+        reset()
+      } catch { /* leave the session alone if settings cannot be read */ }
+    })()
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      listeners.forEach(([e, fn]) => window.removeEventListener(e, fn))
+    }
+  }, [authorized]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const isActive = (href) => href === '/admin' ? router.pathname === '/admin' : router.pathname.startsWith(href)
   const canSee   = (roles) => profile && roles.includes(profile.role)
 

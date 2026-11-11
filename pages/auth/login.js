@@ -139,6 +139,11 @@ export default function SupportLogin() {
 
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', textAlign: 'center', marginBottom: 6 }}>Staff Sign In</h2>
           <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 12, textAlign: 'center', marginBottom: 28 }}>Authorised personnel only</p>
+          {router.query.reason === 'timeout' && (
+            <p style={{ color: '#f59e0b', fontSize: 12, textAlign: 'center', marginBottom: 20, padding: '10px 14px', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 10 }}>
+              You were signed out after a period of inactivity. Please sign in again.
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ marginBottom: 16 }}>
