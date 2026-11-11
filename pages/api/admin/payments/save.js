@@ -13,7 +13,7 @@
  */
 import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
-const TYPES = ['bank_transfer', 'crypto', 'card', 'ewallet', 'cash', 'other']
+const TYPES = ['cashapp', 'zelle', 'venmo', 'chime', 'paypal', 'bank_transfer', 'crypto', 'money_order', 'other']
 
 /** A number, or the fallback when the value is missing or not a number. */
 function intOr(value, fallback) {

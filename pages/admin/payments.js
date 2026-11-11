@@ -6,6 +6,19 @@ import StatusBadge from '../../components/ui/StatusBadge'
 
 const fmt = c => c != null ? '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'
 
+// payment_methods.type has a CHECK constraint. The old dropdown offered
+// 'card', 'ewallet' and 'cash', which are not in it — saving a new method
+// failed with payment_methods_type_check. These are the values the rest of
+// the system uses: the promotions Payment Methods tab, and the player app's
+// deposit, withdraw and payout-method screens.
+const TYPES = ['cashapp', 'zelle', 'venmo', 'chime', 'paypal', 'bank_transfer', 'crypto', 'money_order', 'other']
+
+const TYPE_COLOR = {
+  cashapp: '#22c55e', zelle: '#a855f7', venmo: '#3b82f6', chime: '#06b6d4',
+  paypal: '#0ea5e9', bank_transfer: '#fbbf24', crypto: '#f97316',
+  money_order: '#8b5cf6', other: '#94a3b8',
+}
+
 function MethodModal({ method, onClose, onSave }) {
   const isNew = !method
   // Every key here is a real column on payment_methods. The old form used
@@ -13,7 +26,7 @@ function MethodModal({ method, onClose, onSave }) {
   // supports_deposit/withdrawal — none of which exist on the table.
   const [form, setForm] = useState({
     name: method?.name || '',
-    type: method?.type || 'bank_transfer',
+    type: method?.type || 'cashapp',
     min_deposit_cents: method?.min_deposit_cents != null ? (method.min_deposit_cents / 100).toFixed(2) : '5.00',
     max_deposit_cents: method?.max_deposit_cents != null ? (method.max_deposit_cents / 100).toFixed(2) : '1000.00',
     default_bonus_pct: method?.default_bonus_pct ?? '',
@@ -75,7 +88,7 @@ function MethodModal({ method, onClose, onSave }) {
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Type</label>
             <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
               style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
-              {['bank_transfer', 'crypto', 'card', 'ewallet', 'cash'].map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
+              {TYPES.map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
             </select>
           </div>
           {[['min_deposit_cents', 'Min Deposit ($)'], ['max_deposit_cents', 'Max Deposit ($)'], ['default_bonus_pct', 'Default Bonus %'], ['sort_order', 'Sort Order']].map(([key, label]) => (
@@ -158,8 +171,6 @@ export default function AdminPayments() {
     load()
     return {}
   }
-
-  const TYPE_COLOR = { bank_transfer: '#06b6d4', crypto: '#a855f7', card: '#fbbf24', ewallet: '#22c55e', cash: '#f97316' }
 
   const filtered = rows.filter(r => {
     if (filter === 'deposits') return r.allow_deposit
