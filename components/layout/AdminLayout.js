@@ -160,7 +160,19 @@ export default function AdminLayout({ children }) {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (!res.ok) return
-      setPendingCounts(await res.json())
+
+      // The badges are looked up by href, but the route answers with its own
+      // names — deposit_requests, not /admin/deposits. Every lookup came back
+      // undefined, so no badge had ever appeared. Translate once, here.
+      const d = await res.json()
+      setPendingCounts({
+        '/admin/deposits':      d.deposit_requests  || 0,
+        '/admin/withdrawals':   d.withdraw_requests || 0,
+        '/admin/game-loads':    d.scores_requests   || 0,
+        '/admin/redemptions':   d.redeem_requests   || 0,
+        '/admin/kyc':           d.kyc_requests      || 0,
+        '/admin/game-accounts': d.game_requests     || 0,
+      })
     } catch (e) {
       console.error('Failed to load pending counts', e)
     }

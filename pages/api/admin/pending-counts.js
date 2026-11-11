@@ -19,13 +19,24 @@ export default async function handler(req, res) {
     gate,
   )
 
-  const [deposits, withdrawals, scores, redeems, kyc, games] = await Promise.all([
+  // A password change leaves the account active on purpose — the old
+  // password has to keep working until staff replace it — so it is not a
+  // 'pending' row and the Games badge never counted it. It is still work
+  // waiting for staff, so it is counted here alongside new accounts.
+  const passwordRequests = scopeToTenant(
+    gate.db.from('game_accounts').select('*', { count: 'exact', head: true })
+      .eq('password_change_requested', true),
+    gate,
+  )
+
+  const [deposits, withdrawals, scores, redeems, kyc, games, passwords] = await Promise.all([
     pending('deposits'),
     pending('withdrawals'),
     pending('game_loads'),
     pending('redemptions'),
     pending('kyc_records'),
     pending('game_accounts'),
+    passwordRequests,
   ])
 
   return res.status(200).json({
@@ -34,6 +45,6 @@ export default async function handler(req, res) {
     scores_requests:   scores.count      || 0,
     redeem_requests:   redeems.count     || 0,
     kyc_requests:      kyc.count         || 0,
-    game_requests:     games.count       || 0,
+    game_requests:     (games.count || 0) + (passwords.count || 0),
   })
 }
