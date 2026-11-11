@@ -133,8 +133,12 @@ export default function AdminPayments() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const d = await res.json()
+      // A refused request used to leave the table empty, which reads as "this
+      // casino has no payment methods" rather than "you were not allowed to
+      // see them". Say which it is.
+      if (!res.ok) { setRows([]); showToast(d.error || 'Could not load payment methods', 'error'); return }
       setRows(d.rows || d.methods || [])
-    } catch (e) { console.error('Failed to load payment methods', e); setRows([]) }
+    } catch (e) { console.error('Failed to load payment methods', e); setRows([]); showToast('Could not load payment methods', 'error') }
     setLoading(false)
   }
 

@@ -66,28 +66,13 @@ const NAV_SECTIONS = [
   },
 ]
 
-const BUILT = new Set([
-  '/admin',
-  '/admin/players',
-  '/admin/deposits',
-  '/admin/game-accounts',
-  '/admin/game-loads',
-  '/admin/redemptions',
-  '/admin/withdrawals',
-  '/admin/kyc',
-  '/admin/support',
-  '/admin/wallets',
-  '/admin/transactions',
-  '/admin/adjustments',
-  '/admin/games',
-  '/admin/promotions',
-  '/admin/levels',
-  '/admin/staff',
-  '/admin/audit-logs',
-  '/admin/settings',
-  '/admin/risk',
-  '/admin/notifications',
-])
+// There used to be a hand-written BUILT set here that the sidebar filtered
+// every link through, to hide links to pages that did not exist yet. Every
+// page in NAV exists now, and /admin/payments was simply never added to the
+// set — so Payment Methods was invisible in the sidebar and unreachable,
+// which is why "+ Add Method" could not be found. A list that has to be
+// updated by hand whenever a page is added will go stale again, so links are
+// now filtered by role alone.
 
 const ICONS = {
   home:    'M3 11l9-8 9 8M5 10v10h14V10',
@@ -292,7 +277,7 @@ export default function AdminLayout({ children }) {
             the top bar. */}
         <nav style={{ flex: 1, overflowY: 'auto', padding: '12px', scrollbarWidth: 'none' }}>
           {NAV_SECTIONS.map(section => {
-            const visibleItems = section.items.filter(item => canSee(item.roles) && BUILT.has(item.href))
+            const visibleItems = section.items.filter(item => canSee(item.roles))
             if (visibleItems.length === 0) return null
             return (
               <div key={section.label} style={{ marginBottom: 16 }}>
