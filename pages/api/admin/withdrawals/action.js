@@ -19,7 +19,7 @@
  *   1. Mark rejected with reason
  *   2. Audit log
  */
-import { guardAdmin, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, loadOwnedRow, tenantOf, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

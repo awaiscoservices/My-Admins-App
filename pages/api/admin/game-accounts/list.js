@@ -7,21 +7,9 @@ import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const authHeader = req.headers.authorization
-  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' })
-
-  const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-  if (authError || !user) return res.status(401).json({ error: 'Unauthorized' })
-
-  // Verify admin role
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || profile.role === 'player') return res.status(403).json({ error: 'Forbidden' })
+  const gate = await guardAdmin(req, res, { allow: PERMS.GAME_ACCOUNTS_READ })
+  if (!gate) return
+  const supabaseAdmin = gate.db
 
   const { status } = req.query
 
