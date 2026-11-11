@@ -54,6 +54,39 @@ export default async function handler(req, res) {
 
   // ── REJECT ──────────────────────────────────────────────────────
   if (action === 'reject') {
+    // Give the money back. request_game_load takes the amount out of cash
+    // and holds it in reserved_cents the moment the player asks, so a
+    // rejection that only changed the status left the player short and the
+    // reservation stuck on the wallet for ever.
+    const { data: rw } = await supabaseAdmin
+      .from('wallets').select('*').eq('user_id', playerId).single()
+
+    if (rw) {
+      const holdCents = load.withdrawable_hold_cents || 0
+      await supabaseAdmin.from('wallets').update({
+        cash_balance_cents: rw.cash_balance_cents + amountCents,
+        withdrawable_cents: (rw.withdrawable_cents || 0) + holdCents,
+        reserved_cents:     Math.max(0, (rw.reserved_cents || 0) - amountCents),
+        updated_at:         new Date().toISOString(),
+        version:            rw.version + 1,
+      }).eq('user_id', playerId).eq('version', rw.version)
+
+      await supabaseAdmin.from('ledger').insert({
+        tenant_id:           tenantId,
+        reference_id:        `gl-refund-${load_id}`,
+        user_id:             playerId,
+        type:                'game_load_refund',
+        wallet_bucket:       'cash',
+        amount_cents:        amountCents,
+        direction:           'credit',
+        balance_after_cents: rw.cash_balance_cents + amountCents,
+        game_load_id:        load_id,
+        description:         `Game load ${load.reference_id} rejected — refunded`,
+        created_by:          actor.id,
+        idempotency_key:     `gl-refund-${load_id}`,
+      }).then(() => {}, () => {})
+    }
+
     const { error: rejectErr } = await supabaseAdmin
       .from('game_loads')
       .update({
@@ -91,19 +124,25 @@ export default async function handler(req, res) {
 
   if (walletErr || !wallet) return res.status(400).json({ error: 'Wallet not found' })
 
-  const availableCash  = wallet.cash_balance_cents
-  const availableBonus = wallet.bonus_balance_cents
-  const totalAvailable = availableCash + availableBonus
+  // The player's money has ALREADY left cash.
+  //
+  // request_game_load takes the amount out of cash_balance_cents and holds
+  // it in reserved_cents when the player submits. This route then debited
+  // cash a second time and never cleared the reservation — which is why a
+  // $10 load cost $20 and left $10 reserved for ever.
+  //
+  // Approving releases the hold. It must not touch cash or bonus again.
+  // The split across buckets is gone with it: the function only ever takes
+  // cash, and refuses the request outright unless cash covers it.
+  const cashUsed  = amountCents
+  const bonusUsed = 0
 
-  if (totalAvailable < amountCents) {
-    return res.status(422).json({
-      error: `Insufficient balance. Available: $${(totalAvailable / 100).toFixed(2)}, Required: $${(amountCents / 100).toFixed(2)}`
-    })
+  const reserved = wallet.reserved_cents || 0
+  if (reserved < amountCents) {
+    // Older loads, made before the reservation existed, have nothing held.
+    // Say so rather than quietly releasing a hold that was never taken.
+    console.warn(`[game-loads/action] load ${load.reference_id}: reserved ${reserved} < amount ${amountCents}`)
   }
-
-  // Calculate how much comes from cash vs bonus (cash first)
-  const cashUsed  = Math.min(availableCash, amountCents)
-  const bonusUsed = amountCents - cashUsed
 
   const now = new Date().toISOString()
   const idempKey = `gl-approve-${load_id}`
@@ -117,13 +156,13 @@ export default async function handler(req, res) {
 
   if (existing) return res.status(200).json({ ok: true, status: 'completed', idempotent: true })
 
-  // Build wallet update
+  // Release the hold and record the load. Cash and bonus are untouched —
+  // the money came out when the player asked.
   const walletUpdate = {
-    cash_balance_cents:  availableCash  - cashUsed,
-    bonus_balance_cents: availableBonus - bonusUsed,
-    total_loaded_cents:  (wallet.total_loaded_cents || 0) + amountCents,
-    updated_at:          now,
-    version:             wallet.version + 1,
+    reserved_cents:     Math.max(0, reserved - amountCents),
+    total_loaded_cents: (wallet.total_loaded_cents || 0) + amountCents,
+    updated_at:         now,
+    version:            wallet.version + 1,
   }
 
   // Build ledger entries (one per bucket used)
@@ -137,29 +176,17 @@ export default async function handler(req, res) {
       wallet_bucket:     'cash',
       amount_cents:      cashUsed,
       direction:         'debit',
-      balance_after_cents: walletUpdate.cash_balance_cents,
+      // Unchanged by this step: the debit happened at request time.
+      balance_after_cents: wallet.cash_balance_cents,
       game_load_id:      load_id,
       description:       `Game load ${load.reference_id} — cash`,
       created_by:        actor.id,
       idempotency_key:   `${idempKey}-cash`,
     })
   }
-  if (bonusUsed > 0) {
-    ledgerRows.push({
-      tenant_id:         tenantId,
-      reference_id:      `${idempKey}-bonus`,
-      user_id:           playerId,
-      type:              'game_load',
-      wallet_bucket:     'bonus',
-      amount_cents:      bonusUsed,
-      direction:         'debit',
-      balance_after_cents: walletUpdate.bonus_balance_cents,
-      game_load_id:      load_id,
-      description:       `Game load ${load.reference_id} — bonus`,
-      created_by:        actor.id,
-      idempotency_key:   `${idempKey}-bonus`,
-    })
-  }
+  // There is no bonus leg. request_game_load only ever takes cash, and
+  // refuses the request unless cash covers the whole amount, so a load can
+  // never be part-funded from the bonus bucket.
 
   // Execute all writes
   const [walletRes, ledgerRes, loadRes] = await Promise.all([

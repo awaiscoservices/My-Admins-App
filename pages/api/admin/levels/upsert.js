@@ -52,6 +52,13 @@ export default async function handler(req, res) {
     max_redeem_cap_cents: max_redeem_cap_cents ?? null,
     min_redeem_multiplier: min_redeem_multiplier ?? null,
     max_redeem_multiplier: max_redeem_multiplier ?? null,
+    // recalculate_eligibility, in the database, multiplies a game's loads by
+    // player_levels.redeem_multiplier — a single older column this form does
+    // not edit. So the Max Redeem Multiplier set here never reached the
+    // calculation, and every level behaved as whatever redeem_multiplier
+    // happened to hold. Writing the ceiling into it keeps that function
+    // working and makes the setting mean something.
+    redeem_multiplier: parseFloat(max_redeem_multiplier) || 5,
     min_withdrawal_cents: min_withdrawal_cents ?? null,
     max_withdrawal_cents: max_withdrawal_cents ?? null,
     // No updated_at: player_levels has created_at only. Sending a column
