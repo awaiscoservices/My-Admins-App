@@ -9,18 +9,49 @@ import { supabase } from '../../lib/supabase'
 const G  = '#fbbf24'
 const G2 = '#f59e0b'
 
+/**
+ * Stroke icons on a 24×24 box, matching the admin dashboard and the sidebar.
+ * These replace the emoji each card carried: an emoji is a different glyph on
+ * every platform, so the row never read as one set.
+ */
+const ICONS = {
+  building: 'M3 21h18M5 21V5a2 2 0 012-2h7a2 2 0 012 2v16M16 10h3a2 2 0 012 2v9M9 7h2M9 11h2M9 15h2',
+  check:    'M22 11.1V12a10 10 0 11-5.9-9.1M22 4L12 14l-3-3',
+  pause:    'M12 21a9 9 0 100-18 9 9 0 000 18zM10 9v6M14 9v6',
+  globe:    'M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 000 18 14 14 0 000-18',
+  calendar: 'M7 3v4M17 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z',
+  users:    'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M9.5 10a4 4 0 100-8 4 4 0 000 8zM21 20v-2a4 4 0 00-3-3.9M16 2.1a4 4 0 010 7.8',
+}
+
+function Icon({ name, size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+      <path d={ICONS[name] || ICONS.building} />
+    </svg>
+  )
+}
+
 function StatCard({ icon, label, value, sub, color }) {
+  const tint = color || '#94a3b8'
   return (
     <div style={{
       background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)',
       borderRadius: 12, padding: '20px 24px',
+      display: 'flex', flexDirection: 'column', minHeight: 132,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <span style={{ fontSize: 22 }}>{icon}</span>
-        <span style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</span>
+        <span style={{
+          width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+          background: `${tint}18`, border: `1px solid ${tint}33`, color: tint,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon name={icon} size={17} />
+        </span>
+        <span style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', lineHeight: 1.3 }}>{label}</span>
       </div>
       <div style={{ color: color || '#fff', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12, marginTop: 6 }}>{sub}</div>}
+      {sub && <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12, marginTop: 'auto', paddingTop: 6 }}>{sub}</div>}
     </div>
   )
 }
@@ -67,12 +98,15 @@ export default function SuperAdminDashboard() {
         {stats && (
           <>
             {/* Stat cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 16, marginBottom: 32 }}>
-              <StatCard icon="🏢" label="Total Tenants"    value={stats.total}     sub="All time"           color={G} />
-              <StatCard icon="✅" label="Active"           value={stats.active}    sub="Operational"        color="#22c55e" />
-              <StatCard icon="⏸️"  label="Suspended"       value={stats.suspended} sub="Access blocked"     color="#ef4444" />
-              <StatCard icon="🌐" label="Total Domains"    value={stats.domains}   sub="Custom + sub"       />
-              <StatCard icon="📅" label="New This Month"   value={stats.new_month} sub="Last 30 days"       color={G} />
+            {/* auto-fit rather than auto-fill: the last line stretches to the
+                edge instead of leaving an empty column behind. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 16, marginBottom: 32 }}>
+              <StatCard icon="building" label="Total Tenants"  value={stats.total}                  sub="All time"       color={G} />
+              <StatCard icon="check"    label="Active"         value={stats.active}                 sub="Operational"    color="#22c55e" />
+              <StatCard icon="pause"    label="Suspended"      value={stats.suspended}              sub="Access blocked" color="#ef4444" />
+              <StatCard icon="users"    label="Total Players"  value={(stats.players ?? 0).toLocaleString()} sub="Across every casino" color="#3b82f6" />
+              <StatCard icon="globe"    label="Total Domains"  value={stats.domains}                sub="Custom + sub"   color="#06b6d4" />
+              <StatCard icon="calendar" label="New This Month" value={stats.new_month}              sub="Since the 1st"  color={G} />
             </div>
 
             {/* Recent tenants */}

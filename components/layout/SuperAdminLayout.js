@@ -190,8 +190,9 @@ export default function SuperAdminLayout({ children, title }) {
         </nav>
 
         <div style={{ padding: 12, borderTop: '1px solid rgba(251,191,36,.1)' }}>
-          <button onClick={handleSignOut} disabled={signingOut}
-            style={{ width: '100%', padding: '10px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 12, color: '#f87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <button onClick={handleSignOut} disabled={signingOut} title="Sign out"
+            className="rail-btn"
+            style={{ width: '100%', height: 40, padding: '0 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 10, color: '#f87171', fontSize: 13, fontWeight: 700, cursor: signingOut ? 'default' : 'pointer', fontFamily: "'Outfit', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: signingOut ? .6 : 1, transition: 'background .15s, border-color .15s' }}>
             <Icon name="logout" size={16} />
             <span className="rail-label" style={{ whiteSpace: 'nowrap' }}>{signingOut ? 'Signing out…' : 'Sign Out'}</span>
           </button>
@@ -220,13 +221,24 @@ export default function SuperAdminLayout({ children, title }) {
         .admin-sidebar:hover,
         .admin-sidebar:focus-within { width: 250px; box-shadow: 8px 0 32px rgba(0,0,0,.55); }
 
+        /* A hidden label must take no WIDTH either. With opacity alone the
+           text still occupied the rail, so the Sign Out button centred its
+           icon against invisible text and pushed it off the 72px edge. */
         .admin-sidebar .rail-label {
           opacity: 0;
-          transition: opacity .12s ease;
+          max-width: 0;
+          overflow: hidden;
+          transition: opacity .12s ease, max-width .18s ease;
           pointer-events: none;
         }
         .admin-sidebar:hover .rail-label,
-        .admin-sidebar:focus-within .rail-label { opacity: 1; pointer-events: auto; }
+        .admin-sidebar:focus-within .rail-label { opacity: 1; max-width: 190px; pointer-events: auto; }
+
+        /* Collapsed, the sign-out button is a square icon button: no side
+           padding and no gap, so the icon sits in the middle of the rail. */
+        .admin-sidebar .rail-btn { gap: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+        .admin-sidebar:hover .rail-btn,
+        .admin-sidebar:focus-within .rail-btn { gap: 8px !important; padding-left: 12px !important; padding-right: 12px !important; }
 
         .admin-sidebar .rail-section { height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; transition: height .18s ease, padding .18s ease; }
         .admin-sidebar:hover .rail-section,
@@ -239,7 +251,8 @@ export default function SuperAdminLayout({ children, title }) {
         @media (max-width: 768px) {
           .admin-sidebar { width: 250px !important; transform: translateX(-100%); transition: transform .25s; }
           .admin-sidebar.open { transform: translateX(0); }
-          .admin-sidebar .rail-label { opacity: 1 !important; pointer-events: auto !important; }
+          .admin-sidebar .rail-label { opacity: 1 !important; max-width: none !important; pointer-events: auto !important; }
+          .admin-sidebar .rail-btn { gap: 8px !important; padding-left: 12px !important; padding-right: 12px !important; }
           .admin-sidebar .rail-section { height: auto !important; padding: 4px 12px 8px !important; }
           .admin-main { margin-left: 0 !important; }
           .mobile-ham { display: flex !important; }

@@ -16,11 +16,15 @@ export default async function handler(req, res) {
     { count: active },
     { count: suspended },
     { count: domains },
+    { count: players },
   ] = await Promise.all([
     supabaseAdmin.from('tenants').select('id', { count: 'exact', head: true }),
     supabaseAdmin.from('tenants').select('id', { count: 'exact', head: true }).eq('status', 'active'),
     supabaseAdmin.from('tenants').select('id', { count: 'exact', head: true }).eq('status', 'suspended'),
     supabaseAdmin.from('tenant_domains').select('id', { count: 'exact', head: true }),
+    // Platform-wide, every casino's players together — the one number that
+    // says how big the whole thing is, which the tenant counts do not.
+    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'player'),
   ])
 
   // New this month
@@ -39,7 +43,7 @@ export default async function handler(req, res) {
     .limit(10)
 
   return res.status(200).json({
-    stats: { total, active, suspended, domains, new_month },
+    stats: { total, active, suspended, domains, players, new_month },
     recent: recent || [],
   })
 }
