@@ -10,12 +10,14 @@ import { supabase } from '../../lib/supabase'
 const NAV_SECTIONS = [
   {
     label: 'Overview',
+    icon: 'grid',
     items: [
       { href: '/admin',              icon: 'home',    label: 'Dashboard',       roles: ['admin','super_admin','finance','game_ops','support','kyc_agent','risk','reporting','marketing'] },
     ],
   },
   {
     label: 'Players',
+    icon: 'users',
     items: [
       { href: '/admin/players',      icon: 'users',   label: 'Players',         roles: ['admin','super_admin','support','kyc_agent','risk','finance'] },
       { href: '/admin/kyc',          icon: 'shield',  label: 'KYC Review',      roles: ['admin','super_admin','kyc_agent','risk'] },
@@ -24,6 +26,7 @@ const NAV_SECTIONS = [
   },
   {
     label: 'Operations',
+    icon: 'layers',
     items: [
       { href: '/admin/game-accounts',icon: 'cards',   label: 'Games',           roles: ['admin','super_admin','game_ops'] },
       { href: '/admin/deposits',     icon: 'card',    label: 'Deposits',        roles: ['admin','super_admin','finance'] },
@@ -34,6 +37,7 @@ const NAV_SECTIONS = [
   },
   {
     label: 'Finance',
+    icon: 'coin',
     items: [
       { href: '/admin/wallets',      icon: 'wallet',  label: 'Wallets',         roles: ['admin','super_admin','finance'] },
       { href: '/admin/transactions', icon: 'list',    label: 'Transactions',    roles: ['admin','super_admin','finance','reporting'] },
@@ -42,6 +46,7 @@ const NAV_SECTIONS = [
   },
   {
     label: 'Configuration',
+    icon: 'gear',
     items: [
       { href: '/admin/games',        icon: 'games',   label: 'Game Panels',     roles: ['admin','super_admin'] },
       { href: '/admin/payments',     icon: 'coin',    label: 'Payment Methods', roles: ['admin','super_admin','finance'] },
@@ -51,6 +56,7 @@ const NAV_SECTIONS = [
   },
   {
     label: 'Support',
+    icon: 'chat',
     items: [
       { href: '/admin/support',      icon: 'chat',    label: 'Support Tickets', roles: ['admin','super_admin','support'] },
       { href: '/admin/notifications',icon: 'bell',    label: 'Notifications',   roles: ['admin','super_admin','support'] },
@@ -58,6 +64,7 @@ const NAV_SECTIONS = [
   },
   {
     label: 'System',
+    icon: 'shield',
     items: [
       { href: '/admin/staff',        icon: 'user',    label: 'Staff & Roles',   roles: ['admin','super_admin'] },
       { href: '/admin/audit-logs',   icon: 'search',  label: 'Audit Logs',      roles: ['admin','super_admin'] },
@@ -75,6 +82,9 @@ const NAV_SECTIONS = [
 // now filtered by role alone.
 
 const ICONS = {
+  clock:    'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2',
+  layers:   'M12 3l9 5-9 5-9-5 9-5zM3 14l9 5 9-5M3 10.5l9 5 9-5',
+  grid:     'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   home:    'M3 11l9-8 9 8M5 10v10h14V10',
   users:   'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M9.5 10a4 4 0 100-8 4 4 0 000 8zM21 20v-2a4 4 0 00-3-3.9M16 2.1a4 4 0 010 7.8',
   shield:  'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4',
@@ -293,7 +303,10 @@ export default function AdminLayout({ children }) {
             if (visibleItems.length === 0) return null
             return (
               <div key={section.label} style={{ marginBottom: 16 }}>
-                <div className="rail-label rail-section" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,.7)', padding: '4px 12px 8px', whiteSpace: 'nowrap' }}>{section.label}</div>
+                <div className="rail-section" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,.7)', padding: '4px 12px 8px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name={section.icon} size={14} />
+                <span className="rail-label">{section.label}</span>
+              </div>
                 {visibleItems.map(item => {
                   const active  = isActive(item.href)
                   const pending = pendingCounts[item.href] || 0
@@ -369,6 +382,10 @@ export default function AdminLayout({ children }) {
            ended up pointing at Withdrawals. Only the text fades now; the
            space it occupies never changes, so nothing moves. */
         .admin-sidebar .rail-section { height: 22px; padding: 4px 12px 8px !important; overflow: hidden; }
+        /* While the rail is narrow the heading is just its icon, in the same
+           gold as the text, so the row says Finance or Support instead of
+           being an empty gap. */
+        .admin-sidebar .rail-section svg { opacity: .75; }
 
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }

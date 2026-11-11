@@ -18,6 +18,10 @@ import { supabase } from '../../lib/supabase'
 const GOLD = '#fbbf24'
 
 const ICONS = {
+  coin:     'M12 21c4.4 0 8-1.8 8-4V7c0-2.2-3.6-4-8-4S4 4.8 4 7v10c0 2.2 3.6 4 8 4zM20 7c0 2.2-3.6 4-8 4S4 9.2 4 7M20 12c0 2.2-3.6 4-8 4s-8-1.8-8-4',
+  clock:    'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2',
+  layers:   'M12 3l9 5-9 5-9-5 9-5zM3 14l9 5 9-5M3 10.5l9 5 9-5',
+  grid:     'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   home:    'M3 11l9-8 9 8M5 10v10h14V10',
   tenants: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
   card:    'M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20',
@@ -41,6 +45,7 @@ function Icon({ name, size = 18 }) {
 const NAV_SECTIONS = [
   {
     label: 'Platform',
+    icon: 'tenants',
     items: [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
       { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
@@ -49,6 +54,7 @@ const NAV_SECTIONS = [
   },
   {
     label: 'Coming soon',
+    icon: 'clock',
     items: [
       { href: '/superadmin/billing',  icon: 'card',   label: 'Billing'    },
       { href: '/superadmin/audit',    icon: 'search', label: 'Audit Logs' },
@@ -161,7 +167,10 @@ export default function SuperAdminLayout({ children, title }) {
         <nav style={{ flex: 1, overflowY: 'auto', padding: 12, scrollbarWidth: 'none' }}>
           {NAV_SECTIONS.map(section => (
             <div key={section.label} style={{ marginBottom: 16 }}>
-              <div className="rail-label rail-section" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,.7)', padding: '4px 12px 8px', whiteSpace: 'nowrap' }}>{section.label}</div>
+              <div className="rail-section" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(251,191,36,.7)', padding: '4px 12px 8px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name={section.icon} size={14} />
+                <span className="rail-label">{section.label}</span>
+              </div>
               {section.items.map(item => {
                 const active = isActive(item.href)
                 const built  = BUILT.has(item.href)
@@ -247,6 +256,10 @@ export default function SuperAdminLayout({ children, title }) {
            ended up pointing at Withdrawals. Only the text fades now; the
            space it occupies never changes, so nothing moves. */
         .admin-sidebar .rail-section { height: 22px; padding: 4px 12px 8px !important; overflow: hidden; }
+        /* While the rail is narrow the heading is just its icon, in the same
+           gold as the text, so the row says Finance or Support instead of
+           being an empty gap. */
+        .admin-sidebar .rail-section svg { opacity: .75; }
 
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }
