@@ -191,8 +191,33 @@ export default async function handler(req, res) {
     approved_at:           now,
   }
 
-  // Write wallet + ledger + withdrawal update in parallel
-  const [walletRes, ledgerRes, withdrawalRes] = await Promise.all([
+  // The withdrawal is marked FIRST, on its own, and the money only moves if
+  // that succeeded.
+  //
+  // These three ran together in a Promise.all. When the status write was
+  // refused — it set a value the column forbids — the wallet debit and the
+  // ledger row had already gone through, so the player was charged while
+  // the request stayed pending and the panel showed an error. Doing the
+  // cheap, most likely to fail write first means a failure costs nothing.
+  const withdrawalRes = await supabaseAdmin.from('withdrawals').update({
+    // 'paid', not 'approved'. The column allows pending, processing, paid,
+    // rejected, cancelled and failed.
+    status:                 'paid',
+    reviewed_by:            actor.id,
+    reviewed_at:            now,
+    processed_by:           actor.id,
+    processed_at:           now,
+    updated_at:             now,
+    level_id_at_time:       levelId,
+    daily_limit_snapshot:   dailyLimitSnapshot,
+    ...(proof_screenshot_url ? { proof_screenshot_url } : {}),
+  }).eq('id', withdrawal_id)
+
+  if (withdrawalRes.error) {
+    return res.status(500).json({ error: 'Withdrawal update failed: ' + withdrawalRes.error.message })
+  }
+
+  const [walletRes, ledgerRes] = await Promise.all([
     supabaseAdmin.from('wallets').update({
       reserved_cents:        Math.max(0, (wallet.reserved_cents || 0) - amountCents),
       // Paid out money is no longer withdrawable. Nothing reduced this, so it
@@ -218,27 +243,10 @@ export default async function handler(req, res) {
       idempotency_key:     idempKey,
     }),
 
-    supabaseAdmin.from('withdrawals').update({
-      // 'paid', not 'approved'. The column allows pending, processing, paid,
-      // rejected, cancelled and failed, so this write was refused every time
-      // and no withdrawal could ever be approved. Approving is the payout:
-      // the money leaves the wallet and the ledger records it in the same
-      // breath, so paid is what has happened.
-      status:                 'paid',
-      reviewed_by:            actor.id,
-      reviewed_at:            now,
-      processed_by:           actor.id,
-      processed_at:           now,
-      updated_at:             now,
-      level_id_at_time:       levelId,
-      daily_limit_snapshot:   dailyLimitSnapshot,
-      ...(proof_screenshot_url ? { proof_screenshot_url } : {}),
-    }).eq('id', withdrawal_id),
   ])
 
   if (walletRes.error)     return res.status(500).json({ error: 'Wallet update failed: ' + walletRes.error.message })
   if (ledgerRes.error)     return res.status(500).json({ error: 'Ledger write failed: ' + ledgerRes.error.message })
-  if (withdrawalRes.error) return res.status(500).json({ error: 'Withdrawal update failed: ' + withdrawalRes.error.message })
 
   // Update daily_withdrawal_tracking cache
   await supabaseAdmin.from('daily_withdrawal_tracking').upsert({
