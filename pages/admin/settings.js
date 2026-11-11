@@ -5,8 +5,85 @@ import AdminLayout from '../../components/layout/AdminLayout'
 
 const fmt = c => c != null ? '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''
 
+// ── IP whitelist editor ──────────────────────────────────────────────────────
+// A list of networks allowed to reach this casino's panel, plus the on/off
+// switch. The switch is deliberately hard to turn on by accident: it is
+// disabled until this casino's list contains the address you are on right
+// now, so you cannot lock yourself out. A super admin is never subject to the
+// whitelist, so the platform owner can always turn it back off.
+function IpWhitelistEditor({ settings, update, myIp, inputStyle, labelStyle, sectionStyle, sectionTitle }) {
+  const [draft, setDraft] = useState('')
+  const raw = settings?.ip_whitelist
+  const list = Array.isArray(raw) ? raw : (() => { try { return JSON.parse(raw) } catch { return [] } })()
+  const enabled = settings?.ip_whitelist_enabled === true || settings?.ip_whitelist_enabled === 'true'
+  const hasMyIp = myIp && list.includes(myIp)
+
+  const setList = next => update('ip_whitelist', next)
+
+  function add(ip) {
+    const v = String(ip || '').trim()
+    if (!v || list.includes(v)) return
+    setList([...list, v])
+    setDraft('')
+  }
+
+  return (
+    <div style={sectionStyle}>
+      <div style={sectionTitle}>IP Whitelist</div>
+
+      <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, marginBottom: 16, fontSize: 12.5, color: 'rgba(255,255,255,.55)' }}>
+        Your current network: <strong style={{ color: '#fff', fontFamily: 'monospace' }}>{myIp || '—'}</strong>
+        {myIp && !hasMyIp && (
+          <button onClick={() => add(myIp)} style={{ marginLeft: 10, padding: '3px 10px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.35)', borderRadius: 7, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
+            + Add it
+          </button>
+        )}
+      </div>
+
+      {/* Cannot be switched on unless the current network is already on the
+          list — the editor's own guard against locking yourself out. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 0' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Restrict to these networks</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>
+            {hasMyIp ? 'Only the addresses below may reach this panel' : 'Add your current network first, so you are not locked out'}
+          </div>
+        </div>
+        <button
+          onClick={() => { if (enabled || hasMyIp) update('ip_whitelist_enabled', !enabled) }}
+          disabled={!enabled && !hasMyIp}
+          style={{ width: 46, height: 26, borderRadius: 99, border: 'none', flexShrink: 0, position: 'relative',
+            cursor: (!enabled && !hasMyIp) ? 'not-allowed' : 'pointer', opacity: (!enabled && !hasMyIp) ? .4 : 1,
+            background: enabled ? '#22c55e' : 'rgba(255,255,255,.15)', transition: 'background .2s' }}>
+          <span style={{ position: 'absolute', top: 3, left: enabled ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, margin: '16px 0 12px' }}>
+        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(draft) } }}
+          placeholder="e.g. 203.0.113.42" style={{ ...inputStyle, flex: 1 }} />
+        <button onClick={() => add(draft)} style={{ padding: '0 18px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.35)', borderRadius: 10, color: '#fbbf24', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>Add</button>
+      </div>
+
+      {list.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.3)' }}>No networks added. The restriction does nothing until at least one is here.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {list.map(ip => (
+            <div key={ip} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 9 }}>
+              <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#fff' }}>{ip}{ip === myIp && <span style={{ marginLeft: 8, fontSize: 10, color: '#22c55e', fontWeight: 800 }}>YOU</span>}</span>
+              <button onClick={() => setList(list.filter(x => x !== ip))} style={{ padding: '4px 10px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, color: '#f87171', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminSettings() {
   const [settings, setSettings] = useState(null)
+  const [myIp, setMyIp] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
@@ -34,6 +111,7 @@ export default function AdminSettings() {
         const flat = {}
         for (const row of d.settings || []) {
           let v = row.value
+          if (Array.isArray(v)) { flat[row.key] = v; continue }  // ip_whitelist stays a list
           if (v === 'true') v = true
           else if (v === 'false') v = false
           else if (v !== '' && v !== null && !isNaN(v)) v = Number(v)
@@ -41,6 +119,10 @@ export default function AdminSettings() {
         }
         setSettings(flat)
       }
+
+      // The caller's own IP, for the whitelist editor.
+      const ipRes = await fetch('/api/admin/my-ip', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      if (ipRes.ok) setMyIp((await ipRes.json()).ip)
     } catch { /* leave the form empty */ }
     setLoading(false)
   }
@@ -57,7 +139,13 @@ export default function AdminSettings() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       // The API takes a list of key/value pairs, not a flat object.
       body: JSON.stringify({
-        updates: Object.entries(settings || {}).map(([key, value]) => ({ key, value: String(value) })),
+        // Arrays (the IP whitelist) are kept as arrays so they store as a
+        // jsonb list; everything else is a string, which is how the rest of
+        // the settings are stored and read.
+        updates: Object.entries(settings || {}).map(([key, value]) => ({
+          key,
+          value: Array.isArray(value) ? value : String(value),
+        })),
       }),
     })
     const d = await res.json()
@@ -150,20 +238,28 @@ export default function AdminSettings() {
           )}
 
           {activeTab === 'security' && (
-            <div style={sectionStyle}>
-              <div style={sectionTitle}>Security Settings</div>
-              <Toggle field="two_factor_required" label="Require 2FA for Staff" desc="All staff members must enable two-factor authentication" />
-              <Toggle field="session_timeout_enabled" label="Session Timeout" desc="Automatically log out inactive users" />
-              <Toggle field="ip_whitelist_enabled" label="IP Whitelist" desc="Restrict admin access to whitelisted IPs only" />
-              <div style={{ marginTop: 16 }}>
-                <label style={labelStyle}>Session Timeout (minutes)</label>
-                <input type="number" min="5" value={settings?.session_timeout_minutes || 60} onChange={e => update('session_timeout_minutes', parseInt(e.target.value))} style={inputStyle} />
+            <>
+              <div style={sectionStyle}>
+                <div style={sectionTitle}>Session Timeout</div>
+                <Toggle field="session_timeout_enabled" label="Session Timeout" desc="Sign staff out of this panel after a period of inactivity" />
+                <div style={{ marginTop: 16 }}>
+                  <label style={labelStyle}>Minutes of inactivity before sign-out</label>
+                  <input type="number" min="1" value={settings?.session_timeout_minutes || 60} onChange={e => update('session_timeout_minutes', parseInt(e.target.value))} style={{ ...inputStyle, maxWidth: 200 }} />
+                </div>
               </div>
-              <div style={{ marginTop: 16 }}>
-                <label style={labelStyle}>Max Failed Login Attempts</label>
-                <input type="number" min="1" max="20" value={settings?.max_login_attempts || 5} onChange={e => update('max_login_attempts', parseInt(e.target.value))} style={inputStyle} />
+
+              <div style={sectionStyle}>
+                <div style={sectionTitle}>Two-Factor Authentication</div>
+                <Toggle field="two_factor_required" label="Require 2FA for Staff" desc="Every staff member of this casino must set up an authenticator app before they can use the panel" />
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', margin: '8px 0 0', lineHeight: 1.6 }}>
+                  You set up your own 2FA from the account menu, top right. With this on, staff who have
+                  not set it up are sent to do so at their next sign-in.
+                </p>
               </div>
-            </div>
+
+              <IpWhitelistEditor settings={settings} update={update} myIp={myIp}
+                inputStyle={inputStyle} labelStyle={labelStyle} sectionStyle={sectionStyle} sectionTitle={sectionTitle} />
+            </>
           )}
 
           {activeTab === 'maintenance' && (
