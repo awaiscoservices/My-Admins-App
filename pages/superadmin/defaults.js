@@ -104,18 +104,25 @@ export default function SuperAdminDefaults() {
     load()
   }
 
-  async function applyToCasinos(tenantId) {
+  async function applyToCasinos(tenantId, mode) {
+    if (mode === 'push' && !window.confirm('Give every casino anything it is missing from the defaults? Rows they already have are left alone.')) return
+
     setBusy(true)
     const res = await fetch('/api/superadmin/defaults/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
-      body: JSON.stringify(tenantId ? { tenant_id: tenantId } : {}),
+      body: JSON.stringify({ ...(tenantId ? { tenant_id: tenantId } : {}), ...(mode ? { mode } : {}) }),
     })
     const d = await res.json()
     setBusy(false)
     if (!res.ok) { showToast(d.error || 'Could not apply', 'error'); return }
-    const added = (d.results || []).reduce((s, r) => s + r.added, 0)
-    showToast(added ? `Added ${added} rows across ${d.results.length} casino${d.results.length === 1 ? '' : 's'}` : 'Nothing was missing')
+
+    const added  = (d.results || []).reduce((s, r) => s + r.added, 0)
+    // A silent "nothing was missing" hid real insert failures before.
+    const failed = (d.results || []).flatMap(r => (r.failed || []).map(f => `${r.tenant} — ${f}`))
+
+    if (failed.length) showToast(failed[0], 'error')
+    else showToast(added ? `Added ${added} row${added === 1 ? '' : 's'} across ${d.results.length} casino${d.results.length === 1 ? '' : 's'}` : 'Every casino already had everything')
     load()
   }
 
@@ -192,12 +199,26 @@ export default function SuperAdminDefaults() {
         <div style={{ padding: '14px 18px', borderBottom: BDR, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>What each casino has</div>
-            <div style={{ fontSize: 12, color: DIM2 }}>A zero means that casino cannot use the feature at all.</div>
+            <div style={{ fontSize: 12, color: DIM2 }}>
+              A zero means that casino cannot use the feature at all. Fill gives a casino a set it has
+              none of; Push adds any single row it is missing, which is how a new game reaches casinos
+              that already have the rest.
+            </div>
           </div>
-          <button onClick={() => applyToCasinos(null)} disabled={busy || loading}
-            style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 9, color: '#050505', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-            Fill every gap
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => applyToCasinos(null)} disabled={busy || loading}
+              title="Gives a casino a whole set only if it has none of it"
+              style={{ padding: '9px 18px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.35)', borderRadius: 9, color: G, fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+              Fill every gap
+            </button>
+            {/* Row by row, so a game added today reaches casinos that already
+                have the others — which Fill cannot do. */}
+            <button onClick={() => applyToCasinos(null, 'push')} disabled={busy || loading}
+              title="Adds any individual row a casino is missing, without touching what it has"
+              style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 9, color: '#050505', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+              Push to all
+            </button>
+          </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
