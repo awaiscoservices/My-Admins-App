@@ -18,8 +18,30 @@ export default function AdminSettings() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('platform_settings').select('*').single()
-    if (data) setSettings(data)
+    // platform_settings is key/value, one row per setting per casino — not a
+    // single row of columns. Reading it straight from the browser also skipped
+    // the tenant filter, so this now goes through the API and is flattened
+    // into the shape the fields below expect.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setLoading(false); return }
+
+      const res = await fetch('/api/admin/settings/get', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      if (res.ok) {
+        const flat = {}
+        for (const row of d.settings || []) {
+          let v = row.value
+          if (v === 'true') v = true
+          else if (v === 'false') v = false
+          else if (v !== '' && v !== null && !isNaN(v)) v = Number(v)
+          flat[row.key] = v
+        }
+        setSettings(flat)
+      }
+    } catch { /* leave the form empty */ }
     setLoading(false)
   }
 
@@ -33,7 +55,10 @@ export default function AdminSettings() {
     const res = await fetch('/api/admin/settings/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(settings),
+      // The API takes a list of key/value pairs, not a flat object.
+      body: JSON.stringify({
+        updates: Object.entries(settings || {}).map(([key, value]) => ({ key, value: String(value) })),
+      }),
     })
     const d = await res.json()
     if (!res.ok) { showToast(d.error || 'Failed to save', 'error') }

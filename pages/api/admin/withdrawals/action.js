@@ -89,9 +89,13 @@ export default async function handler(req, res) {
   const levelDailyLimit   = profile?.player_levels?.daily_withdrawal_limit_cents || 50000
 
   // Check daily withdrawal limit setting is enabled
-  const { data: limitSetting } = await supabaseAdmin
-    .from('platform_settings').select('value')
-    .eq('key', 'withdrawal_daily_limit_enabled').maybeSingle()
+  // This casino's own setting. Shared, one operator's limit applied to every
+  // operator's players.
+  const { data: limitSetting } = await scopeToTenant(
+    supabaseAdmin.from('platform_settings').select('value')
+      .eq('key', 'withdrawal_daily_limit_enabled'),
+    gate,
+  ).maybeSingle()
   const limitEnabled = limitSetting?.value !== false && limitSetting?.value !== 'false'
 
   if (limitEnabled) {

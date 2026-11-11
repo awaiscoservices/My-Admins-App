@@ -94,6 +94,21 @@ export default async function handler(req, res) {
     after_state: { name: tenant.name, slug: tenant.slug, plan },
   }).then(() => {}, () => {})
 
+  // Give the new casino a working set of settings, copied from the first
+  // casino. Without this a new casino has no rows at all, and the withdrawal
+  // path reads withdrawal_daily_limit_enabled while approving a payout.
+  const { data: template } = await supabaseAdmin
+    .from('platform_settings')
+    .select('key, value, description')
+    .eq('tenant_id', '00000000-0000-0000-0000-000000000001')
+
+  if (template?.length) {
+    await supabaseAdmin.from('platform_settings').upsert(
+      template.map(r => ({ ...r, tenant_id: tenant.id })),
+      { onConflict: 'tenant_id,key' },
+    ).then(() => {}, () => {})
+  }
+
   // Create the first admin, if credentials were given.
   //
   // Supabase Auth still needs an address, but a username-only account never
