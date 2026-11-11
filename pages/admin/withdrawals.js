@@ -119,7 +119,9 @@ export default function AdminWithdrawals() {
 
       <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
-          {['all','pending','approved','rejected'].map(s => (
+          {/* 'paid', not 'approved' — no withdrawal can hold that status, so the
+              tab matched nothing. */}
+          {['all','pending','paid','rejected'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>

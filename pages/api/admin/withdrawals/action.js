@@ -133,7 +133,7 @@ export default async function handler(req, res) {
   const idempKey = `wd-approve-${withdrawal_id}`
   const { data: existing } = await supabaseAdmin
     .from('ledger').select('id').eq('idempotency_key', idempKey).maybeSingle()
-  if (existing) return res.status(200).json({ ok: true, status: 'approved', idempotent: true })
+  if (existing) return res.status(200).json({ ok: true, status: 'paid', idempotent: true })
 
   const newCashBalance = wallet.cash_balance_cents - amountCents
 
@@ -171,7 +171,12 @@ export default async function handler(req, res) {
     }),
 
     supabaseAdmin.from('withdrawals').update({
-      status:                 'approved',
+      // 'paid', not 'approved'. The column allows pending, processing, paid,
+      // rejected, cancelled and failed, so this write was refused every time
+      // and no withdrawal could ever be approved. Approving is the payout:
+      // the money leaves the wallet and the ledger records it in the same
+      // breath, so paid is what has happened.
+      status:                 'paid',
       reviewed_by:            actor.id,
       reviewed_at:            now,
       processed_by:           actor.id,
@@ -208,7 +213,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok:           true,
-    status:       'approved',
+    status:       'paid',
     amount_cents: amountCents,
     level_name:   levelName,
     daily_limit_cents: levelDailyLimit,
