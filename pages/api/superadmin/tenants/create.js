@@ -9,15 +9,12 @@
  * the insert failed outright.
  */
 import { guardSuperAdmin, supabaseAdmin } from '../_guard'
-import { readDefaultLevels, readDefaultSettings } from '../defaults/levels'
+import { applyDefaultsToTenant } from '../../../../lib/platformDefaults'
 
 // Addresses for username-only staff accounts. Never receives mail; it exists
 // because Supabase Auth requires an address.
 const INTERNAL_EMAIL_DOMAIN = 'staff.casinoze.local'
 
-// The first casino. Its settings and player levels are the template every new
-// casino starts from, so a new casino is usable the moment it is created.
-const TEMPLATE_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
 /**
  * profiles.full_name is NOT NULL, so an invite that does not set it fails
@@ -99,51 +96,18 @@ export default async function handler(req, res) {
     after_state: { name: tenant.name, slug: tenant.slug, plan },
   }).then(() => {}, () => {})
 
-  // Give the new casino a working set of settings, copied from the first
-  // casino. Without this a new casino has no rows at all, and the withdrawal
-  // path reads withdrawal_daily_limit_enabled while approving a payout.
-  // From the platform defaults when they are set. The fallback to the first
-  // casino is only for the gap before any defaults have been saved — once
-  // Super Admin → New Casino Defaults has been filled in, no casino is
-  // involved and any of them can be deleted safely.
-  let template = await readDefaultSettings()
-
-  if (!template.length) {
-    const { data: fallback } = await supabaseAdmin
-      .from('platform_settings')
-      .select('key, value, description')
-      .eq('tenant_id', TEMPLATE_TENANT_ID)
-    template = fallback || []
-  }
-
-  if (template.length) {
-    await supabaseAdmin.from('platform_settings').upsert(
-      template.map(r => ({ ...r, tenant_id: tenant.id })),
-      { onConflict: 'tenant_id,key' },
-    ).then(() => {}, () => {})
-  }
-
-  // Give it the standard set of player levels too.
+  // Set the casino up from the platform defaults: levels, games, payment
+  // methods, referral tiers and settings.
   //
-  // A casino with no levels cannot be configured at all: the deposit bonus
-  // grid is one row per level, so it came up empty, and players have no rank
-  // to earn.
+  // Without these a casino exists but cannot operate — no games to request an
+  // account in, no way to take a deposit, no levels for the bonus grid, and
+  // the withdrawal path reads a setting that would not be there.
   //
-  // The levels come from the platform defaults, which belong to no casino —
-  // Super Admin → New Casino Defaults. They used to be copied from the first
-  // casino, which meant deleting that casino would quietly stop every future
-  // casino getting levels.
-  // The stored defaults already have id, tenant_id and the timestamps
-  // removed, so each one only needs the new casino stamped on it.
-  let levels_seeded = 0
-  const { levels: defaultLevels } = await readDefaultLevels()
-
-  if (defaultLevels.length) {
-    const copies = defaultLevels.map(l => ({ ...l, tenant_id: tenant.id }))
-    const { error: levelErr } = await supabaseAdmin.from('player_levels').insert(copies)
-    if (!levelErr) levels_seeded = copies.length
-    else console.error('[tenants/create] level seed failed:', levelErr)
-  }
+  // The defaults belong to the platform, not to a casino. They used to be
+  // copied from the first casino, which made that casino a template nobody
+  // could see and meant deleting it would quietly stop every future casino
+  // getting anything.
+  const seeded = await applyDefaultsToTenant(supabaseAdmin, tenant.id)
 
   // Create the first admin, if credentials were given.
   //
@@ -235,5 +199,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(201).json({ tenant, admin_invite, levels_seeded })
+  return res.status(201).json({ tenant, admin_invite, seeded })
 }

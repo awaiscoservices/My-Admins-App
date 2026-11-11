@@ -1,16 +1,16 @@
 /**
- * pages/superadmin/defaults.js — Super Admin → Levels
+ * pages/superadmin/defaults.js — Super Admin → Defaults
  *
- * The player levels every new casino is created with. They are held on the
- * platform, not on any casino, so no casino is secretly the template and
- * deleting one changes nothing about onboarding.
+ * What every new casino is created with: player levels, games, payment
+ * methods, referral tiers and settings.
  *
- * The editor is components/levels/LevelDrawer — the same form the per-casino
- * Player Levels page uses, so a default level can be given everything a real
- * level has: redeem rules, withdraw limits, KYC, the lot.
+ * These belong to the platform, not to a casino. The first casino used to be
+ * the template, which nobody could see and which meant deleting it would have
+ * quietly stopped every future casino getting anything.
  *
- * Editing here does not touch casinos that already exist. They keep the
- * levels they have.
+ * The page also shows which existing casinos are missing which pieces, and
+ * fills the gaps — four of five casinos had no games, no payment methods and
+ * no referral tiers, so they could not take a deposit or set up a game.
  */
 import { useEffect, useState, useCallback } from 'react'
 import Head from 'next/head'
@@ -24,228 +24,263 @@ const DIM2 = 'rgba(255,255,255,.3)'
 const CARD = 'rgba(255,255,255,.03)'
 const BDR  = '1px solid rgba(255,255,255,.08)'
 
-// Tokens expire while a page is open, so every request takes a fresh one.
 async function freshToken() {
   const { data: { session } } = await supabase.auth.getSession()
   return session?.access_token || null
 }
 
-export default function SuperAdminLevels() {
-  const [levels, setLevels]   = useState([])
-  const [tenants, setTenants] = useState([])
-  const [importFrom, setImportFrom] = useState('')
-  const [updatedAt, setUpdatedAt]   = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy]       = useState(false)
-  const [drawer, setDrawer]   = useState(null)   // null = closed, {} = new, object = edit
-  const [toast, setToast]     = useState(null)
+/** One line describing a stored row, per kind. */
+function describe(key, row) {
+  switch (key) {
+    case 'player_levels':
+      return `${row.name} · ${fmtX(row.max_redeem_multiplier ?? row.redeem_multiplier)} · cap ${fmtD(row.max_redeem_cap_cents)}`
+    case 'game_panels':
+      return row.name
+    case 'payment_methods':
+      return `${row.name} · ${String(row.type || '').replace(/_/g, ' ')}`
+    case 'referral_bonus_tiers':
+      return `Deposit ${row.deposit_number} · ${row.bonus_percent}%`
+    case 'platform_settings':
+      return `${row.key} = ${row.value}`
+    default:
+      return JSON.stringify(row).slice(0, 60)
+  }
+}
 
-  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4500) }
+export default function SuperAdminDefaults() {
+  const [sets, setSets]         = useState({})
+  const [kinds, setKinds]       = useState([])
+  const [coverage, setCoverage] = useState([])
+  const [tab, setTab]           = useState('player_levels')
+  const [importFrom, setImportFrom] = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [busy, setBusy]         = useState(false)
+  const [drawer, setDrawer]     = useState(null)
+  const [toast, setToast]       = useState(null)
+
+  function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 6000) }
 
   const load = useCallback(async () => {
     setLoading(true)
-    const token = await freshToken()
-    const [lv, tn] = await Promise.all([
-      fetch('/api/superadmin/defaults/levels', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/superadmin/tenants/list?limit=100', { headers: { Authorization: `Bearer ${token}` } }),
-    ])
-    const lvd = await lv.json()
-    const tnd = await tn.json()
-    if (!lv.ok) showToast(lvd.error || 'Could not load the defaults', 'error')
-    setLevels(Array.isArray(lvd.levels) ? lvd.levels : [])
-    setUpdatedAt(lvd.updated_at || null)
-    setTenants(tnd.tenants || [])
+    const res = await fetch('/api/superadmin/defaults/sets', { headers: { Authorization: `Bearer ${await freshToken()}` } })
+    const d = await res.json()
+    if (!res.ok) showToast(d.error || 'Could not load defaults', 'error')
+    setSets(d.sets || {})
+    setKinds(d.kinds || [])
+    setCoverage(d.coverage || [])
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  /** Write the whole list back. Returns { error } so the drawer can show it. */
-  async function persist(next, message) {
+  async function saveRows(key, rows, message) {
     setBusy(true)
-    const res = await fetch('/api/superadmin/defaults/levels', {
+    const res = await fetch('/api/superadmin/defaults/sets', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
-      body: JSON.stringify({ levels: next }),
+      body: JSON.stringify({ key, rows }),
     })
     const d = await res.json()
     setBusy(false)
     if (!res.ok) return { error: d.error || 'Could not save' }
-    setLevels(d.levels)
-    setUpdatedAt(new Date().toISOString())
+    await load()
     if (message) showToast(message)
     return {}
   }
 
-  // The drawer hands back only the fields it edits, so anything else the
-  // level carries is kept by spreading the original first.
-  async function saveFromDrawer(body) {
-    const editing = drawer && drawer.__index != null
-    const next = editing
-      ? levels.map((l, i) => i === drawer.__index ? { ...l, ...body } : l)
-      : [...levels, body]
-
-    const sorted = [...next].sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
-    const result = await persist(sorted, editing ? 'Level updated' : 'Level added')
-    if (result.error) return result
-    setDrawer(null)
-  }
-
-  async function removeLevel(index) {
-    const name = levels[index]?.name || 'this level'
-    if (!window.confirm(`Remove "${name}" from the defaults? Casinos that already exist keep their levels — this only changes what the next new casino starts with.`)) return
-    const result = await persist(levels.filter((_, i) => i !== index), 'Level removed')
-    if (result.error) showToast(result.error, 'error')
-  }
-
-  async function runImport() {
+  async function copyFromCasino() {
     if (!importFrom) { showToast('Pick a casino first', 'error'); return }
     setBusy(true)
-    const res = await fetch('/api/superadmin/defaults/import', {
+    const res = await fetch('/api/superadmin/defaults/sets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
-      body: JSON.stringify({ tenant_id: importFrom }),
+      body: JSON.stringify({ from_tenant_id: importFrom }),
     })
     const d = await res.json()
     setBusy(false)
     if (!res.ok) { showToast(d.error || 'Could not copy', 'error'); return }
-    setLevels(d.levels)
-    setUpdatedAt(new Date().toISOString())
-    showToast(`Copied ${d.levels.length} levels and ${d.settings_copied || 0} settings from ${d.from}`)
+    const total = Object.values(d.copied || {}).reduce((s, r) => s + (r.count || 0), 0)
+    showToast(`Copied ${total} rows from ${d.from}`)
+    load()
   }
 
-  const th = { padding: '10px 12px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: DIM2, whiteSpace: 'nowrap' }
-  const td = { padding: '12px', fontSize: 12.5, color: 'rgba(255,255,255,.65)', whiteSpace: 'nowrap' }
+  async function applyToCasinos(tenantId) {
+    setBusy(true)
+    const res = await fetch('/api/superadmin/defaults/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await freshToken()}` },
+      body: JSON.stringify(tenantId ? { tenant_id: tenantId } : {}),
+    })
+    const d = await res.json()
+    setBusy(false)
+    if (!res.ok) { showToast(d.error || 'Could not apply', 'error'); return }
+    const added = (d.results || []).reduce((s, r) => s + r.added, 0)
+    showToast(added ? `Added ${added} rows across ${d.results.length} casino${d.results.length === 1 ? '' : 's'}` : 'Nothing was missing')
+    load()
+  }
+
+  // The level editor is the same drawer the per-casino page uses.
+  async function saveLevelFromDrawer(body) {
+    const rows = sets.player_levels?.rows || []
+    const editing = drawer && drawer.__index != null
+    const next = editing
+      ? rows.map((l, i) => i === drawer.__index ? { ...l, ...body } : l)
+      : [...rows, body]
+    const sorted = [...next].sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+    const result = await saveRows('player_levels', sorted, editing ? 'Level updated' : 'Level added')
+    if (result.error) return result
+    setDrawer(null)
+  }
+
+  async function removeRow(key, index, name) {
+    if (!window.confirm(`Remove "${name}" from the defaults? Casinos that already exist keep what they have.`)) return
+    const rows = (sets[key]?.rows || []).filter((_, i) => i !== index)
+    const r = await saveRows(key, rows, 'Removed')
+    if (r.error) showToast(r.error, 'error')
+  }
+
+  const current = sets[tab] || { rows: [] }
+  const th = { padding: '9px 12px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: DIM2, whiteSpace: 'nowrap' }
+  const td = { padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.7)' }
 
   return (
     <SuperAdminLayout>
-      <Head><title>Levels — Super Admin</title></Head>
+      <Head><title>Defaults — Super Admin</title></Head>
 
       {toast && (
-        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
+        <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, maxWidth: '90vw',
           background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius: 12,
           padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif",
           boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>
       )}
 
       {drawer && (
-        <LevelDrawer
-          level={drawer}
-          subtitle="Default for new casinos"
-          onClose={() => setDrawer(null)}
-          onSave={saveFromDrawer}
-        />
+        <LevelDrawer level={drawer} subtitle="Default for new casinos"
+          onClose={() => setDrawer(null)} onSave={saveLevelFromDrawer} />
       )}
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Levels</h1>
-          <p style={{ color: DIM2, fontSize: 13, margin: 0 }}>
-            The player levels every new casino is created with. Held on the platform, so no casino is the
-            template — deleting a casino never changes this.
-          </p>
-        </div>
-        <button onClick={() => setDrawer({})} disabled={loading}
-          style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none',
-            borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-          + Add Level
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Defaults</h1>
+        <p style={{ color: DIM2, fontSize: 13, margin: 0 }}>
+          What every new casino is created with. Held on the platform, so no casino is the template —
+          deleting a casino never changes this.
+        </p>
       </div>
 
-      {/* Copy from an existing casino */}
+      {/* Copy everything from one casino */}
       <div style={{ background: CARD, border: BDR, borderRadius: 14, padding: 18, marginBottom: 18 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Copy from a casino</div>
         <div style={{ fontSize: 12, color: DIM2, marginBottom: 12 }}>
-          Replaces the list below with that casino’s levels, and copies its settings too. A one-time copy —
-          the casino is not linked afterwards, so it can be changed or deleted freely.
+          Replaces all five sets below with that casino’s configuration. A one-time copy — the casino
+          is not linked afterwards and can be changed or deleted freely.
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <select value={importFrom} onChange={e => setImportFrom(e.target.value)}
-            style={{ padding: '9px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: 9, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 220 }}>
+            style={{ padding: '9px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 220 }}>
             <option value="" style={{ background: '#0e1a2e' }}>Choose a casino…</option>
-            {tenants.map(t => <option key={t.id} value={t.id} style={{ background: '#0e1a2e' }}>{t.name}</option>)}
+            {coverage.map(t => <option key={t.id} value={t.id} style={{ background: '#0e1a2e' }}>{t.name}</option>)}
           </select>
-          <button onClick={runImport} disabled={busy || !importFrom}
-            style={{ padding: '9px 18px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.35)',
-              borderRadius: 9, color: G, fontSize: 13, fontWeight: 700, cursor: busy || !importFrom ? 'default' : 'pointer',
-              opacity: busy || !importFrom ? .5 : 1, fontFamily: "'Outfit',sans-serif" }}>
-            Copy levels
+          <button onClick={copyFromCasino} disabled={busy || !importFrom}
+            style={{ padding: '9px 18px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.35)', borderRadius: 9, color: G, fontSize: 13, fontWeight: 700, cursor: busy || !importFrom ? 'default' : 'pointer', opacity: busy || !importFrom ? .5 : 1, fontFamily: "'Outfit',sans-serif" }}>
+            Copy everything
           </button>
         </div>
       </div>
 
-      {/* The levels */}
-      <div style={{ background: CARD, border: BDR, borderRadius: 14, overflow: 'hidden' }}>
+      {/* What each casino is missing */}
+      <div style={{ background: CARD, border: BDR, borderRadius: 14, overflow: 'hidden', marginBottom: 18 }}>
         <div style={{ padding: '14px 18px', borderBottom: BDR, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Default player levels</div>
-          <div style={{ fontSize: 12, color: DIM2 }}>
-            {loading ? 'Loading…'
-              : levels.length === 0 ? 'None set — new casinos start with no levels'
-              : `${levels.length} level${levels.length === 1 ? '' : 's'}${updatedAt ? ` · last changed ${new Date(updatedAt).toLocaleDateString()}` : ''}`}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>What each casino has</div>
+            <div style={{ fontSize: 12, color: DIM2 }}>A zero means that casino cannot use the feature at all.</div>
           </div>
+          <button onClick={() => applyToCasinos(null)} disabled={busy || loading}
+            style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 9, color: '#050505', fontSize: 13, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+            Fill every gap
+          </button>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
+            <thead><tr style={{ background: 'rgba(255,255,255,.03)' }}>
+              <th style={th}>Casino</th>
+              {kinds.map(k => <th key={k.key} style={{ ...th, textAlign: 'center' }}>{k.label}</th>)}
+              <th style={th} />
+            </tr></thead>
+            <tbody>
+              {coverage.map(t => (
+                <tr key={t.id} style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
+                  <td style={{ ...td, color: '#fff', fontWeight: 700 }}>{t.name}</td>
+                  {kinds.map(k => (
+                    <td key={k.key} style={{ ...td, textAlign: 'center', color: t.counts[k.key] ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                      {t.counts[k.key]}
+                    </td>
+                  ))}
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    <button onClick={() => applyToCasinos(t.id)} disabled={busy}
+                      style={{ padding: '5px 11px', background: 'rgba(251,191,36,.12)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: G, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+                      Fill
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* The sets themselves */}
+      <div style={{ display: 'flex', gap: 5, background: 'rgba(255,255,255,.04)', padding: 5, borderRadius: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        {kinds.map(k => (
+          <button key={k.key} onClick={() => setTab(k.key)}
+            style={{ padding: '9px 18px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700,
+              background: tab === k.key ? 'linear-gradient(135deg,#f59e0b,#fbbf24)' : 'transparent',
+              color: tab === k.key ? '#050505' : DIM }}>
+            {k.label} ({sets[k.key]?.rows?.length || 0})
+          </button>
+        ))}
+      </div>
+
+      <div style={{ background: CARD, border: BDR, borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '13px 18px', borderBottom: BDR, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ fontSize: 12.5, color: DIM }}>
+            {loading ? 'Loading…' : `${current.rows.length} row${current.rows.length === 1 ? '' : 's'}`}
+          </div>
+          {tab === 'player_levels' && (
+            <button onClick={() => setDrawer({})}
+              style={{ padding: '8px 16px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.35)', borderRadius: 9, color: G, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+              + Add level
+            </button>
+          )}
         </div>
 
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: DIM2, fontSize: 13 }}>Loading…</div>
-        ) : levels.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: DIM2, fontSize: 13 }}>
-            No default levels yet. Copy them from a casino above, or add them one at a time.
+        {!loading && current.rows.length === 0 ? (
+          <div style={{ padding: 36, textAlign: 'center', color: DIM2, fontSize: 13 }}>
+            Nothing set. Use “Copy from a casino” above to fill this in.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,.03)' }}>
-                  {['Level', 'Order', 'XP', 'Redeem Cap', 'Multiplier', 'Withdraw', 'KYC', 'Status', ''].map((h, i) => (
-                    <th key={i} style={th}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {levels.map((l, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
-                    <td style={{ ...td, color: '#fff', fontWeight: 700 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: l.accent_color || G, display: 'inline-block' }} />
-                        {l.badge_icon ? `${l.badge_icon} ` : ''}{l.name || <em style={{ color: DIM2 }}>Unnamed</em>}
-                      </span>
-                    </td>
-                    <td style={td}>{l.sort_order ?? '—'}</td>
-                    <td style={td}>{l.xp_required ?? 0}</td>
-                    <td style={td}>{fmtD(l.max_redeem_cap_cents)}</td>
-                    <td style={td}>{fmtX(l.min_redeem_multiplier)} – {fmtX(l.max_redeem_multiplier)}</td>
-                    <td style={td}>{fmtD(l.min_withdrawal_cents)} – {l.max_withdrawal_cents != null ? fmtD(l.max_withdrawal_cents) : '∞'}</td>
-                    <td style={td}>{l.kyc_required ? 'Required' : '—'}</td>
-                    <td style={td}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
-                        background: l.is_active === false ? 'rgba(255,255,255,.08)' : 'rgba(34,197,94,.15)',
-                        color: l.is_active === false ? DIM : '#22c55e' }}>
-                        {l.is_active === false ? 'INACTIVE' : 'ACTIVE'}
-                      </span>
-                    </td>
-                    <td style={{ ...td, textAlign: 'right' }}>
-                      <button onClick={() => setDrawer({ ...l, __index: i })}
-                        style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)',
-                          borderRadius: 8, color: G, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", marginRight: 6 }}>
-                        Edit
-                      </button>
-                      <button onClick={() => removeLevel(i)} title="Remove from the defaults"
-                        style={{ padding: '6px 10px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)',
-                          borderRadius: 8, color: '#f87171', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          current.rows.map((row, i) => (
+            <div key={i} style={{ padding: '11px 18px', borderTop: '1px solid rgba(255,255,255,.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,.8)' }}>{describe(tab, row)}</span>
+              <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                {tab === 'player_levels' && (
+                  <button onClick={() => setDrawer({ ...row, __index: i })}
+                    style={{ padding: '5px 11px', background: 'rgba(251,191,36,.12)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: G, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+                    Edit
+                  </button>
+                )}
+                <button onClick={() => removeRow(tab, i, describe(tab, row))}
+                  style={{ padding: '5px 9px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
+                  ✕
+                </button>
+              </span>
+            </div>
+          ))
         )}
       </div>
 
       <p style={{ marginTop: 14, fontSize: 12, color: DIM2 }}>
-        Changing this does not affect casinos that already exist — they keep the levels they have.
+        Changing a default does not affect casinos that already exist — they keep what they have.
+        Use Fill to give a casino only what it is missing.
       </p>
     </SuperAdminLayout>
   )
