@@ -90,6 +90,9 @@ function DataTable({ headers, rows }) {
 const tdS = { padding: '11px 14px', borderTop: '1px solid rgba(255,255,255,.04)' }
 
 // ─── status filter bar ────────────────────────────────────────────────────────
+// The default list suits deposits. Tabs whose table finishes with a
+// different word pass their own — game loads and redeems complete,
+// withdrawals are paid.
 function FilterBar({ value, onChange, options = ['all','pending','approved','rejected'] }) {
   return (
     <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -246,7 +249,14 @@ function TabTransactionList({ playerId, tabKey, columns, renderRow, emptyMsg = '
 
   return (
     <div>
-      <FilterBar value={status} onChange={onStatusChange} />
+      {/* Each table finishes with its own word, and filtering on the wrong
+          one quietly returns nothing. */}
+      <FilterBar value={status} onChange={onStatusChange}
+        options={
+          tabKey === 'withdrawals'                         ? ['all','pending','paid','rejected']
+          : tabKey === 'scores' || tabKey === 'redeems'    ? ['all','pending','completed','rejected']
+          :                                                  ['all','pending','approved','rejected']
+        } />
       {err && <div style={{ color: '#f87171', marginBottom: 10 }}>⚠ {err}</div>}
       {loading ? <div style={{ color: 'rgba(255,255,255,.3)', padding: 20 }}>Loading…</div> : (
         <>

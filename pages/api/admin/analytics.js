@@ -4,6 +4,7 @@
  * Accessible to all staff roles.
  */
 import { guardAdmin, scopeToTenant, PERMS } from '../../../lib/adminGuard'
+import { SETTLED } from '../../../lib/statuses'
 
 function daysAgo(n) {
   const d = new Date()
@@ -64,8 +65,8 @@ export default async function handler(req, res) {
     q('profiles', 'created_at').eq('role','player').gte('created_at', ago14).order('created_at'),
 
     // Financial totals (all time approved)
-    q('deposits', 'amount_cents').in('status',['approved','completed']),
-    q('withdrawals', 'amount_cents').in('status',['approved','completed']),
+    q('deposits', 'amount_cents').in('status', SETTLED.deposits),
+    q('withdrawals', 'amount_cents').in('status', SETTLED.withdrawals),
 
     // Game accounts
     q('game_accounts', 'id', { count:'exact', head:true }).eq('status','active'),
@@ -78,8 +79,8 @@ export default async function handler(req, res) {
     q('support_tickets', 'id', { count:'exact', head:true }).eq('status','open'),
 
     // 7d charts
-    q('deposits', 'amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
-    q('withdrawals', 'amount_cents, created_at').in('status',['approved','completed']).gte('created_at', ago7),
+    q('deposits', 'amount_cents, created_at').in('status', SETTLED.deposits).gte('created_at', ago7),
+    q('withdrawals', 'amount_cents, created_at').in('status', SETTLED.withdrawals).gte('created_at', ago7),
 
     // Game loads (scores) — 7d count + pending
     q('game_loads', 'id', { count:'exact', head:true }).gte('created_at', ago7),

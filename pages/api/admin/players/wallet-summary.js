@@ -13,6 +13,7 @@
  *  - ledger.notes → description  (column was renamed)
  */
 import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
+import { SETTLED } from '../../../../lib/statuses'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -54,8 +55,8 @@ export default async function handler(req, res) {
       supabaseAdmin.from('withdrawals').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('game_loads').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('redemptions').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
-      supabaseAdmin.from('game_loads').select('amount_cents').eq('user_id', player_id).eq('status', 'approved'),
-      supabaseAdmin.from('redemptions').select('amount_cents,excess_cents').eq('user_id', player_id).eq('status', 'approved'),
+      supabaseAdmin.from('game_loads').select('amount_cents').eq('user_id', player_id).in('status', SETTLED.game_loads),
+      supabaseAdmin.from('redemptions').select('amount_cents,excess_cents').eq('user_id', player_id).in('status', SETTLED.redemptions),
       supabaseAdmin.from('player_level_history').select('*, from_level:from_level_id(name,accent_color), to_level:to_level_id(name,accent_color)').eq('user_id', player_id).order('created_at', { ascending: false }).limit(5),
     ])
 

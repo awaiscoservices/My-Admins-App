@@ -138,7 +138,9 @@ export default function AdminRedemptions() {
 
       <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
-          {['all','pending','approved','partial','rejected'].map(s => (
+          {/* 'completed', not 'approved' — redemptions cannot hold that value, so
+              the tab matched nothing. 'partial' is not a status either. */}
+          {['all','pending','under_review','completed','rejected'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>
