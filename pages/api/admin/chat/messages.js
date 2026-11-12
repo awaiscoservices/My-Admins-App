@@ -36,7 +36,7 @@ async function getMessages(req, res) {
 
   const { data: messages, error } = await gate.db
     .from('chat_messages')
-    .select('id, sender_id, sender_type, body, read_at, created_at')
+    .select('id, sender_id, sender_type, body, file_url, file_name, file_type, read_at, created_at')
     .eq('conversation_id', conversationId)
     .eq('tenant_id', conv.tenant_id)   // belt + suspenders
     .order('created_at', { ascending: true })
@@ -64,11 +64,14 @@ async function sendMessage(req, res) {
   const gate = await guardAdmin(req, res, { allow: PERMS.CHAT_SEND })
   if (!gate) return
 
-  const { conversationId, body } = req.body ?? {}
-  if (!conversationId || !body?.trim()) {
-    return res.status(400).json({ error: 'conversationId and body required' })
+  const { conversationId, body, fileUrl, fileName, fileType } = req.body ?? {}
+  if (!conversationId) {
+    return res.status(400).json({ error: 'conversationId required' })
   }
-  if (body.trim().length > 2000) {
+  if (!body?.trim() && !fileUrl) {
+    return res.status(400).json({ error: 'Message or file required' })
+  }
+  if ((body ?? '').trim().length > 2000) {
     return res.status(400).json({ error: 'Message too long (max 2000 chars)' })
   }
 
@@ -88,9 +91,12 @@ async function sendMessage(req, res) {
       conversation_id: conversationId,
       sender_id:       gate.actor.id,
       sender_type:     'staff',
-      body:            body.trim(),
+      body:            (body ?? '').trim(),
+      file_url:        fileUrl ?? null,
+      file_name:       fileName ?? null,
+      file_type:       fileType ?? null,
     })
-    .select('id, sender_id, sender_type, body, read_at, created_at')
+    .select('id, sender_id, sender_type, body, file_url, file_name, file_type, read_at, created_at')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
