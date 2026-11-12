@@ -29,10 +29,13 @@ function MethodModal({ method, onClose, onSave }) {
     type: method?.type || 'cashapp',
     min_deposit_cents: method?.min_deposit_cents != null ? (method.min_deposit_cents / 100).toFixed(2) : '5.00',
     max_deposit_cents: method?.max_deposit_cents != null ? (method.max_deposit_cents / 100).toFixed(2) : '1000.00',
-    default_bonus_pct: method?.default_bonus_pct ?? '',
     sort_order: method?.sort_order ?? 0,
     description: method?.description || '',
     instructions: method?.instructions || '',
+    // Account details the player sees on deposit step 3: free text + an
+    // optional payment QR image. Stored together in the account_details jsonb.
+    account_text: method?.account_details?.text || '',
+    qr_image_url: method?.account_details?.qr_image_url || '',
     is_active: method?.is_active ?? true,
     is_auto: method?.is_auto ?? false,
     allow_deposit: method?.allow_deposit ?? true,
@@ -42,6 +45,30 @@ function MethodModal({ method, onClose, onSave }) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [qrUploading, setQrUploading] = useState(false)
+
+  async function uploadQr(file) {
+    if (!file) return
+    setQrUploading(true); setError('')
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/payments/upload-qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ file_base64: base64, file_type: file.type, file_name: file.name }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Upload failed')
+      setForm(p => ({ ...p, qr_image_url: d.url }))
+    } catch (err) { setError(err.message || 'QR upload failed') }
+    finally { setQrUploading(false) }
+  }
 
   async function submit() {
     if (!form.name.trim()) { setError('Method name is required'); return }
@@ -52,11 +79,17 @@ function MethodModal({ method, onClose, onSave }) {
       ...form,
       min_deposit_cents: form.min_deposit_cents ? Math.round(parseFloat(form.min_deposit_cents) * 100) : 500,
       max_deposit_cents: form.max_deposit_cents ? Math.round(parseFloat(form.max_deposit_cents) * 100) : 100000,
-      default_bonus_pct: form.default_bonus_pct ? parseFloat(form.default_bonus_pct) : 0,
       sort_order: parseInt(form.sort_order, 10) || 0,
       description: form.description.trim() || null,
       instructions: form.instructions.trim() || null,
+      // Bundle the player-facing account details into the jsonb column.
+      account_details: {
+        text: form.account_text.trim() || '',
+        ...(form.qr_image_url ? { qr_image_url: form.qr_image_url } : {}),
+      },
     }
+    delete body.account_text
+    delete body.qr_image_url
     const result = await onSave(method?.id, body)
     if (result?.error) { setError(result.error); setSaving(false) }
     else onClose()
@@ -91,7 +124,7 @@ function MethodModal({ method, onClose, onSave }) {
               {TYPES.map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
             </select>
           </div>
-          {[['min_deposit_cents', 'Min Deposit ($)'], ['max_deposit_cents', 'Max Deposit ($)'], ['default_bonus_pct', 'Default Bonus %'], ['sort_order', 'Sort Order']].map(([key, label]) => (
+          {[['min_deposit_cents', 'Min Deposit ($)'], ['max_deposit_cents', 'Max Deposit ($)'], ['sort_order', 'Sort Order']].map(([key, label]) => (
             <div key={key}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>{label}</label>
               <input type="number" min="0" step="0.01" value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} placeholder="0"
@@ -107,6 +140,23 @@ function MethodModal({ method, onClose, onSave }) {
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Player Instructions</label>
             <textarea rows={3} value={form.instructions} onChange={e => setForm(p => ({ ...p, instructions: e.target.value }))} placeholder="How to pay — where to send it, what to include"
               style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
+          </div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Account Details (shown to player)</label>
+            <textarea rows={3} value={form.account_text} onChange={e => setForm(p => ({ ...p, account_text: e.target.value }))} placeholder="e.g. CashApp tag: $YourTag&#10;Name: John Doe"
+              style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
+          </div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Payment QR Image (optional)</label>
+            <input type="file" accept="image/*" disabled={qrUploading} onChange={e => uploadQr(e.target.files?.[0])}
+              style={{ width: '100%', padding: '9px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 12, fontFamily: "'Outfit',sans-serif", boxSizing: 'border-box' }} />
+            {qrUploading && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 6 }}>Uploading…</div>}
+            {form.qr_image_url && !qrUploading && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <img src={form.qr_image_url} alt="QR" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,.15)' }} />
+                <button type="button" onClick={() => setForm(p => ({ ...p, qr_image_url: '' }))} style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 11, fontWeight: 700, padding: '6px 12px', cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Remove</button>
+              </div>
+            )}
           </div>
           <Toggle field="is_active" label="Active" />
           <Toggle field="is_auto" label="Auto-approve" />
@@ -208,14 +258,14 @@ export default function AdminPayments() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Method', 'Type', 'Min / Max', 'Bonus', 'Requires', 'Channels', 'Status', 'Actions'].map(h => (
+                {['Method', 'Type', 'Min / Max', 'Requires', 'Channels', 'Status', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No methods found</td></tr>
+              {loading ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No methods found</td></tr>
               : filtered.map(r => {
                 const tc = TYPE_COLOR[r.type] || '#fbbf24'
                 return (
@@ -227,7 +277,6 @@ export default function AdminPayments() {
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: tc + '22', color: tc, textTransform: 'capitalize' }}>{r.type?.replace(/_/g, ' ')}</span>
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.5)', whiteSpace: 'nowrap' }}>{fmt(r.min_deposit_cents)} — {r.max_deposit_cents ? fmt(r.max_deposit_cents) : '∞'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24' }}>{Number(r.default_bonus_pct) > 0 ? Number(r.default_bonus_pct) + '%' : '—'}</td>
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: 4 }}>
                         {r.requires_proof && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99, background: 'rgba(251,191,36,.15)', color: '#fbbf24' }}>PROOF</span>}
