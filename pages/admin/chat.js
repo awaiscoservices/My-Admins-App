@@ -229,18 +229,34 @@ export default function AdminChat() {
 
   useEffect(() => { loadConvs() }, [loadConvs])
 
-  // Auto-refresh the conversation list: realtime on any new message or new
-  // conversation for this casino, plus a slow poll as a safety net.
+  // Quietly reload the OPEN thread's messages and merge — no "Loading…"
+  // flash, and only touches state when something actually changed (so the
+  // view doesn't jump). This is what makes a player's new message appear in
+  // an already-open chat without clicking the contact again.
+  const refreshMessages = useCallback(async (convId) => {
+    if (!convId) return
+    const data = await apiFetch(`/api/admin/chat/messages?conversationId=${convId}`)
+    if (!Array.isArray(data.messages)) return
+    setMessages(prev => {
+      const b = prev[prev.length - 1], n = data.messages[data.messages.length - 1]
+      const same = prev.length === data.messages.length && (!n || (b && b.id === n.id && b.read_at === n.read_at))
+      return same ? prev : data.messages
+    })
+  }, [])
+
+  // Auto-refresh: realtime on any new message / conversation for this casino,
+  // plus a poll as a safety net (realtime needs a staff RLS policy to deliver).
+  // The poll also refreshes the open thread so new messages show live.
   useEffect(() => {
     const ch = supabase.channel('admin-chat-inbox')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' },
-        () => refreshConvs(selected?.id))
+        () => { refreshConvs(selected?.id); refreshMessages(selected?.id) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_conversations' },
         () => refreshConvs(selected?.id))
       .subscribe()
-    const poll = setInterval(() => refreshConvs(selected?.id), 10000)
+    const poll = setInterval(() => { refreshConvs(selected?.id); refreshMessages(selected?.id) }, 5000)
     return () => { supabase.removeChannel(ch); clearInterval(poll) }
-  }, [refreshConvs, selected?.id])
+  }, [refreshConvs, refreshMessages, selected?.id])
 
   const loadMessages = useCallback(async (conv) => {
     setMsgLoading(true)
