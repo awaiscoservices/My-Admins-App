@@ -29,16 +29,22 @@ export default async function handler(req, res) {
     gate,
   )
 
-  // Support badge: conversations with at least one unread player message.
-  // Counts chats needing a reply, so the Support tab lights up the moment a
-  // player writes — same live 8s poll as the other queues.
-  const unreadSupport = scopeToTenant(
-    gate.db.from('chat_messages').select('conversation_id')
-      .eq('sender_type', 'player').is('read_at', null),
+  // Support badge: open conversations whose latest message is from the player
+  // — i.e. still waiting for a staff reply. This persists until a staff member
+  // actually replies, exactly like the request queues persist until acted on.
+  // (The earlier version counted unread messages, which cleared the instant
+  // the chat was opened, so the badge vanished before anyone replied.)
+  const openConvs = scopeToTenant(
+    gate.db.from('chat_conversations').select('id').eq('status', 'open'),
+    gate,
+  )
+  const recentMsgs = scopeToTenant(
+    gate.db.from('chat_messages').select('conversation_id, sender_type')
+      .order('created_at', { ascending: false }).limit(3000),
     gate,
   )
 
-  const [deposits, withdrawals, scores, redeems, kyc, games, passwords, support] = await Promise.all([
+  const [deposits, withdrawals, scores, redeems, kyc, games, passwords, convs, msgs] = await Promise.all([
     pending('deposits'),
     pending('withdrawals'),
     pending('game_loads'),
@@ -46,10 +52,17 @@ export default async function handler(req, res) {
     pending('kyc_records'),
     pending('game_accounts'),
     passwordRequests,
-    unreadSupport,
+    openConvs,
+    recentMsgs,
   ])
 
-  const supportCount = new Set((support.data || []).map(r => r.conversation_id)).size
+  // First message seen per conversation is the latest (rows are newest-first).
+  const latestSender = {}
+  for (const m of msgs.data || []) {
+    if (!(m.conversation_id in latestSender)) latestSender[m.conversation_id] = m.sender_type
+  }
+  const supportCount = (convs.data || [])
+    .filter(c => latestSender[c.id] === 'player').length
 
   return res.status(200).json({
     deposit_requests:  deposits.count    || 0,
