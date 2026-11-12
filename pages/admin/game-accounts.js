@@ -133,18 +133,26 @@ export default function AdminGameAccounts() {
 
   useEffect(() => { loadAccounts() }, [filter])
 
+  // Live refresh: silently re-fetch every 8s so new requests (new accounts,
+  // password-change requests) appear without a hard refresh (no spinner flash).
+  useEffect(() => {
+    const t = setInterval(() => loadAccounts(true), 8000)
+    return () => clearInterval(t)
+  }, [filter])
+
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
   }
 
-  async function loadAccounts() {
-    setLoading(true)
+  async function loadAccounts(silent = false) {
+    if (!silent) setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const params = new URLSearchParams({ status: filter })
       const res = await fetch(`/api/admin/game-accounts/list?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       })
       const d = await res.json()
       setAccounts(d.accounts || [])
