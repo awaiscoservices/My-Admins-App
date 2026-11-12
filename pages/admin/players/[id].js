@@ -234,11 +234,10 @@ export default function AdminPlayerDetail() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg,#f59e0b,#fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: '#050505' }}>
-              {(player.full_name || 'U')[0].toUpperCase()}
+              {(player.username || player.full_name || 'U')[0].toUpperCase()}
             </div>
             <div>
-              <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{player.full_name}</h1>
-              <div style={{ fontSize: 13, color: '#fbbf24' }}>{player.email}</div>
+              <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4, fontFamily: 'monospace' }}>{player.username || player.full_name}</h1>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>ID: {player.id}</div>
             </div>
           </div>
@@ -321,8 +320,7 @@ export default function AdminPlayerDetail() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, padding: '20px' }}>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)', marginBottom: 14 }}>Account Info</div>
-            <InfoRow label="Full Name"      value={player.full_name} />
-            <InfoRow label="Email"          value={player.email} />
+            <InfoRow label="Username"       value={player.username || player.full_name} mono />
             <InfoRow label="Phone"          value={player.phone} />
             <InfoRow label="Referral Code"  value={player.referral_code} mono />
             <InfoRow label="Total XP"       value={`${player.total_xp || 0} XP`} />
