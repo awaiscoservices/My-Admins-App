@@ -344,6 +344,13 @@ export default function AdminChat() {
 
   async function handleSend(e) {
     e.preventDefault()
+    // If the box holds a "/key" that matches a saved reply, expand it into the
+    // box instead of sending the raw "/key" — covers Enter and the Send button.
+    if (body.startsWith('/')) {
+      const q = body.slice(1).toLowerCase().trim()
+      const match = canned.find(r => r.key === q) || cannedMatches[0]
+      if (match) { setBody(match.text); setShowCanned(false); inputRef.current?.focus(); return }
+    }
     if ((!body.trim() && !pendingFile.current) || !selected || sending) return
     setSending(true)
     setError('')
