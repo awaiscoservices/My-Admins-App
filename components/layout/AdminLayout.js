@@ -209,12 +209,20 @@ export default function AdminLayout({ children }) {
     return () => document.removeEventListener('click', close)
   }, [menuOpen])
 
+  // Keep the topbar/sidebar badges live: re-count every 8s so a new request
+  // lights the tab and an approved one clears it, without a page reload.
+  useEffect(() => {
+    const t = setInterval(() => loadPendingCounts(), 8000)
+    return () => clearInterval(t)
+  }, [])
+
   async function loadPendingCounts() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       const res = await fetch('/api/admin/pending-counts', {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       })
       if (!res.ok) return
 
