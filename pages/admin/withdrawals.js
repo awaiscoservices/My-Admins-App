@@ -84,6 +84,7 @@ export default function AdminWithdrawals() {
       if (!session) { setItems([]); setLoading(false); return }
       const res = await fetch(`/api/admin/withdrawals/list?status=${filter}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       })
       const d = await res.json()
       if (!res.ok) { showToast(d.error || 'Failed to load withdrawals', 'error'); setItems([]) }

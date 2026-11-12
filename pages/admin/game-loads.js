@@ -84,6 +84,7 @@ export default function AdminGameLoads() {
 
       const res = await fetch(`/api/admin/game-loads/list?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       })
       const d = await res.json()
       setRows(res.ok ? (d.data || []) : [])

@@ -82,6 +82,7 @@ export default function AdminDeposits() {
       const params = new URLSearchParams({ status: filter })
       const res = await fetch(`/api/admin/deposits/list?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       })
       const d = await res.json()
       if (!res.ok) { showToast(d.error || 'Failed to load deposits', 'error'); setDeposits([]); }

@@ -89,6 +89,7 @@ export default function AdminRedemptions() {
       if (!session) { setItems([]); setLoading(false); return }
       const res = await fetch(`/api/admin/redemptions/list?status=${filter}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       })
       const d = await res.json()
       if (!res.ok) { showToast(d.error || 'Failed to load redemptions', 'error'); setItems([]) }
