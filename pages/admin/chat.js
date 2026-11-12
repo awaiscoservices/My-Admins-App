@@ -1,19 +1,15 @@
 /**
  * /admin/chat — Staff chat inbox
- *
- * Left panel: list of conversations for this casino (scoped server-side).
- * Right panel: message thread for the selected conversation.
- * Real-time: Supabase channel on chat_messages, filtered by conversation_id.
- *
- * Auth: uses the session token from supabase (browser client) for API calls.
- * All data fetched through /api/admin/chat/* which uses guardAdmin + service-role key.
+ * Changes from previous version:
+ *   - Search bar filters conversation list by player name/email
+ *   - File attachment button (📎) uploads via /api/admin/chat/upload
+ *   - Bubble renders image preview or file download link
  */
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
 const fmtTime = d => d ? new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
 const fmtAgo  = d => {
@@ -30,7 +26,6 @@ async function apiFetch(path, opts = {}) {
   const r = await fetch(path, {
     ...opts,
     headers: {
-      'Content-Type': 'application/json',
       Authorization: `Bearer ${session?.access_token}`,
       ...(opts.headers ?? {}),
     },
@@ -38,64 +33,105 @@ async function apiFetch(path, opts = {}) {
   return r.json()
 }
 
-// ─── styles ───────────────────────────────────────────────────────────────────
 const PANEL  = { background: 'linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018))', border: '1px solid rgba(251,191,36,.13)', borderRadius: 16 }
 const GOLD   = '#fbbf24'
 const SUBTLE = 'rgba(255,255,255,.45)'
 
 // ─── ConversationList ─────────────────────────────────────────────────────────
-function ConversationList({ convs, selected, onSelect, loading }) {
-  if (loading) return (
-    <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>Loading…</div>
-  )
-  if (!convs.length) return (
-    <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>No open conversations</div>
-  )
+function ConversationList({ convs, selected, onSelect, loading, search, onSearch }) {
+  const filtered = search.trim()
+    ? convs.filter(c => {
+        const p = c.player ?? {}
+        const hay = `${p.full_name ?? ''} ${p.username ?? ''} ${p.email ?? ''}`.toLowerCase()
+        return hay.includes(search.toLowerCase())
+      })
+    : convs
+
   return (
-    <div>
-      {convs.map(c => {
-        const name = c.player?.full_name || c.player?.username || c.player?.email || 'Player'
-        const isActive = selected?.id === c.id
-        return (
-          <button key={c.id} onClick={() => onSelect(c)}
-            style={{
-              width: '100%', textAlign: 'left', padding: '14px 16px',
-              background: isActive ? 'rgba(251,191,36,.1)' : 'transparent',
-              borderLeft: isActive ? `3px solid ${GOLD}` : '3px solid transparent',
-              border: 'none', cursor: 'pointer', display: 'block',
-              borderBottom: '1px solid rgba(255,255,255,.06)',
-            }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>{name}</span>
-              <span style={{ fontSize: 11, color: SUBTLE }}>{fmtAgo(c.last_message_at)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: SUBTLE }}>{c.player?.email || ''}</span>
-              {c.unread > 0 && (
-                <span style={{ background: GOLD, color: '#000', borderRadius: 10, fontSize: 10, fontWeight: 800, padding: '1px 7px', minWidth: 18, textAlign: 'center' }}>
-                  {c.unread}
-                </span>
-              )}
-            </div>
-          </button>
-        )
-      })}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Search */}
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+        <input
+          value={search}
+          onChange={e => onSearch(e.target.value)}
+          placeholder="Search players…"
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '8px 12px', background: 'rgba(255,255,255,.07)',
+            border: '1px solid rgba(255,255,255,.1)', borderRadius: 10,
+            color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none',
+          }}
+        />
+      </div>
+
+      <div style={{ overflowY: 'auto', flex: 1 }}>
+        {loading && <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>Loading…</div>}
+        {!loading && !filtered.length && (
+          <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>
+            {search ? 'No matches' : 'No open conversations'}
+          </div>
+        )}
+        {filtered.map(c => {
+          const name = c.player?.full_name || c.player?.username || c.player?.email || 'Player'
+          const isActive = selected?.id === c.id
+          return (
+            <button key={c.id} onClick={() => onSelect(c)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '14px 16px',
+                background: isActive ? 'rgba(251,191,36,.1)' : 'transparent',
+                borderLeft: isActive ? `3px solid ${GOLD}` : '3px solid transparent',
+                border: 'none', cursor: 'pointer', display: 'block',
+                borderBottom: '1px solid rgba(255,255,255,.06)',
+              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>{name}</span>
+                <span style={{ fontSize: 11, color: SUBTLE }}>{fmtAgo(c.last_message_at)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: SUBTLE }}>{c.player?.email || ''}</span>
+                {c.unread > 0 && (
+                  <span style={{ background: GOLD, color: '#000', borderRadius: 10, fontSize: 10, fontWeight: 800, padding: '1px 7px', minWidth: 18, textAlign: 'center' }}>
+                    {c.unread}
+                  </span>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-// ─── MessageBubble ────────────────────────────────────────────────────────────
+// ─── Bubble ───────────────────────────────────────────────────────────────────
 function Bubble({ msg, myId }) {
   const isMe = msg.sender_id === myId || msg.sender_type === 'staff'
+  const isImage = msg.file_type?.startsWith('image/')
   return (
     <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
       <div style={{
-        maxWidth: '72%', padding: '10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+        maxWidth: '72%', padding: msg.file_url && !msg.body ? '6px' : '10px 14px',
+        borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
         background: isMe ? 'linear-gradient(135deg,#b45309,#92400e)' : 'rgba(255,255,255,.08)',
         border: isMe ? 'none' : '1px solid rgba(255,255,255,.1)',
         fontSize: 14, color: '#fff', lineHeight: 1.5, wordBreak: 'break-word',
       }}>
-        {msg.body}
+        {/* File / image attachment */}
+        {msg.file_url && isImage && (
+          <a href={msg.file_url} target="_blank" rel="noreferrer">
+            <img src={msg.file_url} alt={msg.file_name ?? 'image'}
+              style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 10, display: 'block', marginBottom: msg.body ? 8 : 0 }} />
+          </a>
+        )}
+        {msg.file_url && !isImage && (
+          <a href={msg.file_url} target="_blank" rel="noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', textDecoration: 'none', marginBottom: msg.body ? 8 : 0 }}>
+            <span style={{ fontSize: 20 }}>📎</span>
+            <span style={{ fontSize: 12, wordBreak: 'break-all' }}>{msg.file_name ?? 'Attachment'}</span>
+          </a>
+        )}
+        {/* Text body */}
+        {msg.body && <span>{msg.body}</span>}
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>
           {fmtTime(msg.created_at)}
           {isMe && msg.read_at && <span style={{ marginLeft: 4 }}>✓✓</span>}
@@ -109,24 +145,25 @@ function Bubble({ msg, myId }) {
 export default function AdminChat() {
   const [convs, setConvs]           = useState([])
   const [convLoading, setConvLoading] = useState(true)
+  const [search, setSearch]         = useState('')
   const [selected, setSelected]     = useState(null)
   const [messages, setMessages]     = useState([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [body, setBody]             = useState('')
   const [sending, setSending]       = useState(false)
+  const [uploading, setUploading]   = useState(false)
   const [error, setError]           = useState('')
   const [myId, setMyId]             = useState(null)
   const bottomRef                   = useRef(null)
   const channelRef                  = useRef(null)
+  const fileRef                     = useRef(null)
 
-  // Get own user id for bubble alignment
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setMyId(session?.user?.id ?? null)
     })
   }, [])
 
-  // Load conversation list
   const loadConvs = useCallback(async () => {
     setConvLoading(true)
     const data = await apiFetch('/api/admin/chat/conversations?status=open')
@@ -136,14 +173,12 @@ export default function AdminChat() {
 
   useEffect(() => { loadConvs() }, [loadConvs])
 
-  // Load messages when a conversation is selected
   const loadMessages = useCallback(async (conv) => {
     setMsgLoading(true)
     setMessages([])
     const data = await apiFetch(`/api/admin/chat/messages?conversationId=${conv.id}`)
     setMessages(data.messages ?? [])
     setMsgLoading(false)
-    // Clear unread badge
     setConvs(prev => prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c))
   }, [])
 
@@ -153,88 +188,98 @@ export default function AdminChat() {
     loadMessages(conv)
   }, [loadMessages])
 
-  // Real-time subscription on selected conversation
   useEffect(() => {
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
-      channelRef.current = null
-    }
+    if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null }
     if (!selected) return
-
-    const ch = supabase
-      .channel(`admin-chat-${selected.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: `conversation_id=eq.${selected.id}`,
-      }, (payload) => {
-        setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
+    const ch = supabase.channel(`admin-chat-${selected.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${selected.id}` },
+        (payload) => {
+          setMessages(prev => prev.find(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
+          setConvs(prev => prev.map(c => c.id === selected.id ? { ...c, last_message_at: payload.new.created_at } : c))
         })
-        // Update last_message_at in list
-        setConvs(prev => prev.map(c =>
-          c.id === selected.id ? { ...c, last_message_at: payload.new.created_at } : c
-        ))
-      })
       .subscribe()
-
     channelRef.current = ch
-    return () => {
-      supabase.removeChannel(ch)
-      channelRef.current = null
-    }
+    return () => { supabase.removeChannel(ch); channelRef.current = null }
   }, [selected?.id])
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   async function handleSend(e) {
     e.preventDefault()
-    if (!body.trim() || !selected || sending) return
+    if ((!body.trim() && !pendingFile.current) || !selected || sending) return
     setSending(true)
     setError('')
     const data = await apiFetch('/api/admin/chat/messages', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversationId: selected.id, body: body.trim() }),
     })
     setSending(false)
     if (data.error) { setError(data.error); return }
     setBody('')
-    // Optimistic — real-time will also fire but dedup handles it
     setMessages(prev => prev.find(m => m.id === data.message.id) ? prev : [...prev, data.message])
   }
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file || !selected) return
+    setUploading(true)
+    setError('')
+    const { data: { session } } = await supabase.auth.getSession()
+    const fd = new FormData()
+    fd.append('file', file)
+    const r = await fetch('/api/admin/chat/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+      body: fd,
+    })
+    const up = await r.json()
+    if (up.error) { setError(up.error); setUploading(false); return }
+
+    // Send a message that is just the attachment (empty body is allowed for attachments)
+    const data = await apiFetch('/api/admin/chat/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: selected.id,
+        body: '',
+        fileUrl: up.url,
+        fileName: up.name,
+        fileType: up.type,
+      }),
+    })
+    setUploading(false)
+    if (data.error) { setError(data.error); return }
+    setMessages(prev => prev.find(m => m.id === data.message.id) ? prev : [...prev, data.message])
+    e.target.value = ''
+  }
+
+  const pendingFile = useRef(null)
 
   return (
     <AdminLayout title="Chat">
       <Head><title>Chat — Casinoze Support</title></Head>
-
-      {/* The page itself does not scroll — it fits the viewport and only the
-          conversation list and the message thread scroll inside their panels.
-          minHeight:100vh here forced the whole body taller than the screen on
-          top of the layout's own top bar and padding. */}
       <div style={{ boxSizing: 'border-box' }}>
         <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 20 }}>
           Live Chat
         </h1>
-
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, height: 'calc(100vh - 180px)', minHeight: 360 }}>
-          {/* Left — conversation list */}
+          {/* Left */}
           <div style={{ ...PANEL, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
               <span style={{ fontFamily: "'Cinzel',serif", fontSize: 13, fontWeight: 700, color: GOLD, letterSpacing: '.1em', textTransform: 'uppercase' }}>
                 Conversations
               </span>
             </div>
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              <ConversationList convs={convs} selected={selected} onSelect={handleSelect} loading={convLoading} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <ConversationList
+                convs={convs} selected={selected} onSelect={handleSelect}
+                loading={convLoading} search={search} onSearch={setSearch}
+              />
             </div>
           </div>
 
-          {/* Right — message thread */}
+          {/* Right */}
           <div style={{ ...PANEL, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {!selected ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: SUBTLE, fontSize: 14 }}>
@@ -242,7 +287,6 @@ export default function AdminChat() {
               </div>
             ) : (
               <>
-                {/* Header */}
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>
@@ -255,25 +299,26 @@ export default function AdminChat() {
                   </span>
                 </div>
 
-                {/* Messages */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-                  {msgLoading && (
-                    <div style={{ textAlign: 'center', color: SUBTLE, fontSize: 13, padding: 20 }}>Loading…</div>
-                  )}
-                  {!msgLoading && messages.length === 0 && (
-                    <div style={{ textAlign: 'center', color: SUBTLE, fontSize: 13, padding: 20 }}>No messages yet</div>
-                  )}
+                  {msgLoading && <div style={{ textAlign: 'center', color: SUBTLE, fontSize: 13, padding: 20 }}>Loading…</div>}
+                  {!msgLoading && messages.length === 0 && <div style={{ textAlign: 'center', color: SUBTLE, fontSize: 13, padding: 20 }}>No messages yet</div>}
                   {messages.map(m => <Bubble key={m.id} msg={m} myId={myId} />)}
                   <div ref={bottomRef} />
                 </div>
 
-                {/* Input */}
-                <form onSubmit={handleSend} style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10 }}>
+                <form onSubmit={handleSend} style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
                   {error && (
                     <div style={{ position: 'absolute', bottom: 70, left: 20, right: 20, padding: '8px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 12 }}>
                       {error}
                     </div>
                   )}
+                  {/* File picker */}
+                  <input ref={fileRef} type="file" accept="image/*,.pdf,.txt" style={{ display: 'none' }} onChange={handleFile} />
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                    title="Attach file"
+                    style={{ flexShrink: 0, width: 40, height: 40, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: uploading ? SUBTLE : '#fff', fontSize: 18, cursor: uploading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {uploading ? '…' : '📎'}
+                  </button>
                   <input
                     value={body}
                     onChange={e => setBody(e.target.value)}
