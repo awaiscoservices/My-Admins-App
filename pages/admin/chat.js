@@ -104,6 +104,15 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
   )
 }
 
+// WhatsApp-style ticks: grey ✓✓ = delivered, blue ✓✓ = seen (read_at set).
+function Ticks({ read }) {
+  return (
+    <span style={{ marginLeft: 5, fontSize: 11, letterSpacing: '-3px', color: read ? '#53bdeb' : 'rgba(255,255,255,.55)' }}>
+      ✓✓
+    </span>
+  )
+}
+
 // ─── Bubble ───────────────────────────────────────────────────────────────────
 function Bubble({ msg, myId }) {
   const isMe = msg.sender_id === myId || msg.sender_type === 'staff'
@@ -135,7 +144,7 @@ function Bubble({ msg, myId }) {
         {msg.body && <span>{msg.body}</span>}
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>
           {fmtTime(msg.created_at)}
-          {isMe && msg.read_at && <span style={{ marginLeft: 4 }}>✓✓</span>}
+          {isMe && <Ticks read={!!msg.read_at} />}
         </div>
       </div>
     </div>
@@ -218,8 +227,13 @@ export default function AdminChat() {
     if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null }
     if (!selected) return
     const ch = supabase.channel(`admin-chat-${selected.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${selected.id}` },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages', filter: `conversation_id=eq.${selected.id}` },
         (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            // read_at flips when the player opens the thread — turn ticks blue.
+            setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+            return
+          }
           setMessages(prev => prev.find(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
           setConvs(prev => prev.map(c => c.id === selected.id ? { ...c, last_message_at: payload.new.created_at } : c))
         })
