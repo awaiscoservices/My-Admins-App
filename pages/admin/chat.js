@@ -12,6 +12,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
+import PlayerWalletModal from '../../components/PlayerWalletModal'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const fmtTime = d => d ? new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''
@@ -116,8 +117,33 @@ export default function AdminChat() {
   const [sending, setSending]       = useState(false)
   const [error, setError]           = useState('')
   const [myId, setMyId]             = useState(null)
+  const [walletFor, setWalletFor]   = useState(null)
+  const [canned, setCanned]         = useState([])        // [{ key, text }]
+  const [showCanned, setShowCanned] = useState(false)     // the "/" picker
+  const [manageCanned, setManageCanned] = useState(false) // the editor modal
   const bottomRef                   = useRef(null)
   const channelRef                  = useRef(null)
+  const inputRef                    = useRef(null)
+
+  // Saved replies for this casino.
+  const loadCanned = useCallback(async () => {
+    const data = await apiFetch('/api/admin/chat/canned')
+    setCanned(Array.isArray(data.replies) ? data.replies : [])
+  }, [])
+  useEffect(() => { loadCanned() }, [loadCanned])
+
+  // The replies the current "/text" matches, for the picker.
+  const cannedMatches = (() => {
+    if (!body.startsWith('/')) return []
+    const q = body.slice(1).toLowerCase()
+    return canned.filter(r => r.key.includes(q) || r.text.toLowerCase().includes(q)).slice(0, 6)
+  })()
+
+  function applyCanned(reply) {
+    setBody(reply.text)
+    setShowCanned(false)
+    inputRef.current?.focus()
+  }
 
   // Get own user id for bubble alignment
   useEffect(() => {
@@ -250,9 +276,17 @@ export default function AdminChat() {
                     </div>
                     <div style={{ fontSize: 11, color: SUBTLE }}>{selected.player?.email}</div>
                   </div>
-                  <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.3)', color: '#4ade80' }}>
-                    {selected.status}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* The player's balances and history, without leaving the
+                        chat — staff often need them to answer a question. */}
+                    <button onClick={() => setWalletFor(selected)}
+                      style={{ padding: '6px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 9, color: 'rgba(255,255,255,.8)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+                      Wallet
+                    </button>
+                    <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.3)', color: '#4ade80' }}>
+                      {selected.status}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Messages */}
@@ -268,16 +302,48 @@ export default function AdminChat() {
                 </div>
 
                 {/* Input */}
-                <form onSubmit={handleSend} style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10 }}>
+                <form onSubmit={handleSend} style={{ position: 'relative', padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 10, alignItems: 'center' }}>
                   {error && (
                     <div style={{ position: 'absolute', bottom: 70, left: 20, right: 20, padding: '8px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 12 }}>
                       {error}
                     </div>
                   )}
+
+                  {/* Saved-reply picker. Opens when the box starts with "/".
+                      Click one, or press Enter when the key matches exactly,
+                      and the whole message drops into the box. */}
+                  {showCanned && cannedMatches.length > 0 && (
+                    <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 16, right: 16, background: '#0e1a2e', border: '1px solid rgba(251,191,36,.25)', borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.6)', overflow: 'hidden', zIndex: 20, maxHeight: 240, overflowY: 'auto' }}>
+                      {cannedMatches.map(r => (
+                        <button key={r.key} type="button" onClick={() => applyCanned(r)}
+                          style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,.05)', cursor: 'pointer' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(251,191,36,.08)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div style={{ color: GOLD, fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>/{r.key}</div>
+                          <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.text}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button type="button" onClick={() => setManageCanned(true)} title="Saved replies"
+                    style={{ padding: '10px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: 'rgba(255,255,255,.6)', fontSize: 13, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>
+                    /
+                  </button>
+
                   <input
+                    ref={inputRef}
                     value={body}
-                    onChange={e => setBody(e.target.value)}
-                    placeholder="Type a reply…"
+                    onChange={e => { setBody(e.target.value); setShowCanned(e.target.value.startsWith('/')) }}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') setShowCanned(false)
+                      // Enter on an exact "/key" expands it instead of sending.
+                      if (e.key === 'Enter' && body.startsWith('/')) {
+                        const exact = canned.find(r => r.key === body.slice(1).toLowerCase().trim())
+                        if (exact) { e.preventDefault(); applyCanned(exact); return }
+                      }
+                    }}
+                    placeholder="Type a reply, or / for a saved one…"
                     maxLength={2000}
                     disabled={sending}
                     style={{ flex: 1, padding: '11px 16px', background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 12, color: '#fff', fontSize: 14, fontFamily: "'Outfit',sans-serif", outline: 'none' }}
@@ -292,6 +358,82 @@ export default function AdminChat() {
           </div>
         </div>
       </div>
+
+      {walletFor && (
+        <PlayerWalletModal
+          playerId={walletFor.user_id || walletFor.player?.id}
+          playerName={walletFor.player?.full_name}
+          onClose={() => setWalletFor(null)}
+        />
+      )}
+
+      {manageCanned && (
+        <CannedManager
+          replies={canned}
+          onClose={() => setManageCanned(false)}
+          onSaved={next => { setCanned(next); setManageCanned(false) }}
+        />
+      )}
     </AdminLayout>
+  )
+}
+
+// ─── Saved-reply editor ───────────────────────────────────────────────────────
+function CannedManager({ replies, onClose, onSaved }) {
+  const [rows, setRows] = useState(replies.length ? replies : [{ key: '', text: '' }])
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const set = (i, field, v) => setRows(rs => rs.map((r, j) => j === i ? { ...r, [field]: v } : r))
+
+  async function save() {
+    setSaving(true); setErr('')
+    const clean = rows
+      .map(r => ({ key: r.key.trim().toLowerCase().replace(/\s+/g, ''), text: r.text.trim() }))
+      .filter(r => r.key && r.text)
+    const data = await apiFetch('/api/admin/chat/canned', { method: 'PUT', body: JSON.stringify({ replies: clean }) })
+    setSaving(false)
+    if (data.error) { setErr(data.error); return }
+    onSaved(data.replies || clean)
+  }
+
+  const inp = { width: '100%', padding: '9px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', boxSizing: 'border-box' }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#0b1626', border: '1px solid rgba(251,191,36,.3)', borderRadius: 18, padding: 26, width: '100%', maxWidth: 560, maxHeight: '86vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>Saved Replies</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+        <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.4)', margin: '0 0 18px', lineHeight: 1.6 }}>
+          Give each reply a short key. In a chat, type <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>/</span> to pick one, or
+          type <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>/key</span> and press Enter and the whole message drops in.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {rows.map((r, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '130px 1fr auto', gap: 8, alignItems: 'start' }}>
+              <input value={r.key} onChange={e => set(i, 'key', e.target.value)} placeholder="key" style={{ ...inp, fontFamily: 'monospace' }} />
+              <textarea value={r.text} onChange={e => set(i, 'text', e.target.value)} placeholder="The full message" rows={2} style={{ ...inp, resize: 'vertical' }} />
+              <button onClick={() => setRows(rs => rs.filter((_, j) => j !== i))} style={{ padding: '8px 10px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={() => setRows(rs => [...rs, { key: '', text: '' }])} style={{ marginTop: 12, padding: '8px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+          + Add reply
+        </button>
+
+        {err && <p style={{ color: '#f87171', fontSize: 12.5, marginTop: 12 }}>⚠ {err}</p>}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button onClick={save} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
+            {saving ? 'Saving…' : 'Save replies'}
+          </button>
+          <button onClick={onClose} style={{ padding: '11px 18px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.5)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+        </div>
+      </div>
+    </div>
   )
 }
