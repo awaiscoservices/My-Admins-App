@@ -48,13 +48,15 @@ async function getMessages(req, res) {
     .filter(m => m.sender_type === 'player' && !m.read_at)
     .map(m => m.id)
 
+  // Awaited, not fire-and-forget: the Support badge counts unread player
+  // messages, so it must be cleared in the DB before this returns — otherwise
+  // the badge the client re-fetches right after opening still sees them unread.
   if (unreadIds.length) {
-    gate.db
+    await gate.db
       .from('chat_messages')
       .update({ read_at: new Date().toISOString() })
       .in('id', unreadIds)
       .eq('tenant_id', conv.tenant_id)
-      .then(() => {})
   }
 
   return res.json({ messages: messages ?? [] })

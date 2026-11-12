@@ -113,6 +113,40 @@ function PaperclipIcon({ size = 17 }) {
   )
 }
 
+// A small, dependency-free emoji picker. Common chat emojis only.
+const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤩','🥳','😅','😭','😉','😴','🤔','🙏','👍','👎','👌','🙌','👏','💪','👋','🤝','🔥','💯','✅','❌','⭐','🎉','🎁','💰','💵','🤑','🥰','😇','😳','🤗','😢','😡','❤️','💖','😬','🙈','🫶','😄','🤭','😤']
+
+function EmojiButton({ onPick, disabled }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button type="button" onClick={() => setOpen(o => !o)} disabled={disabled} title="Emoji"
+        style={{ width: 40, height: 40, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 18, cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        🙂
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, width: 268, background: '#0e1a2e', border: '1px solid rgba(251,191,36,.25)', borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.6)', padding: 8, display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 2, zIndex: 30 }}>
+          {EMOJIS.map(em => (
+            <button key={em} type="button" onClick={() => { onPick(em); setOpen(false) }}
+              style={{ background: 'transparent', border: 'none', fontSize: 20, lineHeight: 1, padding: '5px 0', cursor: 'pointer', borderRadius: 6 }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(251,191,36,.12)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              {em}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // WhatsApp-style ticks: grey ✓✓ = delivered, blue ✓✓ = seen (read_at set).
 function Ticks({ read }) {
   return (
@@ -181,6 +215,7 @@ export default function AdminChat() {
   const channelRef                  = useRef(null)
   const inputRef                    = useRef(null)
   const fileRef                     = useRef(null)
+  const justOpenedRef               = useRef(false)  // jump to newest instantly on open
 
   // Saved replies for this casino.
   const loadCanned = useCallback(async () => {
@@ -261,9 +296,13 @@ export default function AdminChat() {
     setMsgLoading(true)
     setMessages([])
     const data = await apiFetch(`/api/admin/chat/messages?conversationId=${conv.id}`)
+    justOpenedRef.current = true           // next render jumps straight to newest
     setMessages(data.messages ?? [])
     setMsgLoading(false)
     setConvs(prev => prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c))
+    // Reading the thread marked its messages read on the server — tell the
+    // layout to drop the Support badge now instead of waiting for the poll.
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('admin:chat-opened'))
   }, [])
 
   const handleSelect = useCallback((conv) => {
@@ -291,7 +330,17 @@ export default function AdminChat() {
     return () => { supabase.removeChannel(ch); channelRef.current = null }
   }, [selected?.id])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  // On open, snap straight to the newest message (no animated scroll through
+  // the whole history). For messages that arrive while the chat is open, glide.
+  useEffect(() => {
+    if (!messages.length) return
+    if (justOpenedRef.current) {
+      bottomRef.current?.scrollIntoView()
+      justOpenedRef.current = false
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages])
 
   async function handleSend(e) {
     e.preventDefault()
@@ -453,16 +502,21 @@ export default function AdminChat() {
                     /
                   </button>
 
+                  <EmojiButton disabled={sending} onPick={em => { setBody(b => b + em); inputRef.current?.focus() }} />
+
                   <input
                     ref={inputRef}
                     value={body}
                     onChange={e => { setBody(e.target.value); setShowCanned(e.target.value.startsWith('/')) }}
                     onKeyDown={e => {
                       if (e.key === 'Escape') setShowCanned(false)
-                      // Enter on an exact "/key" expands it instead of sending.
-                      if (e.key === 'Enter' && body.startsWith('/')) {
+                      // While the "/" picker is open, Enter drops the matching
+                      // saved reply into the box instead of sending: the exact
+                      // key if one matches, otherwise the top suggestion shown.
+                      if (e.key === 'Enter' && body.startsWith('/') && cannedMatches.length > 0) {
                         const exact = canned.find(r => r.key === body.slice(1).toLowerCase().trim())
-                        if (exact) { e.preventDefault(); applyCanned(exact); return }
+                        e.preventDefault()
+                        applyCanned(exact || cannedMatches[0])
                       }
                     }}
                     placeholder="Type a reply, or / for a saved one…"

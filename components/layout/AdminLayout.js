@@ -216,6 +216,19 @@ export default function AdminLayout({ children }) {
     return () => clearInterval(t)
   }, [])
 
+  // Opening a chat marks its messages read, so the Support badge should drop
+  // immediately — not on the next 8s tick. The chat page fires this event: we
+  // clear the badge at once (optimistic) and re-count from the server to catch
+  // any other chats that still have unread messages.
+  useEffect(() => {
+    const onChatOpened = () => {
+      setPendingCounts(prev => ({ ...prev, '/admin/chat': 0 }))
+      loadPendingCounts()
+    }
+    window.addEventListener('admin:chat-opened', onChatOpened)
+    return () => window.removeEventListener('admin:chat-opened', onChatOpened)
+  }, [])
+
   async function loadPendingCounts() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
