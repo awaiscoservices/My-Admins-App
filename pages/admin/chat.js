@@ -43,7 +43,7 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
   const filtered = search.trim()
     ? convs.filter(c => {
         const p = c.player ?? {}
-        const hay = `${p.full_name ?? ''} ${p.username ?? ''} ${p.email ?? ''}`.toLowerCase()
+        const hay = `${p.username ?? ''}`.toLowerCase()
         return hay.includes(search.toLowerCase())
       })
     : convs

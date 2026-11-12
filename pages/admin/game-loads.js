@@ -27,8 +27,7 @@ function ReviewModal({ load, onClose, onAction }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{load.profiles?.full_name}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{load.profiles?.email}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4, fontFamily: 'monospace' }}>{load.profiles?.username || load.profiles?.full_name}</div>
           <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 700, marginTop: 8 }}>−{fmt(load.amount_cents)}</div>
           <div style={{ fontSize: 11, color: '#a855f7', marginTop: 4 }}>Game: {load.game_panel_name || '—'}</div>
           <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 2, fontFamily: 'monospace' }}>Account: {load.game_account_username || '—'}</div>
@@ -105,7 +104,7 @@ export default function AdminGameLoads() {
   const filtered = rows.filter(r => {
     if (!search) return true
     const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) || r.profiles?.email?.toLowerCase().includes(s) || r.reference_id?.toLowerCase().includes(s) || r.game_panel_name?.toLowerCase().includes(s)
+    return r.profiles?.username?.toLowerCase().includes(s) || r.reference_id?.toLowerCase().includes(s) || r.game_panel_name?.toLowerCase().includes(s)
   })
 
   return (
@@ -149,8 +148,7 @@ export default function AdminGameLoads() {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 14px' }}><span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{r.reference_id}</span></td>
                   <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.profiles?.full_name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{r.profiles?.username || r.profiles?.full_name}</div>
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, color: '#a855f7', fontWeight: 600 }}>{r.game_panel_name || '—'}</td>
                   <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24', fontFamily: 'monospace' }}>{r.game_account_username || '—'}</td>

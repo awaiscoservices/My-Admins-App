@@ -60,7 +60,7 @@ export default function AdminTransactions() {
   const filtered = rows.filter(r => {
     if (!search) return true
     const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) || r.profiles?.email?.toLowerCase().includes(s) || r.reference_id?.toLowerCase().includes(s)
+    return r.profiles?.username?.toLowerCase().includes(s) || r.reference_id?.toLowerCase().includes(s)
   })
 
   return (
@@ -78,7 +78,7 @@ export default function AdminTransactions() {
             <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s', whiteSpace: 'nowrap' }}>{TX_LABELS[s] || s.replace(/_/g, ' ')}</button>
           ))}
         </div>
-        <input type="text" placeholder="Search player, email, reference…" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Search username or reference…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }} />
       </div>
 
@@ -104,8 +104,7 @@ export default function AdminTransactions() {
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '12px 14px' }}><span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{r.reference_id || '—'}</span></td>
                     <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.profiles?.full_name}</div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{r.profiles?.username || r.profiles?.full_name}</div>
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: color + '22', color, textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{TX_LABELS[r.type] || r.type?.replace(/_/g, ' ')}</span>

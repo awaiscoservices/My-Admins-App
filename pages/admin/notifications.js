@@ -115,7 +115,7 @@ export default function AdminNotifications() {
   const filtered = rows.filter(r => {
     if (!search) return true
     const s = search.toLowerCase()
-    return r.title?.toLowerCase().includes(s) || r.recipient?.email?.toLowerCase().includes(s) || r.body?.toLowerCase().includes(s)
+    return r.title?.toLowerCase().includes(s) || r.user_name?.toLowerCase().includes(s) || r.message?.toLowerCase().includes(s)
   })
 
   return (
@@ -173,7 +173,7 @@ export default function AdminNotifications() {
                     <td style={{ padding: '12px 14px' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: cc + '22', color: cc, textTransform: 'uppercase' }}>{r.channel?.replace(/_/g, ' ')}</span>
                     </td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.recipient?.email || 'All Players'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.user_name || 'All Players'}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.sender?.full_name || 'System'}</td>
                     <td style={{ padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</td>
                   </tr>

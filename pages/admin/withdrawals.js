@@ -32,8 +32,7 @@ function ReviewModal({ item, onClose, onAction }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', fontSize:20, cursor:'pointer' }}>✕</button>
         </div>
         <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>{item.profiles?.full_name}</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>{item.profiles?.email}</div>
+          <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4, fontFamily:'monospace' }}>{item.profiles?.username || item.profiles?.full_name}</div>
           <div style={{ fontSize:13, color:'#3b82f6', fontWeight:700, marginTop:8 }}>{fmt(item.amount_cents)}</div>
           {item.player_levels && (
             <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:4 }}>
@@ -103,8 +102,7 @@ export default function AdminWithdrawals() {
   const rows = items.filter(r => {
     if (!search) return true
     const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) ||
-      r.profiles?.email?.toLowerCase().includes(s) ||
+    return r.profiles?.username?.toLowerCase().includes(s) ||
       r.reference_id?.toLowerCase().includes(s)
   })
 
@@ -138,7 +136,7 @@ export default function AdminWithdrawals() {
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>
-        <input type="text" placeholder="Search player, email, reference…" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Search username or reference…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding:'9px 14px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', minWidth:240 }} />
       </div>
 
@@ -167,8 +165,7 @@ export default function AdminWithdrawals() {
                     <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', fontFamily:'monospace' }}>{r.reference_id}</div>
                   </td>
                   <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{r.profiles?.full_name || '—'}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#fff', fontFamily:'monospace' }}>{r.profiles?.username || r.profiles?.full_name || '—'}</div>
                   </td>
                   <td style={{ padding:'12px 14px' }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'#3b82f6' }}>{fmt(r.amount_cents)}</div>

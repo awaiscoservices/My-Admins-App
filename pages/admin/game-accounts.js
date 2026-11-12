@@ -37,8 +37,7 @@ function SetupModal({ account, onClose, onSave }) {
 
         {/* Player info */}
         <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{account.profiles?.full_name}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{account.profiles?.email}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4, fontFamily: 'monospace' }}>{account.profiles?.username || account.profiles?.full_name}</div>
           <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 4 }}>Game: {account.game_panels?.name}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Request: {account.reference_id}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>KYC: {account.profiles?.kyc_status}</div>
@@ -185,8 +184,7 @@ export default function AdminGameAccounts() {
   const filtered = accounts.filter(a => {
     if (!search) return true
     const s = search.toLowerCase()
-    return a.profiles?.full_name?.toLowerCase().includes(s) ||
-      a.profiles?.email?.toLowerCase().includes(s) ||
+    return a.profiles?.username?.toLowerCase().includes(s) ||
       a.reference_id?.toLowerCase().includes(s) ||
       a.game_panels?.name?.toLowerCase().includes(s)
   })
@@ -252,8 +250,7 @@ export default function AdminGameAccounts() {
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{a.reference_id}</div>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{a.profiles?.full_name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{a.profiles?.email}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{a.profiles?.username || a.profiles?.full_name}</div>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

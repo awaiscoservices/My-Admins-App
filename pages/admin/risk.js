@@ -32,8 +32,7 @@ function FlagModal({ flag, onClose, onAction }) {
             <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: (SEVERITY_COLORS[flag.severity] || '#fbbf24') + '22', color: SEVERITY_COLORS[flag.severity] || '#fbbf24', textTransform: 'uppercase' }}>{flag.severity}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{flag.flag_type?.replace(/_/g, ' ')}</span>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{flag.profiles?.full_name}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{flag.profiles?.email}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2, fontFamily: 'monospace' }}>{flag.profiles?.username || flag.profiles?.full_name}</div>
           {flag.details && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 8, lineHeight: 1.5 }}>{typeof flag.details === 'string' ? flag.details : JSON.stringify(flag.details, null, 2)}</div>}
         </div>
         <div style={{ marginBottom: 20 }}>
@@ -95,7 +94,7 @@ export default function AdminRisk() {
   const filtered = rows.filter(r => {
     if (!search) return true
     const s = search.toLowerCase()
-    return r.profiles?.full_name?.toLowerCase().includes(s) || r.profiles?.email?.toLowerCase().includes(s) || r.flag_type?.toLowerCase().includes(s)
+    return r.profiles?.username?.toLowerCase().includes(s) || r.flag_type?.toLowerCase().includes(s)
   })
 
   return (
@@ -115,7 +114,7 @@ export default function AdminRisk() {
             <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s' }}>{s}</button>
           ))}
         </div>
-        <input type="text" placeholder="Search player, email, flag type…" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Search username or flag type…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }} />
       </div>
 
@@ -137,8 +136,7 @@ export default function AdminRisk() {
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.profiles?.full_name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{r.profiles?.username || r.profiles?.full_name}</div>
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24', fontWeight: 600, textTransform: 'capitalize' }}>{r.flag_type?.replace(/_/g, ' ')}</td>
                   <td style={{ padding: '12px 14px' }}>

@@ -58,10 +58,7 @@ export default function AdminWallets() {
   const filtered = wallets.filter(w => {
     if (!search) return true
     const q = search.toLowerCase()
-    return (
-      w.profiles?.full_name?.toLowerCase().includes(q) ||
-      w.profiles?.email?.toLowerCase().includes(q)
-    )
+    return w.profiles?.username?.toLowerCase().includes(q)
   })
 
   const canAdjust = ['super_admin', 'admin'].includes(role)
@@ -87,7 +84,7 @@ export default function AdminWallets() {
         </div>
         <input
           type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search name or email…"
+          placeholder="Search username…"
           style={{ padding:'9px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', width:220 }}
         />
       </div>
@@ -113,8 +110,7 @@ export default function AdminWallets() {
                       onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.025)'}
                       onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                       <td style={{ padding:'12px 12px' }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{w.profiles?.full_name || '—'}</div>
-                        <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>{w.profiles?.email}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#fff', fontFamily:'monospace' }}>{w.profiles?.username || w.profiles?.full_name || '—'}</div>
                       </td>
                       <td style={{ padding:'12px 12px' }}>
                         {w.profiles?.player_levels ? (

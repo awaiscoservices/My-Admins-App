@@ -64,8 +64,7 @@ export default function AdminAdjustments() {
     if (!search) return true
     const q = search.toLowerCase()
     return (
-      item.profiles?.full_name?.toLowerCase().includes(q) ||
-      item.profiles?.email?.toLowerCase().includes(q) ||
+      item.profiles?.username?.toLowerCase().includes(q) ||
       item.reference_id?.toLowerCase().includes(q) ||
       item.reason?.toLowerCase().includes(q)
     )
