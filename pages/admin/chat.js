@@ -104,6 +104,16 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
   )
 }
 
+// Clean paperclip glyph (replaces the flat 📎 emoji).
+function PaperclipIcon({ size = 17 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  )
+}
+
 // WhatsApp-style ticks: grey ✓✓ = delivered, blue ✓✓ = seen (read_at set).
 function Ticks({ read }) {
   return (
@@ -136,7 +146,7 @@ function Bubble({ msg, myId }) {
         {msg.file_url && !isImage && (
           <a href={msg.file_url} target="_blank" rel="noreferrer"
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', textDecoration: 'none', marginBottom: msg.body ? 8 : 0 }}>
-            <span style={{ fontSize: 20 }}>📎</span>
+            <PaperclipIcon size={16} />
             <span style={{ fontSize: 12, wordBreak: 'break-all' }}>{msg.file_name ?? 'Attachment'}</span>
           </a>
         )}
@@ -206,7 +216,31 @@ export default function AdminChat() {
     setConvLoading(false)
   }, [])
 
+  // Quiet refresh — no "Loading…" flash. Used by polling + realtime so the
+  // list picks up new chats and new messages without a hard refresh.
+  const refreshConvs = useCallback(async (selectedId) => {
+    const data = await apiFetch('/api/admin/chat/conversations?status=open')
+    setConvs(prev => {
+      const next = data.conversations ?? []
+      // Keep the open thread's unread at 0 — we're looking at it.
+      return selectedId ? next.map(c => c.id === selectedId ? { ...c, unread: 0 } : c) : next
+    })
+  }, [])
+
   useEffect(() => { loadConvs() }, [loadConvs])
+
+  // Auto-refresh the conversation list: realtime on any new message or new
+  // conversation for this casino, plus a slow poll as a safety net.
+  useEffect(() => {
+    const ch = supabase.channel('admin-chat-inbox')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' },
+        () => refreshConvs(selected?.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_conversations' },
+        () => refreshConvs(selected?.id))
+      .subscribe()
+    const poll = setInterval(() => refreshConvs(selected?.id), 10000)
+    return () => { supabase.removeChannel(ch); clearInterval(poll) }
+  }, [refreshConvs, selected?.id])
 
   const loadMessages = useCallback(async (conv) => {
     setMsgLoading(true)
@@ -296,6 +330,18 @@ export default function AdminChat() {
 
   const pendingFile = useRef(null)
 
+  async function closeConversation() {
+    if (!selected) return
+    const data = await apiFetch('/api/admin/chat/conversations', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId: selected.id, status: 'closed' }),
+    })
+    if (data.error) { setError(data.error); return }
+    setConvs(prev => prev.filter(c => c.id !== selected.id))
+    setSelected(null)
+  }
+
   return (
     <AdminLayout title="Chat">
       <Head><title>Chat — Casinoze Support</title></Head>
@@ -341,9 +387,11 @@ export default function AdminChat() {
                       style={{ padding: '6px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 9, color: 'rgba(255,255,255,.8)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
                       Wallet
                     </button>
-                    <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.3)', color: '#4ade80' }}>
-                      {selected.status}
-                    </span>
+                    {/* Close (resolve) this conversation and clear it from the list. */}
+                    <button onClick={closeConversation} title="Close conversation"
+                      style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.28)', borderRadius: 9, color: '#f87171', fontSize: 16, lineHeight: 1, cursor: 'pointer' }}>
+                      ✕
+                    </button>
                   </div>
                 </div>
 
@@ -382,8 +430,8 @@ export default function AdminChat() {
                   <input ref={fileRef} type="file" accept="image/*,.pdf,.txt" style={{ display: 'none' }} onChange={handleFile} />
                   <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
                     title="Attach file"
-                    style={{ flexShrink: 0, width: 40, height: 40, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: uploading ? SUBTLE : '#fff', fontSize: 18, cursor: uploading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {uploading ? '…' : '📎'}
+                    style={{ flexShrink: 0, width: 40, height: 40, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: uploading ? SUBTLE : 'rgba(255,255,255,.75)', cursor: uploading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {uploading ? '…' : <PaperclipIcon />}
                   </button>
 
                   <button type="button" onClick={() => setManageCanned(true)} title="Saved replies"

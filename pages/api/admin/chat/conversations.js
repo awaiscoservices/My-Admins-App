@@ -7,9 +7,10 @@
  * Scoped by: scopeToTenant() on chat_conversations, keyed to tenant_id.
  * NOT scoped: nothing — all reads go through gate.
  */
-import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
+  if (req.method === 'PATCH') return setStatus(req, res)
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   const gate = await guardAdmin(req, res, { allow: PERMS.CHAT_READ })
@@ -70,4 +71,34 @@ export default async function handler(req, res) {
   }))
 
   return res.json({ conversations: result })
+}
+
+/**
+ * PATCH /api/admin/chat/conversations  { conversationId, status }
+ *   Close or reopen a conversation. Scoped to the caller's tenant.
+ *   Roles: super_admin, admin, support
+ */
+async function setStatus(req, res) {
+  const gate = await guardAdmin(req, res, { allow: PERMS.CHAT_SEND })
+  if (!gate) return
+
+  const { conversationId, status } = req.body ?? {}
+  if (!conversationId) return res.status(400).json({ error: 'conversationId required' })
+  if (!['open', 'closed'].includes(status)) return res.status(400).json({ error: 'status must be open or closed' })
+
+  // Ownership check — 404 if the conversation belongs to another tenant
+  const { row: conv, error: ownerErr } = await loadOwnedRow(
+    gate, 'chat_conversations', conversationId, 'id, tenant_id'
+  )
+  if (ownerErr || !conv) return res.status(404).json({ error: 'Conversation not found' })
+
+  const now = new Date().toISOString()
+  const { error } = await gate.db
+    .from('chat_conversations')
+    .update({ status, updated_at: now })
+    .eq('id', conversationId)
+    .eq('tenant_id', conv.tenant_id)
+
+  if (error) return res.status(500).json({ error: error.message })
+  return res.json({ ok: true, status })
 }
