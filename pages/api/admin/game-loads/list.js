@@ -5,6 +5,7 @@
  * Uses explicit FK hint to avoid "more than one relationship" error.
  */
 import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
       id, reference_id, amount_cents, status, created_at, admin_notes, reviewed_at,
       wallet_bucket, game_account_username, game_panel_name,
       game_accounts ( id, game_username, game_panels ( name ) ),
-      profiles!game_loads_user_id_fkey ( id, full_name, email )
+      profiles!game_loads_user_id_fkey ( id, username )
     `)
     .order('created_at', { ascending: false })
     .limit(100)
@@ -35,5 +36,5 @@ export default async function handler(req, res) {
   const { data, error } = await q
   if (error) return res.status(400).json({ error: error.message })
 
-  return res.status(200).json({ data })
+  return res.status(200).json({ data: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })) })
 }

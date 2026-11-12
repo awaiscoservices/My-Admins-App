@@ -5,6 +5,7 @@
  * Roles: super_admin, admin, finance
  */
 import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
       status, player_reference, screenshot_url, player_notes, admin_notes,
       rejection_reason, created_at, reviewed_at,
       payment_method_id, user_id,
-      profiles!deposits_user_id_fkey ( id, full_name, email )
+      profiles!deposits_user_id_fkey ( id, username )
     `)
     .order('created_at', { ascending: false })
     .limit(100)
@@ -33,5 +34,5 @@ export default async function handler(req, res) {
   const { data, error } = await q
   if (error) return res.status(500).json({ error: error.message })
 
-  return res.status(200).json({ deposits: data || [] })
+  return res.status(200).json({ deposits: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })) })
 }

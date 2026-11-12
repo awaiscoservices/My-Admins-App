@@ -3,6 +3,7 @@
  * Returns game accounts for admin — bypasses RLS using service role key.
  */
 import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
 
   let query = supabaseAdmin
     .from('game_accounts')
-    .select('*, profiles!game_accounts_user_id_fkey(full_name, email, kyc_status, status), game_panels!game_accounts_game_panel_id_fkey(name, accent_color)')
+    .select('*, profiles!game_accounts_user_id_fkey(id, username, kyc_status, status), game_panels!game_accounts_game_panel_id_fkey(name, accent_color)')
     .order('created_at', { ascending: true })
     .limit(100)
 
@@ -35,5 +36,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to load game accounts' })
   }
 
-  return res.status(200).json({ accounts: data || [] })
+  return res.status(200).json({ accounts: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })) })
 }

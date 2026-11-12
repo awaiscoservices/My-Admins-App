@@ -1,4 +1,5 @@
 import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
     // wallet_adjustments has created_by and approved_by. There is no
     // admin_id, so this join named a key that does not exist and the route
     // failed outright — as did the page, which asked for actor_id.
-    .select('id, reference_id, amount_cents, direction, wallet_bucket, reason, case_reference, status, created_at, user_id, profiles!wallet_adjustments_user_id_fkey(full_name, email), actor:profiles!wallet_adjustments_created_by_fkey(full_name)', { count: 'exact' })
+    .select('id, reference_id, amount_cents, direction, wallet_bucket, reason, case_reference, status, created_at, user_id, profiles!wallet_adjustments_user_id_fkey(id, username), actor:profiles!wallet_adjustments_created_by_fkey(full_name)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + parseInt(limit) - 1), gate)
 
@@ -22,5 +23,5 @@ export default async function handler(req, res) {
 
   const { data, count, error } = await q
   if (error) return res.status(500).json({ error: error.message })
-  return res.status(200).json({ rows: data || [], total: count || 0 })
+  return res.status(200).json({ rows: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })), total: count || 0 })
 }

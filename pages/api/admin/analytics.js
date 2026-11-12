@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     q('redemptions', 'id', { count:'exact', head:true }).eq('status','pending'),
 
     // Recent ledger transactions
-    q('ledger', 'reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(full_name)')
+    q('ledger', 'reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(username)')
       .in('type', ['deposit','withdrawal'])
       .order('created_at', { ascending:false })
       .limit(20),
@@ -125,7 +125,7 @@ export default async function handler(req, res) {
   // Recent transactions
   const recentTransactions = (recentTxRes.data || []).map(tx => ({
     reference_id: tx.reference_id,
-    player_name:  tx.profiles?.full_name || tx.user_id?.slice(0, 8),
+    player_name:  tx.profiles?.username || `player${String(tx.user_id || '').replace(/-/g,'').slice(0, 8)}`,
     type:         tx.direction === 'credit' ? 'deposit' : 'withdrawal',
     amount_cents: tx.amount_cents,
     status:       'approved',

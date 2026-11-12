@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   let query = supabaseAdmin
     .from('notifications')
-    .select('id, user_id, title, message, is_read, created_at, profiles!notifications_user_id_fkey(full_name, email)', { count: 'exact' })
+    .select('id, user_id, title, message, is_read, created_at, profiles!notifications_user_id_fkey(id, username)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
 
@@ -33,8 +33,8 @@ export default async function handler(req, res) {
   // Flatten profile join — if FK alias fails, row still returns without profile
   const normalized = (rows || []).map(n => ({
     ...n,
-    user_name: n.profiles?.full_name || null,
-    user_email: n.profiles?.email || null,
+    user_name: n.profiles?.username || null,
+    user_email: null,
     profiles: undefined,
   }))
 

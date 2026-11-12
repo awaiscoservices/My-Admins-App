@@ -7,6 +7,7 @@
  * Note: `page` here is 0-based.
  */
 import { guardAdmin, scopeToTenant, PERMS, safeSearchTerm } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
 
   let q = gate.db
     .from('ledger')
-    .select('id, type, direction, wallet_bucket, amount_cents, balance_after_cents, reference_id, description, created_at, profiles!ledger_user_id_fkey(full_name, email)', { count: 'exact' })
+    .select('id, type, direction, wallet_bucket, amount_cents, balance_after_cents, reference_id, description, created_at, profiles!ledger_user_id_fkey(id, username)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
 
@@ -35,5 +36,5 @@ export default async function handler(req, res) {
   const { data, count, error } = await q
   if (error) return res.status(500).json({ error: error.message })
 
-  return res.status(200).json({ rows: data || [], total: count || 0 })
+  return res.status(200).json({ rows: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })), total: count || 0 })
 }

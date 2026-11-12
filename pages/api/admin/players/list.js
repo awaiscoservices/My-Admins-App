@@ -5,6 +5,7 @@
  * Super admins see players across all casinos.
  */
 import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
 
   let query = gate.db
     .from('profiles')
-    .select('id, full_name, email, phone, status, kyc_status, player_level_id, created_at, last_login_at', { count: 'exact' })
+    .select('id, username, phone, status, kyc_status, player_level_id, created_at, last_login_at', { count: 'exact' })
     .eq('role', 'player')
     .order('created_at', { ascending: false })
     .range(offset, offset + limitNum - 1)
@@ -35,7 +36,9 @@ export default async function handler(req, res) {
     // search term containing them could change the filter's meaning. Strip them.
     const safe = String(search).replace(/[,()."%\\]/g, '').trim()
     if (safe) {
-      query = query.or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`)
+      // Staff search by the player's username slug only — real name and email
+      // are never exposed to them, so they can't be searched either.
+      query = query.ilike('username', `%${safe}%`)
     }
   }
 
@@ -43,7 +46,7 @@ export default async function handler(req, res) {
   if (error) return res.status(500).json({ error: error.message })
 
   return res.status(200).json({
-    rows: data || [],
+    rows: (data || []).map(maskPlayer),
     total: count || 0,
     page: pageNum,
     pages: Math.ceil((count || 0) / limitNum),

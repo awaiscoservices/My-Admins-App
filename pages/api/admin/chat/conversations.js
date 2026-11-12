@@ -8,6 +8,7 @@
  * NOT scoped: nothing — all reads go through gate.
  */
 import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
+import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
   if (req.method === 'PATCH') return setStatus(req, res)
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
 
   const { data: profiles, error: pErr } = await gate.db
     .from('profiles')
-    .select('id, full_name, username, email, tenant_id')
+    .select('id, username, tenant_id')
     .in('id', userIds)
     .eq('tenant_id', gate.tenantId ?? convs[0].tenant_id)
 
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
 
   const result = convs.map(c => ({
     ...c,
-    player: profileMap[c.user_id] ?? { full_name: 'Unknown', email: '' },
+    player: maskPlayer(profileMap[c.user_id]) ?? { username: 'Player', full_name: 'Player', email: null },
     unread: unreadMap[c.id] ?? 0,
   }))
 

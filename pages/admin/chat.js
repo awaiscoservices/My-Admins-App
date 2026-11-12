@@ -73,7 +73,7 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
           </div>
         )}
         {filtered.map(c => {
-          const name = c.player?.full_name || c.player?.username || c.player?.email || 'Player'
+          const name = c.player?.username || 'Player'
           const isActive = selected?.id === c.id
           return (
             <button key={c.id} onClick={() => onSelect(c)}
@@ -88,8 +88,7 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
                 <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>{name}</span>
                 <span style={{ fontSize: 11, color: SUBTLE }}>{fmtAgo(c.last_message_at)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: SUBTLE }}>{c.player?.email || ''}</span>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 {c.unread > 0 && (
                   <span style={{ background: GOLD, color: '#000', borderRadius: 10, fontSize: 10, fontWeight: 800, padding: '1px 7px', minWidth: 18, textAlign: 'center' }}>
                     {c.unread}
@@ -392,9 +391,8 @@ export default function AdminChat() {
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>
-                      {selected.player?.full_name || selected.player?.email || 'Player'}
+                      {selected.player?.username || 'Player'}
                     </div>
-                    <div style={{ fontSize: 11, color: SUBTLE }}>{selected.player?.email}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {/* The player's balances and history, without leaving the

@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   const players = {}
   if (userIds.length) {
     const { data } = await supabaseAdmin.from('profiles').select('*').in('id', userIds)
-    for (const p of data || []) players[p.id] = { id: p.id, name: p.full_name, email: p.email || null, phone: p.phone || null }
+    for (const p of data || []) players[p.id] = { id: p.id, name: p.username || `player${String(p.id).replace(/-/g,'').slice(0,8)}`, email: null, phone: p.phone || null }
   }
 
   // game account + game name (looked up separately so it works with or without a foreign key)

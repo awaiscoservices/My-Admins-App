@@ -21,10 +21,10 @@ export default async function handler(req, res) {
   query = admin.scope(query)
 
   if (q && cfg.byAction) query = query.ilike('action', `%${q}%`)
-  else if (q) {   // search by player name / email
+  else if (q) {   // search by player username only
     const safe = String(q).replace(/[^a-zA-Z0-9@._ -]/g, '').trim()
       const { data: found } = await admin.scope(supabaseAdmin.from('profiles').select('id')
-        .or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%`).limit(200))
+        .ilike('username', `%${safe}%`).limit(200))
     const ids = (found || []).map(p => p.id)
     if (!ids.length) return res.status(200).json({ rows: [], total: 0, hasMore: false })
     query = query.in('user_id', ids)
@@ -38,9 +38,19 @@ export default async function handler(req, res) {
   const ids = [...new Set(rows.flatMap(r => [r.user_id, r.actor_id]).filter(Boolean))]
   const names = {}
   if (ids.length) {
-    const { data: ps } = await supabaseAdmin.from('profiles').select('*').in('id', ids)
-    for (const p of ps || []) names[p.id] = { name: p.full_name, email: p.email || null }
+    const { data: ps } = await supabaseAdmin.from('profiles').select('id, full_name, username, role').in('id', ids)
+    for (const p of ps || []) names[p.id] = p
   }
-  const out = rows.map(r => ({ ...r, _player: names[r.user_id] || null, _actor: names[r.actor_id] || null }))
+  // Player identity is the username only (no name/email). Staff actors keep
+  // their name, since that is not player data.
+  const playerName = p => p ? (p.username || `player${String(p.id).replace(/-/g,'').slice(0,8)}`) : null
+  const out = rows.map(r => {
+    const pl = names[r.user_id], ac = names[r.actor_id]
+    return {
+      ...r,
+      _player: pl ? { name: playerName(pl), email: null } : null,
+      _actor:  ac ? { name: ac.full_name, email: null } : null,
+    }
+  })
   return res.status(200).json({ rows: out, total: count ?? out.length, hasMore: (count ?? 0) > page * PAGE + PAGE })
 }
