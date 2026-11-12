@@ -237,6 +237,7 @@ export default function AdminLayout({ children }) {
         '/admin/redemptions':   d.redeem_requests   || 0,
         '/admin/kyc':           d.kyc_requests      || 0,
         '/admin/game-accounts': d.game_requests     || 0,
+        '/admin/chat':          d.support_requests  || 0,
       })
     } catch (e) {
       console.error('Failed to load pending counts', e)

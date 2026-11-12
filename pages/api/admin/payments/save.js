@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
   const {
     id, name, type, icon, description, instructions, account_details,
-    min_deposit_cents, max_deposit_cents, default_bonus_pct,
+    min_deposit_cents, max_deposit_cents,
     is_active, is_auto, requires_proof, requires_reference, sort_order,
     allow_deposit, allow_withdraw,
   } = req.body
@@ -53,7 +53,6 @@ export default async function handler(req, res) {
     account_details:    account_details && typeof account_details === 'object' ? account_details : {},
     min_deposit_cents:  min,
     max_deposit_cents:  max,
-    default_bonus_pct:  Number(default_bonus_pct) || 0,
     is_active:          is_active ?? true,
     is_auto:            is_auto ?? false,
     requires_proof:     requires_proof ?? true,

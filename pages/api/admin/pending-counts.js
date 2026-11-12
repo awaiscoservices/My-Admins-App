@@ -29,7 +29,16 @@ export default async function handler(req, res) {
     gate,
   )
 
-  const [deposits, withdrawals, scores, redeems, kyc, games, passwords] = await Promise.all([
+  // Support badge: conversations with at least one unread player message.
+  // Counts chats needing a reply, so the Support tab lights up the moment a
+  // player writes — same live 8s poll as the other queues.
+  const unreadSupport = scopeToTenant(
+    gate.db.from('chat_messages').select('conversation_id')
+      .eq('sender_type', 'player').is('read_at', null),
+    gate,
+  )
+
+  const [deposits, withdrawals, scores, redeems, kyc, games, passwords, support] = await Promise.all([
     pending('deposits'),
     pending('withdrawals'),
     pending('game_loads'),
@@ -37,7 +46,10 @@ export default async function handler(req, res) {
     pending('kyc_records'),
     pending('game_accounts'),
     passwordRequests,
+    unreadSupport,
   ])
+
+  const supportCount = new Set((support.data || []).map(r => r.conversation_id)).size
 
   return res.status(200).json({
     deposit_requests:  deposits.count    || 0,
@@ -46,5 +58,6 @@ export default async function handler(req, res) {
     redeem_requests:   redeems.count     || 0,
     kyc_requests:      kyc.count         || 0,
     game_requests:     (games.count || 0) + (passwords.count || 0),
+    support_requests:  supportCount,
   })
 }
