@@ -63,10 +63,17 @@ export default function AdminGameLoads() {
 
   useEffect(() => { load() }, [filter])
 
+  // Live refresh: silently re-fetch every 8s so new requests appear without
+  // a hard refresh (no spinner flash).
+  useEffect(() => {
+    const t = setInterval(() => load(true), 8000)
+    return () => clearInterval(t)
+  }, [filter])
+
   function showToast(msg, type = 'success') { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
 
-  async function load() {
-    setLoading(true)
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     // Through the scoped route: the direct query had no tenant filter.
     try {
       const { data: { session } } = await supabase.auth.getSession()
