@@ -59,7 +59,6 @@ const NAV_SECTIONS = [
     label: 'Support',
     icon: 'chat',
     items: [
-      { href: '/admin/support',      icon: 'chat',    label: 'Support Tickets', roles: ['admin','super_admin','support'] },
       { href: '/admin/chat',         icon: 'chat',    label: 'Live Chat',       roles: ['admin','super_admin','support'] },
       { href: '/admin/notifications',icon: 'bell',    label: 'Notifications',   roles: ['admin','super_admin','support'] },
     ],
@@ -134,7 +133,7 @@ const PENDING_COLORS = {
   '/admin/support':       '#6366f1',
 }
 
-// 6 topbar quick-action tabs with badge counts
+// 7 topbar quick-action tabs with badge counts
 const TOPBAR_TABS = [
   { href: '/admin/game-accounts', label: 'Games',       color: '#06b6d4' },
   { href: '/admin/deposits',      label: 'Deposits',    color: '#10b981' },
@@ -142,6 +141,7 @@ const TOPBAR_TABS = [
   { href: '/admin/redemptions',   label: 'Redeem', color: '#f59e0b' },
   { href: '/admin/withdrawals',   label: 'Withdraw', color: '#3b82f6' },
   { href: '/admin/kyc',           label: 'KYC',         color: '#ec4899' },
+  { href: '/admin/chat',          label: 'Support',     color: '#8b5cf6' },
 ]
 
 export default function AdminLayout({ children }) {
