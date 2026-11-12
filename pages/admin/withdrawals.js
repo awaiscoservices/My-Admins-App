@@ -18,11 +18,14 @@ function ReviewModal({ item, onClose, onAction }) {
   const [error, setError]   = useState('')
 
   async function submit(action) {
+    if (action === 'reject' && !notes.trim()) { setError('Please enter a reason the player will see.'); return }
     setSaving(true); setError('')
     const result = await onAction(item.id, action, notes)
     if (result?.error) { setError(result.error); setSaving(false) }
     else onClose()
   }
+
+  const isProcessing = item.status === 'processing'
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
@@ -42,13 +45,17 @@ function ReviewModal({ item, onClose, onAction }) {
           <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>Ref: {item.reference_id}</div>
         </div>
         <div style={{ marginBottom:20 }}>
-          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Notes (optional)</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Internal note or rejection reason…"
+          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Reason / note <span style={{ textTransform:'none', fontWeight:400, color:'rgba(255,255,255,.3)' }}>(required to reject — player sees it)</span></label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason the player will see if rejected…"
             style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', resize:'none', boxSizing:'border-box' }} />
         </div>
         {error && <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13 }}>⚠ {error}</div>}
         <div style={{ display:'flex', gap:10 }}>
-          <button onClick={() => submit('approve')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>✅ Approve</button>
+          {isProcessing ? (
+            <button onClick={() => submit('approve')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>💵 Mark Paid</button>
+          ) : (
+            <button onClick={() => submit('processing')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>→ Move to Processing</button>
+          )}
           <button onClick={() => submit('reject')}  disabled={saving} style={{ flex:1, padding:'11px', background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>❌ Reject</button>
           <button onClick={onClose} style={{ padding:'11px 16px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.4)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Cancel</button>
         </div>
@@ -138,9 +145,9 @@ export default function AdminWithdrawals() {
 
       <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
-          {/* 'paid', not 'approved' — no withdrawal can hold that status, so the
-              tab matched nothing. */}
-          {['all','pending','paid','rejected'].map(s => (
+          {/* pending → processing (accepted, being paid) → paid. 'paid', not
+              'approved' — no withdrawal can hold that status. */}
+          {['all','pending','processing','paid','rejected'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>
@@ -193,9 +200,13 @@ export default function AdminWithdrawals() {
                         style={{ padding:'6px 12px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.14)', borderRadius:8, color:'rgba(255,255,255,.75)', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
                         Wallet
                       </button>
-                      {r.status === 'pending' ? (
+                      {['pending','processing'].includes(r.status) ? (
                         <button onClick={() => setSelected(r)} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:8, color:'#050505', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
-                          ⚡ Review
+                          {r.status === 'processing' ? '💵 Pay / Reject' : '⚡ Review'}
+                        </button>
+                      ) : r.status === 'rejected' && r.rejection_reason ? (
+                        <button onClick={() => showToast(`Reason: ${r.rejection_reason}`, 'error')} title={r.rejection_reason} style={{ padding:'6px 12px', background:'rgba(239,68,68,.12)', border:'1px solid rgba(239,68,68,.3)', borderRadius:8, color:'#f87171', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
+                          Reason
                         </button>
                       ) : (
                         <span style={{ fontSize:11, color:'rgba(255,255,255,.25)', alignSelf:'center' }}>Done</span>

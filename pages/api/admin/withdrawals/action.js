@@ -29,26 +29,68 @@ export default async function handler(req, res) {
   const supabaseAdmin = gate.db
   const actor = gate.actor
 
-  const { withdrawal_id, action, rejection_reason, proof_screenshot_url } = req.body
+  // notes is the reason box the admin types in; rejection_reason kept for
+  // backwards compatibility. Either feeds the player-visible reason.
+  const { withdrawal_id, action, rejection_reason, notes, proof_screenshot_url } = req.body
+  const reason = (rejection_reason ?? notes ?? '').trim()
   if (!withdrawal_id) return res.status(400).json({ error: 'withdrawal_id required' })
-  if (!['approve', 'reject'].includes(action))
-    return res.status(400).json({ error: 'action must be approve or reject' })
+  if (!['approve', 'reject', 'processing'].includes(action))
+    return res.status(400).json({ error: 'action must be approve, reject or processing' })
 
   // Fetch withdrawal
   // Scoped to the caller's casino: another casino's withdrawal is not found.
   const { row: withdrawal, error: wErr } = await loadOwnedRow(gate, 'withdrawals', withdrawal_id)
   if (wErr || !withdrawal) return res.status(404).json({ error: 'Withdrawal not found' })
   const tenantId = tenantOf(withdrawal, gate)
-  if (!['pending', 'under_review'].includes(withdrawal.status)) {
-    return res.status(409).json({ error: `Withdrawal is already ${withdrawal.status}` })
-  }
 
   const playerId    = withdrawal.user_id
   const amountCents = withdrawal.amount_cents
   const now         = new Date().toISOString()
 
+  // Which statuses each action may start from.
+  //   processing: only a fresh request (pending / under_review)
+  //   approve (= mark paid): a request still waiting, or one already moved to processing
+  //   reject: any of those
+  const allowedFrom = {
+    processing: ['pending', 'under_review'],
+    approve:    ['pending', 'under_review', 'processing'],
+    reject:     ['pending', 'under_review', 'processing'],
+  }
+  if (!allowedFrom[action].includes(withdrawal.status)) {
+    return res.status(409).json({ error: `Withdrawal is already ${withdrawal.status}` })
+  }
+
+  // ── MOVE TO PROCESSING ───────────────────────────────────────
+  // Admin accepted the request for payout. No money moves — it already left
+  // the wallet when the player asked. The request now sits in the Processing
+  // tab until someone actually pays it, then it is marked paid.
+  if (action === 'processing') {
+    const { error: procErr } = await supabaseAdmin
+      .from('withdrawals')
+      .update({ status: 'processing', reviewed_by: actor.id, reviewed_at: now, updated_at: now })
+      .eq('id', withdrawal_id)
+    if (procErr) return res.status(500).json({ error: procErr.message })
+
+    await supabaseAdmin.from('audit_logs').insert({
+      actor_id: actor.id, actor_role: actor.role,
+      action: 'withdrawal_processing', target_type: 'withdrawal', target_id: withdrawal_id,
+      description: `Withdrawal ${withdrawal.reference_id} moved to processing`,
+    })
+
+    await supabaseAdmin.from('notifications').insert({
+      tenant_id: tenantId, user_id: playerId, type: 'general',
+      title: 'Withdrawal Processing',
+      message: `Your withdrawal ${withdrawal.reference_id} is now being processed. You will be notified once it is paid.`,
+      reference_id: withdrawal.reference_id,
+    }).then(() => {}, () => {})
+
+    return res.status(200).json({ ok: true, status: 'processing' })
+  }
+
   // ── REJECT ───────────────────────────────────────────────────
   if (action === 'reject') {
+    // A reason is required so the player is always told why.
+    if (!reason) return res.status(400).json({ error: 'A rejection reason is required.' })
     // Give the money back. reserve_withdrawal took it out of cash and held it
     // the moment the player asked, so a rejection that only changed the
     // status left them short and the hold stuck on the wallet for ever.
@@ -89,7 +131,7 @@ export default async function handler(req, res) {
       .from('withdrawals')
       .update({
         status:           'rejected',
-        rejection_reason: rejection_reason || 'Rejected by admin',
+        rejection_reason: reason,
         reviewed_by:      actor.id,
         reviewed_at:      now,
         updated_at:       now,
@@ -105,8 +147,15 @@ export default async function handler(req, res) {
       target_type: 'withdrawal',
       target_id:   withdrawal_id,
       description: `Withdrawal ${withdrawal.reference_id} rejected`,
-      reason:      rejection_reason || null,
+      reason:      reason,
     })
+
+    await supabaseAdmin.from('notifications').insert({
+      tenant_id: tenantId, user_id: playerId, type: 'general',
+      title: 'Withdrawal Rejected',
+      message: `Your withdrawal ${withdrawal.reference_id} was rejected. Reason: ${reason}`,
+      reference_id: withdrawal.reference_id,
+    }).then(() => {}, () => {})
 
     return res.status(200).json({ ok: true, status: 'rejected' })
   }
@@ -266,6 +315,13 @@ export default async function handler(req, res) {
     target_id:   withdrawal_id,
     description: `Withdrawal ${withdrawal.reference_id} approved — $${(amountCents / 100).toFixed(2)} (level: ${levelName}, limit: $${(levelDailyLimit / 100).toFixed(2)}/day)`,
   })
+
+  await supabaseAdmin.from('notifications').insert({
+    tenant_id: tenantId, user_id: playerId, type: 'general',
+    title: 'Withdrawal Paid',
+    message: `Your withdrawal ${withdrawal.reference_id} of $${(amountCents / 100).toFixed(2)} has been paid.`,
+    reference_id: withdrawal.reference_id,
+  }).then(() => {}, () => {})
 
   return res.status(200).json({
     ok:           true,

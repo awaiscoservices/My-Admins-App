@@ -19,6 +19,7 @@ function ReviewModal({ item, onClose, onAction }) {
   const [error, setError]       = useState('')
 
   async function submit(action) {
+    if (action === 'reject' && !notes.trim()) { setError('Please enter a reason the player will see.'); return }
     setSaving(true); setError('')
     const approved_cents = action === 'approve' ? Math.round(parseFloat(approvedAmt || 0) * 100) : undefined
     const result = await onAction(item.id, action, notes, approved_cents)
@@ -47,8 +48,8 @@ function ReviewModal({ item, onClose, onAction }) {
             style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', boxSizing:'border-box' }} />
         </div>
         <div style={{ marginBottom:20 }}>
-          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Notes (optional)</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Internal note or rejection reason…"
+          <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Reason / note <span style={{ textTransform:'none', fontWeight:400, color:'rgba(255,255,255,.3)' }}>(required to reject — player sees it)</span></label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason the player will see if rejected…"
             style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', resize:'none', boxSizing:'border-box' }} />
         </div>
         {error && <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13 }}>⚠ {error}</div>}
@@ -144,9 +145,9 @@ export default function AdminRedemptions() {
 
       <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
-          {/* 'completed', not 'approved' — redemptions cannot hold that value, so
-              the tab matched nothing. 'partial' is not a status either. */}
-          {['all','pending','under_review','completed','rejected'].map(s => (
+          {/* Redeem has three states only: pending → completed → rejected.
+              'completed', not 'approved' — redemptions cannot hold that value. */}
+          {['all','pending','completed','rejected'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>
@@ -203,6 +204,10 @@ export default function AdminRedemptions() {
                       {r.status === 'pending' ? (
                         <button onClick={() => setSelected(r)} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:8, color:'#050505', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
                           ⚡ Review
+                        </button>
+                      ) : r.status === 'rejected' && r.rejection_reason ? (
+                        <button onClick={() => showToast(`Reason: ${r.rejection_reason}`, 'error')} title={r.rejection_reason} style={{ padding:'6px 12px', background:'rgba(239,68,68,.12)', border:'1px solid rgba(239,68,68,.3)', borderRadius:8, color:'#f87171', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
+                          Reason
                         </button>
                       ) : (
                         <span style={{ fontSize:11, color:'rgba(255,255,255,.25)', alignSelf:'center' }}>Done</span>

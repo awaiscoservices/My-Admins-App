@@ -29,7 +29,8 @@ export default async function handler(req, res) {
   const supabaseAdmin = gate.db
   const actor = gate.actor
 
-  const { load_id, action, rejection_reason } = req.body
+  const { load_id, action, rejection_reason, notes } = req.body
+  const reason = (rejection_reason ?? notes ?? '').trim()
   if (!load_id) return res.status(400).json({ error: 'load_id required' })
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'action must be approve or reject' })
 
@@ -54,6 +55,7 @@ export default async function handler(req, res) {
 
   // ── REJECT ──────────────────────────────────────────────────────
   if (action === 'reject') {
+    if (!reason) return res.status(400).json({ error: 'A rejection reason is required.' })
     // Give the money back. request_game_load takes the amount out of cash
     // and holds it in reserved_cents the moment the player asks, so a
     // rejection that only changed the status left the player short and the
@@ -91,7 +93,7 @@ export default async function handler(req, res) {
       .from('game_loads')
       .update({
         status:           'rejected',
-        rejection_reason: rejection_reason || 'Rejected by admin',
+        rejection_reason: reason,
         reviewed_by:      actor.id,
         reviewed_at:      new Date().toISOString(),
         updated_at:       new Date().toISOString(),
@@ -107,8 +109,15 @@ export default async function handler(req, res) {
       target_type: 'game_load',
       target_id:   load_id,
       description: `Game load ${load.reference_id} rejected`,
-      reason:      rejection_reason || null,
+      reason:      reason,
     })
+
+    await supabaseAdmin.from('notifications').insert({
+      tenant_id: tenantId, user_id: playerId, type: 'general',
+      title: 'Scores Request Rejected',
+      message: `Your scores request ${load.reference_id} was rejected. Reason: ${reason}`,
+      reference_id: load.reference_id,
+    }).then(() => {}, () => {})
 
     return res.status(200).json({ ok: true, status: 'rejected' })
   }

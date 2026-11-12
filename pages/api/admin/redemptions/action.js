@@ -33,7 +33,8 @@ export default async function handler(req, res) {
   const supabaseAdmin = gate.db
   const actor = gate.actor
 
-  const { redemption_id, action, approved_cents, rejection_reason } = req.body
+  const { redemption_id, action, approved_cents, rejection_reason, notes } = req.body
+  const reason = (rejection_reason ?? notes ?? '').trim()
   if (!redemption_id) return res.status(400).json({ error: 'redemption_id required' })
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'action must be approve or reject' })
 
@@ -58,11 +59,12 @@ export default async function handler(req, res) {
 
   // ── REJECT ──────────────────────────────────────────────────────
   if (action === 'reject') {
+    if (!reason) return res.status(400).json({ error: 'A rejection reason is required.' })
     const { error: rejectErr } = await supabaseAdmin
       .from('redemptions')
       .update({
         status:           'rejected',
-        rejection_reason: rejection_reason || 'Rejected by admin',
+        rejection_reason: reason,
         reviewed_by:      actor.id,
         reviewed_at:      new Date().toISOString(),
         updated_at:       new Date().toISOString(),
@@ -83,8 +85,15 @@ export default async function handler(req, res) {
       target_type: 'redemption',
       target_id:   redemption_id,
       description: `Redemption ${redemption.reference_id} rejected`,
-      reason:      rejection_reason || null,
+      reason:      reason,
     })
+
+    await supabaseAdmin.from('notifications').insert({
+      tenant_id: tenantId, user_id: playerId, type: 'general',
+      title: 'Redeem Request Rejected',
+      message: `Your redeem request ${redemption.reference_id} was rejected. Reason: ${reason}`,
+      reference_id: redemption.reference_id,
+    }).then(() => {}, () => {})
 
     return res.status(200).json({ ok: true, status: 'rejected' })
   }

@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   let q = gate.db
     .from('withdrawals')
     .select(`
-      id, reference_id, amount_cents, status, created_at, admin_notes, reviewed_at,
+      id, reference_id, amount_cents, status, created_at, admin_notes, reviewed_at, rejection_reason,
       payment_method_id, user_id, method, destination, payout_label,
       profiles!withdrawals_user_id_fkey ( id, username ),
       player_levels ( name, daily_withdrawal_limit_cents )

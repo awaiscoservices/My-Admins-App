@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   let q = gate.db
     .from('redemptions')
     .select(`
-      id, reference_id, amount_cents, approved_cents, status, created_at, admin_notes, reviewed_at, user_id,
+      id, reference_id, amount_cents, approved_cents, status, created_at, admin_notes, reviewed_at, rejection_reason, user_id,
       game_accounts ( id, game_username, game_panels ( name ) ),
       profiles!redemptions_user_id_fkey ( id, username )
     `)
