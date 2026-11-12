@@ -130,7 +130,7 @@ const PENDING_COLORS = {
   '/admin/redemptions':   '#f59e0b',
   '/admin/withdrawals':   '#3b82f6',
   '/admin/kyc':           '#ec4899',
-  '/admin/support':       '#6366f1',
+  '/admin/chat':          '#8b5cf6',
 }
 
 // 7 topbar quick-action tabs with badge counts
