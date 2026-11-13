@@ -50,6 +50,7 @@ export default async function handler(req, res) {
   const playerId       = load.user_id
   const amountCents    = load.amount_cents
   const gameAccountId  = load.game_account_id
+  const bucket         = load.wallet_bucket === 'bonus' ? 'bonus' : 'cash'
   const panelName      = load.game_accounts?.game_panels?.name || null
   const accountUsername = load.game_accounts?.game_username || null
 
@@ -64,24 +65,35 @@ export default async function handler(req, res) {
       .from('wallets').select('*').eq('user_id', playerId).single()
 
     if (rw) {
-      const holdCents = load.withdrawable_hold_cents || 0
-      await supabaseAdmin.from('wallets').update({
-        cash_balance_cents: rw.cash_balance_cents + amountCents,
-        withdrawable_cents: (rw.withdrawable_cents || 0) + holdCents,
-        reserved_cents:     Math.max(0, (rw.reserved_cents || 0) - amountCents),
-        updated_at:         new Date().toISOString(),
-        version:            rw.version + 1,
-      }).eq('user_id', playerId).eq('version', rw.version)
+      const refundBucket = load.wallet_bucket === 'bonus' ? 'bonus' : 'cash'
+      const holdCents = refundBucket === 'bonus' ? 0 : (load.withdrawable_hold_cents || 0)
+      const afterCents = refundBucket === 'bonus'
+        ? (rw.bonus_balance_cents || 0) + amountCents
+        : (rw.cash_balance_cents || 0) + amountCents
+
+      const refundUpdate = {
+        reserved_cents: Math.max(0, (rw.reserved_cents || 0) - amountCents),
+        updated_at:     new Date().toISOString(),
+        version:        rw.version + 1,
+      }
+      if (refundBucket === 'bonus') {
+        refundUpdate.bonus_balance_cents = (rw.bonus_balance_cents || 0) + amountCents
+      } else {
+        refundUpdate.cash_balance_cents = (rw.cash_balance_cents || 0) + amountCents
+        refundUpdate.withdrawable_cents = (rw.withdrawable_cents || 0) + holdCents
+      }
+      await supabaseAdmin.from('wallets').update(refundUpdate)
+        .eq('user_id', playerId).eq('version', rw.version)
 
       await supabaseAdmin.from('ledger').insert({
         tenant_id:           tenantId,
         reference_id:        `gl-refund-${load_id}`,
         user_id:             playerId,
         type:                'game_load_refund',
-        wallet_bucket:       'cash',
+        wallet_bucket:       refundBucket,
         amount_cents:        amountCents,
         direction:           'credit',
-        balance_after_cents: rw.cash_balance_cents + amountCents,
+        balance_after_cents: afterCents,
         game_load_id:        load_id,
         description:         panelName ? `Game load refunded — ${panelName} (${load.reference_id})` : `Game load ${load.reference_id} rejected — refunded`,
         created_by:          actor.id,
@@ -143,8 +155,8 @@ export default async function handler(req, res) {
   // Approving releases the hold. It must not touch cash or bonus again.
   // The split across buckets is gone with it: the function only ever takes
   // cash, and refuses the request outright unless cash covers it.
-  const cashUsed  = amountCents
-  const bonusUsed = 0
+  const cashUsed  = bucket === 'bonus' ? 0 : amountCents
+  const bonusUsed = bucket === 'bonus' ? amountCents : 0
 
   const reserved = wallet.reserved_cents || 0
   if (reserved < amountCents) {
@@ -174,31 +186,30 @@ export default async function handler(req, res) {
     version:            wallet.version + 1,
   }
 
-  // Build ledger entries (one per bucket used)
-  const ledgerRows = []
-  if (cashUsed > 0) {
-    ledgerRows.push({
-      tenant_id:         tenantId,
-      reference_id:      `${idempKey}-cash`,
-      user_id:           playerId,
-      type:              'game_load',
-      wallet_bucket:     'cash',
-      amount_cents:      cashUsed,
-      direction:         'debit',
-      // Unchanged by this step: the debit happened at request time.
-      balance_after_cents: wallet.cash_balance_cents,
-      game_load_id:      load_id,
-      // The game's name, not just the reference. A player looking at their
-      // wallet wants to know which game the money went into; LOAD-001008
-      // told them nothing.
-      description:       panelName ? `Game load — ${panelName} (${load.reference_id})` : `Game load ${load.reference_id}`,
-      created_by:        actor.id,
-      idempotency_key:   `${idempKey}-cash`,
-    })
-  }
-  // There is no bonus leg. request_game_load only ever takes cash, and
-  // refuses the request unless cash covers the whole amount, so a load can
-  // never be part-funded from the bonus bucket.
+  // One ledger row, in the bucket the money actually came from. The player
+  // chose cash or bonus at request time; request_game_load took it from that
+  // bucket and held it in reserved. The "After" balance shown in the wallet
+  // must be that same bucket — a bonus-funded load showing the cash balance
+  // was the bug.
+  const afterCents = bucket === 'bonus' ? wallet.bonus_balance_cents : wallet.cash_balance_cents
+  const ledgerRows = [{
+    tenant_id:         tenantId,
+    reference_id:      `${idempKey}-${bucket}`,
+    user_id:           playerId,
+    type:              'game_load',
+    wallet_bucket:     bucket,
+    amount_cents:      amountCents,
+    direction:         'debit',
+    // Unchanged by this step: the debit happened at request time.
+    balance_after_cents: afterCents,
+    game_load_id:      load_id,
+    // The game's name, not just the reference. A player looking at their
+    // wallet wants to know which game the money went into; LOAD-001008
+    // told them nothing.
+    description:       (panelName ? `Game load — ${panelName} (${load.reference_id})` : `Game load ${load.reference_id}`) + (bucket === 'bonus' ? ' · from Bonus' : ''),
+    created_by:        actor.id,
+    idempotency_key:   `${idempKey}-${bucket}`,
+  }]
 
   // Execute all writes
   const [walletRes, ledgerRes, loadRes] = await Promise.all([
