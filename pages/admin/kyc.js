@@ -148,7 +148,7 @@ export default function AdminKYC() {
         <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:10 }}>
           {/* 'verified', not 'approved' — no record can ever hold that
               value, so the tab matched nothing. */}
-          {['all','pending','under_review','verified','rejected'].map(s => (
+          {['all','pending','verified','rejected'].map(s => (
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>
