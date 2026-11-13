@@ -22,17 +22,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid status filter' })
   }
 
-  // 1. Load conversations scoped to this tenant
-  let q = gate.db
-    .from('chat_conversations')
-    .select('id, tenant_id, user_id, status, last_message_at, created_at')
-    .order('last_message_at', { ascending: false, nullsFirst: false })
+  // 1. Load conversations scoped to this tenant. Starred chats sit on top.
+  const build = (cols, withStar) => {
+    let x = gate.db.from('chat_conversations').select(cols)
+    if (withStar) x = x.order('is_starred', { ascending: false })
+    x = x.order('last_message_at', { ascending: false, nullsFirst: false })
+    x = scopeToTenant(x, gate)
+    if (status !== 'all') x = x.eq('status', status)
+    return x
+  }
 
-  q = scopeToTenant(q, gate)
-
-  if (status !== 'all') q = q.eq('status', status)
-
-  const { data: convs, error } = await q
+  let { data: convs, error } = await build('id, tenant_id, user_id, status, last_message_at, created_at, is_starred', true)
+  if (error) {
+    // is_starred column not added yet — fall back so the inbox still loads.
+    ;({ data: convs, error } = await build('id, tenant_id, user_id, status, last_message_at, created_at', false))
+  }
   if (error) return res.status(500).json({ error: error.message })
 
   if (!convs?.length) return res.json({ conversations: [] })
@@ -84,6 +88,7 @@ export default async function handler(req, res) {
 
   const result = convs.map(c => ({
     ...c,
+    is_starred: c.is_starred ?? false,
     player: maskPlayer(profileMap[c.user_id]) ?? { username: 'Player', full_name: 'Player', email: null },
     unread: unreadMap[c.id] ?? 0,
     last_message: lastMap[c.id]?.text ?? '',
@@ -102,9 +107,18 @@ async function setStatus(req, res) {
   const gate = await guardAdmin(req, res, { allow: PERMS.CHAT_SEND })
   if (!gate) return
 
-  const { conversationId, status } = req.body ?? {}
+  const { conversationId, status, is_starred } = req.body ?? {}
   if (!conversationId) return res.status(400).json({ error: 'conversationId required' })
-  if (!['open', 'closed'].includes(status)) return res.status(400).json({ error: 'status must be open or closed' })
+
+  const patch = { updated_at: new Date().toISOString() }
+  if (status !== undefined) {
+    if (!['open', 'closed'].includes(status)) return res.status(400).json({ error: 'status must be open or closed' })
+    patch.status = status
+  }
+  if (is_starred !== undefined) patch.is_starred = !!is_starred
+  if (patch.status === undefined && patch.is_starred === undefined) {
+    return res.status(400).json({ error: 'Nothing to update' })
+  }
 
   // Ownership check — 404 if the conversation belongs to another tenant
   const { row: conv, error: ownerErr } = await loadOwnedRow(
@@ -112,13 +126,12 @@ async function setStatus(req, res) {
   )
   if (ownerErr || !conv) return res.status(404).json({ error: 'Conversation not found' })
 
-  const now = new Date().toISOString()
   const { error } = await gate.db
     .from('chat_conversations')
-    .update({ status, updated_at: now })
+    .update(patch)
     .eq('id', conversationId)
     .eq('tenant_id', conv.tenant_id)
 
   if (error) return res.status(500).json({ error: error.message })
-  return res.json({ ok: true, status })
+  return res.json({ ok: true, status, is_starred })
 }

@@ -38,8 +38,19 @@ const PANEL  = { background: 'linear-gradient(180deg,rgba(255,255,255,.055),rgba
 const GOLD   = '#fbbf24'
 const SUBTLE = 'rgba(255,255,255,.45)'
 
+// Star glyph — filled yellow when starred, hollow grey otherwise.
+function StarIcon({ filled, size = 17 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24"
+      fill={filled ? GOLD : 'none'} stroke={filled ? GOLD : 'rgba(255,255,255,.45)'}
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+      <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z" />
+    </svg>
+  )
+}
+
 // ─── ConversationList ─────────────────────────────────────────────────────────
-function ConversationList({ convs, selected, onSelect, loading, search, onSearch }) {
+function ConversationList({ convs, selected, onSelect, loading, search, onSearch, onToggleStar }) {
   const filtered = search.trim()
     ? convs.filter(c => {
         const p = c.player ?? {}
@@ -80,22 +91,27 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
             ? (c.last_sender_type === 'staff' ? `You: ${c.last_message}` : c.last_message)
             : ''
           return (
-            <button key={c.id} onClick={() => onSelect(c)}
+            <div key={c.id} onClick={() => onSelect(c)}
               style={{
                 width: '100%', textAlign: 'left', padding: '14px 16px',
-                background: isActive ? 'rgba(251,191,36,.1)' : 'transparent',
-                borderLeft: isActive ? `3px solid ${GOLD}` : '3px solid transparent',
-                border: 'none', cursor: 'pointer', display: 'block',
+                background: isActive ? 'rgba(251,191,36,.1)' : (c.is_starred ? 'rgba(251,191,36,.04)' : 'transparent'),
+                borderLeft: isActive ? `3px solid ${GOLD}` : (c.is_starred ? `3px solid ${GOLD}66` : '3px solid transparent'),
+                cursor: 'pointer', display: 'block',
                 borderBottom: '1px solid rgba(255,255,255,.06)',
               }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {name}
-                  {c.status === 'closed' && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: SUBTLE, border: '1px solid rgba(255,255,255,.18)', borderRadius: 6, padding: '1px 5px', verticalAlign: 'middle' }}>CLOSED</span>}
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    role="button" title={c.is_starred ? 'Unstar' : 'Star this chat'}
+                    onClick={e => { e.stopPropagation(); onToggleStar(c) }}
+                    style={{ flexShrink: 0, cursor: 'pointer', display: 'inline-flex' }}>
+                    <StarIcon filled={!!c.is_starred} size={15} />
+                  </span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
                 </span>
                 <span style={{ fontSize: 11, color: SUBTLE, flexShrink: 0 }}>{fmtAgo(c.last_message_at)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingLeft: 21 }}>
                 <span style={{ fontSize: 12.5, color: c.unread > 0 ? 'rgba(255,255,255,.85)' : SUBTLE, fontWeight: c.unread > 0 ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                   {preview || 'No messages yet'}
                 </span>
@@ -105,7 +121,7 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
                   </span>
                 )}
               </div>
-            </button>
+            </div>
           )
         })}
       </div>
@@ -411,6 +427,24 @@ export default function AdminChat() {
 
   const pendingFile = useRef(null)
 
+  // Star / unstar a chat to highlight it. Optimistic — flip locally, then
+  // persist; starred chats sort to the top on the next list refresh.
+  const toggleStar = useCallback(async (conv) => {
+    const next = !conv.is_starred
+    setConvs(prev => prev.map(c => c.id === conv.id ? { ...c, is_starred: next } : c))
+    setSelected(prev => prev && prev.id === conv.id ? { ...prev, is_starred: next } : prev)
+    const data = await apiFetch('/api/admin/chat/conversations', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId: conv.id, is_starred: next }),
+    })
+    if (data?.error) {
+      // Revert on failure.
+      setConvs(prev => prev.map(c => c.id === conv.id ? { ...c, is_starred: conv.is_starred } : c))
+      setError(data.error)
+    }
+  }, [])
+
   async function closeConversation() {
     if (!selected) return
     const data = await apiFetch('/api/admin/chat/conversations', {
@@ -444,6 +478,7 @@ export default function AdminChat() {
               <ConversationList
                 convs={convs} selected={selected} onSelect={handleSelect}
                 loading={convLoading} search={search} onSearch={setSearch}
+                onToggleStar={toggleStar}
               />
             </div>
           </div>
@@ -463,6 +498,11 @@ export default function AdminChat() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Star to highlight this chat — pins it to the top of the list. */}
+                    <button onClick={() => toggleStar(selected)} title={selected.is_starred ? 'Unstar chat' : 'Star chat'}
+                      style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: selected.is_starred ? 'rgba(251,191,36,.14)' : 'rgba(255,255,255,.06)', border: `1px solid ${selected.is_starred ? 'rgba(251,191,36,.4)' : 'rgba(255,255,255,.14)'}`, borderRadius: 9, cursor: 'pointer' }}>
+                      <StarIcon filled={!!selected.is_starred} size={16} />
+                    </button>
                     {/* The player's balances and history, without leaving the
                         chat — staff often need them to answer a question. */}
                     <button onClick={() => setWalletFor(selected)}
