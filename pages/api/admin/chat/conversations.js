@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const gate = await guardAdmin(req, res, { allow: PERMS.CHAT_READ })
   if (!gate) return
 
-  const { status = 'open' } = req.query
+  const { status = 'all' } = req.query
   if (!['open', 'closed', 'all'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status filter' })
   }
@@ -65,10 +65,29 @@ export default async function handler(req, res) {
     unreadMap[row.conversation_id] = (unreadMap[row.conversation_id] ?? 0) + 1
   }
 
+  // 4. Last message per conversation, for a WhatsApp-style preview line.
+  //    Newest first, then keep the first one seen per conversation.
+  const { data: msgRows } = await gate.db
+    .from('chat_messages')
+    .select('conversation_id, body, sender_type, file_url, created_at')
+    .in('conversation_id', convIds)
+    .order('created_at', { ascending: false })
+
+  const lastMap = {}
+  for (const row of msgRows ?? []) {
+    if (lastMap[row.conversation_id]) continue   // already have the newest
+    lastMap[row.conversation_id] = {
+      text: row.body || (row.file_url ? '📎 Attachment' : ''),
+      sender_type: row.sender_type,
+    }
+  }
+
   const result = convs.map(c => ({
     ...c,
     player: maskPlayer(profileMap[c.user_id]) ?? { username: 'Player', full_name: 'Player', email: null },
     unread: unreadMap[c.id] ?? 0,
+    last_message: lastMap[c.id]?.text ?? '',
+    last_sender_type: lastMap[c.id]?.sender_type ?? null,
   }))
 
   return res.json({ conversations: result })

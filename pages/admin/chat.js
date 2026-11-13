@@ -69,12 +69,16 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
         {loading && <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>Loading…</div>}
         {!loading && !filtered.length && (
           <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>
-            {search ? 'No matches' : 'No open conversations'}
+            {search ? 'No matches' : 'No conversations yet'}
           </div>
         )}
         {filtered.map(c => {
           const name = c.player?.username || 'Player'
           const isActive = selected?.id === c.id
+          // WhatsApp-style preview: our own replies read "You: …".
+          const preview = c.last_message
+            ? (c.last_sender_type === 'staff' ? `You: ${c.last_message}` : c.last_message)
+            : ''
           return (
             <button key={c.id} onClick={() => onSelect(c)}
               style={{
@@ -84,13 +88,19 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
                 border: 'none', cursor: 'pointer', display: 'block',
                 borderBottom: '1px solid rgba(255,255,255,.06)',
               }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>{name}</span>
-                <span style={{ fontSize: 11, color: SUBTLE }}>{fmtAgo(c.last_message_at)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {name}
+                  {c.status === 'closed' && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: SUBTLE, border: '1px solid rgba(255,255,255,.18)', borderRadius: 6, padding: '1px 5px', verticalAlign: 'middle' }}>CLOSED</span>}
+                </span>
+                <span style={{ fontSize: 11, color: SUBTLE, flexShrink: 0 }}>{fmtAgo(c.last_message_at)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12.5, color: c.unread > 0 ? 'rgba(255,255,255,.85)' : SUBTLE, fontWeight: c.unread > 0 ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                  {preview || 'No messages yet'}
+                </span>
                 {c.unread > 0 && (
-                  <span style={{ background: GOLD, color: '#000', borderRadius: 10, fontSize: 10, fontWeight: 800, padding: '1px 7px', minWidth: 18, textAlign: 'center' }}>
+                  <span style={{ background: GOLD, color: '#000', borderRadius: 10, fontSize: 10, fontWeight: 800, padding: '1px 7px', minWidth: 18, textAlign: 'center', flexShrink: 0 }}>
                     {c.unread}
                   </span>
                 )}
@@ -245,7 +255,7 @@ export default function AdminChat() {
 
   const loadConvs = useCallback(async () => {
     setConvLoading(true)
-    const data = await apiFetch('/api/admin/chat/conversations?status=open')
+    const data = await apiFetch('/api/admin/chat/conversations?status=all')
     setConvs(data.conversations ?? [])
     setConvLoading(false)
   }, [])
@@ -253,7 +263,7 @@ export default function AdminChat() {
   // Quiet refresh — no "Loading…" flash. Used by polling + realtime so the
   // list picks up new chats and new messages without a hard refresh.
   const refreshConvs = useCallback(async (selectedId) => {
-    const data = await apiFetch('/api/admin/chat/conversations?status=open')
+    const data = await apiFetch('/api/admin/chat/conversations?status=all')
     setConvs(prev => {
       const next = data.conversations ?? []
       // Keep the open thread's unread at 0 — we're looking at it.
@@ -409,8 +419,10 @@ export default function AdminChat() {
       body: JSON.stringify({ conversationId: selected.id, status: 'closed' }),
     })
     if (data.error) { setError(data.error); return }
-    setConvs(prev => prev.filter(c => c.id !== selected.id))
-    setSelected(null)
+    // Keep the chat in the list — just mark it closed. Staff still see the
+    // full history and can reopen by replying.
+    setConvs(prev => prev.map(c => c.id === selected.id ? { ...c, status: 'closed' } : c))
+    setSelected(prev => prev ? { ...prev, status: 'closed' } : prev)
   }
 
   return (
