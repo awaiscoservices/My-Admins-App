@@ -188,7 +188,7 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
             </div>
           </Section>
 
-          <Section title="Withdraw Limits" subtitle="Withdrawals link to wallet balance" color="#34d399" mt={20}>
+          <Section title="Withdraw Limits" subtitle="Withdraws link to wallet balance" color="#34d399" mt={20}>
             <Row2>
               <Field label="Min Withdraw ($)">
                 <div style={{ position: 'relative' }}>

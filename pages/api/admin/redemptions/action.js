@@ -45,10 +45,10 @@ export default async function handler(req, res) {
     '*, game_accounts(id, user_id, game_username, game_panels(name, redeem_multiplier))'
   )
 
-  if (redemptionErr || !redemption) return res.status(404).json({ error: 'Redemption not found' })
+  if (redemptionErr || !redemption) return res.status(404).json({ error: 'Redeem not found' })
   const tenantId = tenantOf(redemption, gate)
   if (!['pending', 'under_review'].includes(redemption.status)) {
-    return res.status(409).json({ error: `Redemption is already ${redemption.status}` })
+    return res.status(409).json({ error: `Redeem is already ${redemption.status}` })
   }
 
   const playerId       = redemption.user_id
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       action:      'redemption_rejected',
       target_type: 'redemption',
       target_id:   redemption_id,
-      description: `Redemption ${redemption.reference_id} rejected`,
+      description: `Redeem ${redemption.reference_id} rejected`,
       reason:      reason,
     })
 
@@ -253,7 +253,7 @@ export default async function handler(req, res) {
 
   if (walletRes.error)     return res.status(500).json({ error: 'Wallet update failed: ' + walletRes.error.message })
   if (ledgerRes.error)     return res.status(500).json({ error: 'Ledger write failed: ' + ledgerRes.error.message })
-  if (redemptionRes.error) return res.status(500).json({ error: 'Redemption update failed: ' + redemptionRes.error.message })
+  if (redemptionRes.error) return res.status(500).json({ error: 'Redeem update failed: ' + redemptionRes.error.message })
 
   // Record excess consumption + award XP (fire & forget style, non-blocking)
   const xpAwarded = excessCents > 0 ? Math.floor(excessCents / 100) * XP_PER_DOLLAR_EXCESS : 0

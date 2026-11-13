@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/withdrawals/action
  *
- * Approves or rejects a Withdrawal request.
+ * Approves or rejects a Withdraw request.
  *
  * Body: { withdrawal_id, action: 'approve'|'reject', rejection_reason?, proof_screenshot_url? }
  *
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   // Fetch withdrawal
   // Scoped to the caller's casino: another casino's withdrawal is not found.
   const { row: withdrawal, error: wErr } = await loadOwnedRow(gate, 'withdrawals', withdrawal_id)
-  if (wErr || !withdrawal) return res.status(404).json({ error: 'Withdrawal not found' })
+  if (wErr || !withdrawal) return res.status(404).json({ error: 'Withdraw not found' })
   const tenantId = tenantOf(withdrawal, gate)
 
   const playerId    = withdrawal.user_id
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
     reject:     ['pending', 'under_review', 'processing'],
   }
   if (!allowedFrom[action].includes(withdrawal.status)) {
-    return res.status(409).json({ error: `Withdrawal is already ${withdrawal.status}` })
+    return res.status(409).json({ error: `Withdraw is already ${withdrawal.status}` })
   }
 
   // ── MOVE TO PROCESSING ───────────────────────────────────────
@@ -74,12 +74,12 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('audit_logs').insert({
       actor_id: actor.id, actor_role: actor.role,
       action: 'withdrawal_processing', target_type: 'withdrawal', target_id: withdrawal_id,
-      description: `Withdrawal ${withdrawal.reference_id} moved to processing`,
+      description: `Withdraw ${withdrawal.reference_id} moved to processing`,
     })
 
     await supabaseAdmin.from('notifications').insert({
       tenant_id: tenantId, user_id: playerId, type: 'general',
-      title: 'Withdrawal Processing',
+      title: 'Withdraw Processing',
       message: `Your withdrawal ${withdrawal.reference_id} is now being processed. You will be notified once it is paid.`,
       reference_id: withdrawal.reference_id,
     }).then(() => {}, () => {})
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
         direction:           'credit',
         balance_after_cents: rw.cash_balance_cents + cashBack,
         withdrawal_id:       withdrawal_id,
-        description:         `Withdrawal ${withdrawal.reference_id} rejected — refunded`,
+        description:         `Withdraw ${withdrawal.reference_id} rejected — refunded`,
         created_by:          actor.id,
         idempotency_key:     `wd-refund-${withdrawal_id}`,
       }).then(() => {}, () => {})
@@ -146,13 +146,13 @@ export default async function handler(req, res) {
       action:      'withdrawal_rejected',
       target_type: 'withdrawal',
       target_id:   withdrawal_id,
-      description: `Withdrawal ${withdrawal.reference_id} rejected`,
+      description: `Withdraw ${withdrawal.reference_id} rejected`,
       reason:      reason,
     })
 
     await supabaseAdmin.from('notifications').insert({
       tenant_id: tenantId, user_id: playerId, type: 'general',
-      title: 'Withdrawal Rejected',
+      title: 'Withdraw Rejected',
       message: `Your withdrawal ${withdrawal.reference_id} was rejected. Reason: ${reason}`,
       reference_id: withdrawal.reference_id,
     }).then(() => {}, () => {})
@@ -263,7 +263,7 @@ export default async function handler(req, res) {
   }).eq('id', withdrawal_id)
 
   if (withdrawalRes.error) {
-    return res.status(500).json({ error: 'Withdrawal update failed: ' + withdrawalRes.error.message })
+    return res.status(500).json({ error: 'Withdraw update failed: ' + withdrawalRes.error.message })
   }
 
   const [walletRes, ledgerRes] = await Promise.all([
@@ -287,7 +287,7 @@ export default async function handler(req, res) {
       direction:           'debit',
       balance_after_cents: newCashBalance,
       withdrawal_id:       withdrawal_id,
-      description:         `Withdrawal ${withdrawal.reference_id} approved`,
+      description:         `Withdraw ${withdrawal.reference_id} approved`,
       created_by:          actor.id,
       idempotency_key:     idempKey,
     }),
@@ -313,12 +313,12 @@ export default async function handler(req, res) {
     action:      'withdrawal_approved',
     target_type: 'withdrawal',
     target_id:   withdrawal_id,
-    description: `Withdrawal ${withdrawal.reference_id} approved — $${(amountCents / 100).toFixed(2)} (level: ${levelName}, limit: $${(levelDailyLimit / 100).toFixed(2)}/day)`,
+    description: `Withdraw ${withdrawal.reference_id} approved — $${(amountCents / 100).toFixed(2)} (level: ${levelName}, limit: $${(levelDailyLimit / 100).toFixed(2)}/day)`,
   })
 
   await supabaseAdmin.from('notifications').insert({
     tenant_id: tenantId, user_id: playerId, type: 'general',
-    title: 'Withdrawal Paid',
+    title: 'Withdraw Paid',
     message: `Your withdrawal ${withdrawal.reference_id} of $${(amountCents / 100).toFixed(2)} has been paid.`,
     reference_id: withdrawal.reference_id,
   }).then(() => {}, () => {})

@@ -231,7 +231,7 @@ export default function AdminDashboard() {
               <StatCard icon="users"     label="Total Players"        value={fmtNum(s.total_players)}        sub={`${fmtNum(s.new_players_today)} new today`}        color={blue}   />
               <StatCard icon="dollar"    label="Total Deposits"       value={fmt(s.total_deposits_cents)}    sub={`${fmtNum(s.deposits_count)} transactions`}        color={green}  />
               <StatCard icon="upload"    label="Total Withdraw"    value={fmt(s.total_withdrawals_cents)} sub={`${fmtNum(s.withdrawals_count)} paid out`}         color={red}    />
-              <StatCard icon="trendUp"   label="Net Revenue"          value={fmt(totalRevenue)}              sub="Deposits minus withdrawals"                        color={gold}   />
+              <StatCard icon="trendUp"   label="Net Revenue"          value={fmt(totalRevenue)}              sub="Deposits minus withdraws"                        color={gold}   />
 
               {/* Pending queues */}
               <StatCard icon="clock"     label="Pending Deposits"     value={fmtNum(s.pending_deposits)}     sub="Awaiting approval"                                 color={orange} />

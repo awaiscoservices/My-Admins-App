@@ -161,7 +161,7 @@ function MethodModal({ method, onClose, onSave }) {
           <Toggle field="is_active" label="Active" />
           <Toggle field="is_auto" label="Auto-approve" />
           <Toggle field="allow_deposit" label="Deposits" />
-          <Toggle field="allow_withdraw" label="Withdrawals" />
+          <Toggle field="allow_withdraw" label="Withdraws" />
           <Toggle field="requires_proof" label="Needs proof" />
           <Toggle field="requires_reference" label="Needs reference" />
         </div>

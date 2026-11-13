@@ -31,7 +31,7 @@ function ReviewModal({ item, onClose, onAction }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.8)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
       <div style={{ background:'#0e1a2e', border:'1px solid rgba(251,191,36,.3)', borderRadius:20, padding:32, width:'100%', maxWidth:480 }} onClick={e => e.stopPropagation()}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:18, fontWeight:700, color:'#fff' }}>Review Withdrawal</h2>
+          <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:18, fontWeight:700, color:'#fff' }}>Review Withdraw</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', fontSize:20, cursor:'pointer' }}>✕</button>
         </div>
         <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
@@ -109,7 +109,7 @@ export default function AdminWithdrawals() {
     })
     const d = await res.json()
     if (!res.ok) return { error: d.error }
-    showToast(`Withdrawal ${action}d`)
+    showToast(`Withdraw ${action}d`)
     load()
     return {}
   }

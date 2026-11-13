@@ -50,10 +50,10 @@ export default async function handler(req, res) {
     const MSG = {
       game_loads:  { completed: ['Game Load Completed 🎮', `Your game load of ${amt} is complete. Good luck!`],
                      rejected:  ['Game Load Rejected', `Your game load of ${amt} was rejected and the money is back in your wallet. Reason: ${text}`] },
-      redemptions: { completed: ['Redemption Approved 🏆', `Your redemption of ${amt} was approved and added to your wallet.`],
-                     rejected:  ['Redemption Rejected', `Your redemption request of ${amt} was rejected. Reason: ${text}`] },
-      withdrawals: { completed: ['Withdrawal Sent 💸', `Your withdrawal of ${amt} has been paid out.${args.p_reference ? ` Reference: ${args.p_reference}` : ''}`],
-                     rejected:  ['Withdrawal Rejected', `Your withdrawal of ${amt} was rejected and the money is back in your wallet. Reason: ${text}`] },
+      redemptions: { completed: ['Redeem Approved 🏆', `Your redeem of ${amt} was approved and added to your wallet.`],
+                     rejected:  ['Redeem Rejected', `Your redeem request of ${amt} was rejected. Reason: ${text}`] },
+      withdrawals: { completed: ['Withdraw Sent 💸', `Your withdraw of ${amt} has been paid out.${args.p_reference ? ` Reference: ${args.p_reference}` : ''}`],
+                     rejected:  ['Withdraw Rejected', `Your withdraw of ${amt} was rejected and the money is back in your wallet. Reason: ${text}`] },
     }
     const m = MSG[kind][action]
     if (m) await notify(data.user_id, `${kind}_${action}`, m[0], m[1])
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     await safe(supabaseAdmin.from('profiles').update({ kyc_status: action }).eq('id', rec.user_id))
 
     const MSG = {
-      verified:           ['Identity Verified ✅', 'Your identity is verified. Withdrawals are now unlocked.'],
+      verified:           ['Identity Verified ✅', 'Your identity is verified. Withdraws are now unlocked.'],
       rejected:           ['Verification Rejected', `We could not verify your identity. Reason: ${text}. You can submit again.`],
       more_info_required: ['More Information Needed', `We need more information to verify you: ${text}. Please submit again.`],
     }[action]

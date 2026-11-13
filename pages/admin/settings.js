@@ -227,7 +227,7 @@ export default function AdminSettings() {
                 <div style={sectionTitle}>Feature Flags</div>
                 <Toggle field="registrations_enabled" label="New Registrations" desc="Allow new players to create accounts" />
                 <Toggle field="deposits_enabled" label="Deposits" desc="Allow players to make deposits" />
-                <Toggle field="withdrawals_enabled" label="Withdrawals" desc="Allow players to request withdrawals" />
+                <Toggle field="withdrawals_enabled" label="Withdraws" desc="Allow players to request withdraws" />
               </div>
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', margin: '0 0 20px', lineHeight: 1.6 }}>
                 Deposit bonuses and referral rewards are set on <strong style={{ color: '#fbbf24' }}>Player Bonuses</strong>,
