@@ -254,18 +254,24 @@ async function triggerReferralBonus(client, userId, depositId, amountCents, tena
 
   if (!rw) return
 
+  const referrerCashAfter = rw.cash_balance_cents + bonusCents
   await client.from('wallets').update({
-    cash_balance_cents: rw.cash_balance_cents + bonusCents,
+    cash_balance_cents: referrerCashAfter,
     total_bonus_cents:  rw.total_bonus_cents  + bonusCents,
     updated_at:         new Date().toISOString(),
   }).eq('user_id', referral.referrer_id)
 
-  // Ledger entry for referrer
+  // Ledger entry for referrer — bucket/direction/balance_after so it renders
+  // in the player's Transactions like any other movement.
   await client.from('ledger').insert({
-    tenant_id:    tenantId,
-    user_id:      referral.referrer_id,
-    type:         'referral_bonus',
-    amount_cents: bonusCents,
+    tenant_id:           tenantId,
+    user_id:             referral.referrer_id,
+    type:                'referral_bonus',
+    wallet_bucket:       'cash',
+    amount_cents:        bonusCents,
+    direction:           'credit',
+    balance_after_cents: referrerCashAfter,
+    description:         `Referral bonus from deposit #${depositNumber}`,
     entity:       'referrals',
     entity_id:    referral.id,
     metadata: {
