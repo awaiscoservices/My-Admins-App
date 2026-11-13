@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { signInWithEmail } from '../../lib/auth'
+import Icon from '../../components/ui/Icon'
 
 const STAFF_ROLES = ['super_admin', 'admin', 'finance', 'game_ops', 'support', 'kyc_agent', 'risk', 'reporting', 'marketing']
 
@@ -151,7 +152,7 @@ export default function SupportLogin() {
       {/* Toast */}
       {toast && (
         <div style={{ position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, animation: 'toastIn .3s ease', background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(16,185,129,.95)', border: `1px solid ${toast.type === 'error' ? '#ef4444' : '#10b981'}`, borderRadius: 10, padding: '11px 22px', color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: "'Outfit',sans-serif", backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,.5)', whiteSpace: 'nowrap' }}>
-          {toast.type === 'error' ? '⚠ ' : '✓ '}{toast.msg}
+          <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}><Icon name={toast.type === 'error' ? 'alert' : 'check'} size={16} stroke={2.4} /> {toast.msg}</span>
         </div>
       )}
 
@@ -200,13 +201,13 @@ export default function SupportLogin() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Username or Email</label>
               <input type="text" value={email} onChange={e => { setEmail(e.target.value); if (errors.email) setErrors(p => ({ ...p, email: '' })) }} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} placeholder="username or email" style={inp('email')} autoComplete="username" />
-              {errors.email && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}>⚠ {errors.email}</p>}
+              {errors.email && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {errors.email}</p>}
             </div>
 
             <div style={{ marginBottom: 24 }}>
               <label style={{ display: 'block', marginBottom: 7, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.55)', letterSpacing: .5 }}>Password</label>
               <input type="password" value={password} onChange={e => { setPassword(e.target.value); if (errors.password) setErrors(p => ({ ...p, password: '' })) }} onFocus={() => setFocused('password')} onBlur={() => setFocused(null)} placeholder="••••••••" style={inp('password')} autoComplete="current-password" />
-              {errors.password && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}>⚠ {errors.password}</p>}
+              {errors.password && <p style={{ color: '#f87171', fontSize: 11, marginTop: 5, fontWeight: 500 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {errors.password}</p>}
             </div>
 
             <button type="submit" disabled={loading} style={{ width: '100%', padding: 14, background: loading ? 'rgba(245,158,11,.35)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 14, fontWeight: 800, fontFamily: "'Outfit',sans-serif", letterSpacing: .5, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: loading ? 'none' : '0 4px 20px rgba(245,158,11,.3)', transition: 'transform .15s, box-shadow .15s' }}
@@ -214,14 +215,14 @@ export default function SupportLogin() {
               onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
               {loading
                 ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(0,0,0,.2)', borderTopColor: '#050505', borderRadius: '50%', animation: 'spin .7s linear infinite', display: 'inline-block' }} /> Signing in…</>
-                : '🔐 Sign In to Portal'}
+                : 'Sign In to Portal'}
             </button>
           </form>
           )}
 
           <div style={{ marginTop: 24, padding: '12px 16px', background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 10 }}>
             <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, textAlign: 'center', lineHeight: 1.6 }}>
-              🔒 This portal is restricted to authorised staff.<br />
+              This portal is restricted to authorised staff.<br />
               Player accounts are managed on tenant websites.
             </p>
           </div>

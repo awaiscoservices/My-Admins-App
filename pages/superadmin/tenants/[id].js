@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import SuperAdminLayout from '../../../components/layout/SuperAdminLayout'
 import { supabase } from '../../../lib/supabase'
+import Icon from '../../../components/ui/Icon'
 
 /**
  * A fresh access token for every request.
@@ -74,7 +75,7 @@ export default function TenantDetail() {
     })
     const data = await r.json()
     if (!r.ok) { setErr(data.error); setSaving(false); return }
-    setMsg('Saved ✓'); setTenant(t => ({ ...t, ...form })); setSaving(false)
+    setMsg('Saved'); setTenant(t => ({ ...t, ...form })); setSaving(false)
     setTimeout(() => setMsg(''), 3000)
   }
 
@@ -89,7 +90,7 @@ export default function TenantDetail() {
     const data = await r.json()
     if (!r.ok) { setErr(data.error); setSaving(false); return }
     setTenant(t => ({ ...t, status: data.status }))
-    setMsg(`Tenant ${data.status} ✓`); setSaving(false)
+    setMsg(`Tenant ${data.status}`); setSaving(false)
     setTimeout(() => setMsg(''), 3000)
   }
 
@@ -132,14 +133,14 @@ export default function TenantDetail() {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={impersonate} style={{ ...outlineBtn, color: G, borderColor: G }}>
-              👤 Impersonate
+              <Icon name="user" size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Impersonate
             </button>
             <button onClick={suspend} disabled={saving} style={{
               ...outlineBtn,
               color: tenant.status === 'suspended' ? '#22c55e' : '#ef4444',
               borderColor: tenant.status === 'suspended' ? '#22c55e' : '#ef4444',
             }}>
-              {tenant.status === 'suspended' ? '▶ Activate' : '⏸ Suspend'}
+              {tenant.status === 'suspended' ? 'Activate' : 'Suspend'}
             </button>
           </div>
         </div>
@@ -243,7 +244,7 @@ function DomainsTab({ tenantId, token }) {
         {domains.map(d => (
           <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
             <code style={{ color: '#fff', fontSize: 13 }}>{d.domain}</code>
-            <span style={{ fontSize: 11, color: d.is_verified ? '#22c55e' : '#f59e0b' }}>{d.is_verified ? '✓ Verified' : '⏳ Pending'}</span>
+            <span style={{ fontSize: 11, color: d.is_verified ? '#22c55e' : '#f59e0b' }}>{d.is_verified ? 'Verified' : 'Pending'}</span>
           </div>
         ))}
       </div>

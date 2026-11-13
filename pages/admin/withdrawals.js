@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
+import Icon from '../../components/ui/Icon'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
@@ -32,7 +33,7 @@ function ReviewModal({ item, onClose, onAction }) {
       <div style={{ background:'#0e1a2e', border:'1px solid rgba(251,191,36,.3)', borderRadius:20, padding:32, width:'100%', maxWidth:480 }} onClick={e => e.stopPropagation()}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:18, fontWeight:700, color:'#fff' }}>Review Withdraw</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', fontSize:20, cursor:'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', cursor:'pointer', display:'inline-flex' }}><Icon name="x" size={18} /></button>
         </div>
         <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
           <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4, fontFamily:'monospace' }}>{item.profiles?.username || item.profiles?.full_name}</div>
@@ -49,14 +50,14 @@ function ReviewModal({ item, onClose, onAction }) {
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason the player will see if rejected…"
             style={{ width:'100%', padding:'11px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', resize:'none', boxSizing:'border-box' }} />
         </div>
-        {error && <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13 }}>⚠ {error}</div>}
+        {error && <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13 }}><Icon name="alert" size={14} style={{ verticalAlign:'-2px', marginRight:4 }} /> {error}</div>}
         <div style={{ display:'flex', gap:10 }}>
           {isProcessing ? (
-            <button onClick={() => submit('approve')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>💵 Mark Paid</button>
+            <button onClick={() => submit('approve')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#22c55e,#16a34a)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}><Icon name="cash" size={14} style={{ verticalAlign:'-2px', marginRight:5 }} /> Mark Paid</button>
           ) : (
             <button onClick={() => submit('processing')} disabled={saving} style={{ flex:1, padding:'11px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>→ Move to Processing</button>
           )}
-          <button onClick={() => submit('reject')}  disabled={saving} style={{ flex:1, padding:'11px', background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>❌ Reject</button>
+          <button onClick={() => submit('reject')}  disabled={saving} style={{ flex:1, padding:'11px', background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.3)', borderRadius:10, color:'#f87171', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}><Icon name="x" size={14} stroke={2.6} style={{ verticalAlign:'-2px', marginRight:5 }} /> Reject</button>
           <button onClick={onClose} style={{ padding:'11px 16px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.4)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Cancel</button>
         </div>
       </div>
@@ -170,7 +171,7 @@ export default function AdminWithdrawals() {
                 <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
-                  {filter === 'pending' ? '✅ No pending withdrawals!' : 'No withdrawals found'}
+                  {filter === 'pending' ? 'No pending withdrawals' : 'No withdrawals found'}
                 </td></tr>
               ) : rows.map(r => (
                 <tr key={r.id} style={{ borderTop:'1px solid rgba(255,255,255,.04)' }}
@@ -202,7 +203,7 @@ export default function AdminWithdrawals() {
                       </button>
                       {['pending','processing'].includes(r.status) ? (
                         <button onClick={() => setSelected(r)} style={{ padding:'6px 14px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:8, color:'#050505', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
-                          {r.status === 'processing' ? '💵 Pay / Reject' : '⚡ Review'}
+                          {r.status === 'processing' ? 'Pay / Reject' : 'Review'}
                         </button>
                       ) : r.status === 'rejected' && r.rejection_reason ? (
                         <button onClick={() => showToast(`Reason: ${r.rejection_reason}`, 'error')} title={r.rejection_reason} style={{ padding:'6px 12px', background:'rgba(239,68,68,.12)', border:'1px solid rgba(239,68,68,.3)', borderRadius:8, color:'#f87171', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>

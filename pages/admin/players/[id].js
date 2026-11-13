@@ -7,6 +7,7 @@ import AdminLayout from '../../../components/layout/AdminLayout'
 import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../../components/PlayerWalletModal'
+import Icon from '../../../components/ui/Icon'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -56,10 +57,10 @@ function AdjustmentModal({ playerId, onClose, onSave }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ fontFamily: "'Cinzel',serif", fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 20 }}>⚖️ Wallet Adjustment</h3>
+        <h3 style={{ fontFamily: "'Cinzel',serif", fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 20 }}><Icon name="gear" size={16} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Wallet Adjustment</h3>
 
         <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: '#f59e0b', lineHeight: 1.5 }}>
-          ⚠️ All adjustments are logged in the audit trail and cannot be deleted.
+          <Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> All adjustments are logged in the audit trail and cannot be deleted.
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -97,12 +98,12 @@ function AdjustmentModal({ playerId, onClose, onSave }) {
           ))}
         </div>
 
-        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 12 }}>⚠ {error}</div>}
+        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 12 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {error}</div>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '11px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>
           <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '11px', background: saving ? 'rgba(251,191,36,.4)' : 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-            {saving ? '⏳ Processing…' : '⚖️ Apply Adjustment'}
+            {saving ? 'Processing…' : 'Apply Adjustment'}
           </button>
         </div>
       </div>
@@ -206,7 +207,7 @@ export default function AdminPlayerDetail() {
   if (!player) return (
     <AdminLayout>
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
+        <div style={{ marginBottom: 16, display:'flex', justifyContent:'center', color:'#f87171' }}><Icon name="xCircle" size={48} stroke={1.6} /></div>
         <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 16 }}>Player not found</div>
         <Link href="/admin/players" style={{ display: 'inline-block', marginTop: 16, color: '#fbbf24', textDecoration: 'none', fontSize: 14, fontWeight: 700 }}>← Back to Players</Link>
       </div>
@@ -221,7 +222,7 @@ export default function AdminPlayerDetail() {
 
       {toast && (
         <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(16,185,129,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>
-          {toast.type === 'error' ? '⚠ ' : '✓ '}{toast.msg}
+          <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}><Icon name={toast.type === 'error' ? 'alert' : 'check'} size={16} stroke={2.4} /> {toast.msg}</span>
         </div>
       )}
 
@@ -245,10 +246,10 @@ export default function AdminPlayerDetail() {
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={() => setShowWalletModal(true)} style={{ padding: '9px 16px', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-              💳 Wallet Overview
+              <Icon name="wallet" size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Wallet Overview
             </button>
             <button onClick={() => setShowAdjModal(true)} style={{ padding: '9px 16px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-              ⚖️ Adjust Wallet
+              <Icon name="gear" size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Adjust Wallet
             </button>
             {player.status === 'active' ? (
               <>
@@ -256,12 +257,12 @@ export default function AdminPlayerDetail() {
                   ⏸ Suspend
                 </button>
                 <button onClick={() => handleStatusChange('banned')} style={{ padding: '9px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-                  🚫 Ban
+                  <Icon name="ban" size={14} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Ban
                 </button>
               </>
             ) : (
               <button onClick={() => handleStatusChange('active')} style={{ padding: '9px 16px', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 10, color: '#10b981', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-                ✓ Reactivate
+                <Icon name="check" size={14} stroke={2.6} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Reactivate
               </button>
             )}
           </div>
@@ -272,7 +273,7 @@ export default function AdminPlayerDetail() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <StatusBadge status={player.status} />
         <StatusBadge status={player.kyc_status || 'not_started'} />
-        {player.is_flagged && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: 'rgba(239,68,68,.15)', fontSize: 11, fontWeight: 800, color: '#f87171', letterSpacing: '.04em', textTransform: 'uppercase' }}>⚠️ Flagged</span>}
+        {player.is_flagged && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: 'rgba(239,68,68,.15)', fontSize: 11, fontWeight: 800, color: '#f87171', letterSpacing: '.04em', textTransform: 'uppercase' }}><Icon name="alert" size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} /> Flagged</span>}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: 'rgba(251,191,36,.12)', fontSize: 11, fontWeight: 800, color: '#fbbf24', letterSpacing: '.04em', textTransform: 'uppercase' }}>Level {player.player_level_id || 1}</span>
       </div>
 
@@ -348,7 +349,7 @@ export default function AdminPlayerDetail() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              💳 See Detailed Wallet Overview →
+              <Icon name="wallet" size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} /> See Detailed Wallet Overview →
             </button>
           </div>
         </div>
@@ -426,7 +427,7 @@ export default function AdminPlayerDetail() {
                   <td style={{ padding: '11px 14px' }}><MoneyDisplay cents={tx.amount_cents} size="sm" color={txTypeColor(tx.type)} /></td>
                   <td style={{ padding: '11px 14px' }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: tx.direction === 'credit' ? '#10b981' : '#f87171', textTransform: 'uppercase' }}>
-                      {tx.direction === 'credit' ? '▲' : '▼'} {tx.direction}
+                      {tx.direction === 'credit' ? '+' : '−'} {tx.direction}
                     </span>
                   </td>
                   <td style={{ padding: '11px 14px' }}><MoneyDisplay cents={tx.balance_after_cents} size="sm" color="rgba(255,255,255,.5)" /></td>
@@ -477,7 +478,7 @@ export default function AdminPlayerDetail() {
               </pre>
             ) : (
               <div style={{ textAlign: 'center', padding: '20px 0', color: 'rgba(255,255,255,.3)' }}>
-                <div style={{ fontSize: 32, marginBottom: 10 }}>🤖</div>
+                <div style={{ marginBottom: 10, display:'flex', justifyContent:'center', color:'rgba(255,255,255,.4)' }}><Icon name="gear" size={30} /></div>
                 <div style={{ fontSize: 13 }}>AI verification not yet run</div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,.2)', marginTop: 6 }}>Coming in Phase 9 — KYC module</div>
               </div>

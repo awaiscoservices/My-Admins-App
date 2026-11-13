@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../../lib/supabase'
+import Icon from './Icon'
 
 export const G = '#fbbf24'
 export const card = { background: 'rgba(255,255,255,.03)', border: '1px solid rgba(251,191,36,.14)', borderRadius: 18, padding: 22 }
@@ -51,8 +52,8 @@ export function Notice({ kind = 'info', children }) {
   return <div style={{ padding: '12px 16px', borderRadius: 12, marginBottom: 16, fontSize: 13, fontWeight: 600, background: `rgba(${c[0]},.1)`, border: `1px solid rgba(${c[0]},.3)`, color: c[1] }}>{children}</div>
 }
 
-export function Empty({ icon = '📭', text }) {
-  return <div style={{ padding: '36px 16px', textAlign: 'center', color: 'rgba(255,255,255,.35)', fontSize: 13 }}><div style={{ fontSize: 30, marginBottom: 8 }}>{icon}</div>{text}</div>
+export function Empty({ icon = 'inbox', text }) {
+  return <div style={{ padding: '36px 16px', textAlign: 'center', color: 'rgba(255,255,255,.35)', fontSize: 13 }}><div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><Icon name={icon} size={30} /></div>{text}</div>
 }
 
 export const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })

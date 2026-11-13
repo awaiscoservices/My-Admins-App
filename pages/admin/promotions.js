@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
 import AdminLayout from '../../components/layout/AdminLayout'
 import { supabase } from '../../lib/supabase'
+import Icon from '../../components/ui/Icon'
 
 // ─── theme tokens (matches rest of admin app) ─────────────────────────────────
 const G        = '#fbbf24'           // gold
@@ -138,7 +139,7 @@ function MethodAccordion({ method, levels, bonusMap, onCellSave, savingCell }) {
             background: 'rgba(251,191,36,.12)', border: '1px solid rgba(251,191,36,.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, flexShrink: 0,
-          }}>💳</div>
+          }}><Icon name="card" size={20} /></div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: "'Outfit',sans-serif" }}>
               {method.name}
@@ -185,7 +186,7 @@ function MethodAccordion({ method, levels, bonusMap, onCellSave, savingCell }) {
                   {DAYS.map((d, i) => (
                     <th key={d} style={{ padding: '10px 6px', textAlign: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: i >= 5 ? '#f59e0b' : DIM2, whiteSpace: 'nowrap', minWidth: 80 }}>
                       {d}
-                      {i >= 5 && <span style={{ fontSize: 8, marginLeft: 3 }}>🔥</span>}
+                      {i >= 5 && <span style={{ marginLeft: 3, display:'inline-flex', color:'#f59e0b' }}><Icon name="flame" size={10} /></span>}
                     </th>
                   ))}
                 </tr>
@@ -447,7 +448,7 @@ export default function PlayerBonuses() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 12, width: 'fit-content', marginBottom: 24 }}>
-        {[['deposit','💰 Deposit Bonuses'], ['referral','🤝 Referral Bonuses'], ['bonus','🎁 Bonus Balance']].map(([key, label]) => (
+        {[['deposit','Deposit Bonuses'], ['referral','Referral Bonuses'], ['bonus','Bonus Balance']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
             fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700,
@@ -494,7 +495,7 @@ export default function PlayerBonuses() {
                 No bonus (blank)
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#f59e0b' }}>
-                🔥 Weekend (Sat / Sun)
+                Weekend (Sat / Sun)
               </div>
             </div>
           )}

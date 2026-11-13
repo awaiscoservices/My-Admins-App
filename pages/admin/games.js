@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
+import Icon from '../../components/ui/Icon'
 
 function GameModal({ game, onClose, onSave }) {
   const isNew = !game
@@ -29,7 +30,7 @@ function GameModal({ game, onClose, onSave }) {
       <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>{isNew ? 'Add Game' : 'Edit Game'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', display:'inline-flex' }}><Icon name="x" size={18} /></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[{ key: 'name', label: 'Game Name', placeholder: 'e.g. GameVault', type: 'text' }, { key: 'panel_url', label: 'Panel URL', placeholder: 'https://panel.game.com', type: 'url' }, { key: 'description', label: 'Description (optional)', placeholder: 'Short description', type: 'text' }].map(f => (
@@ -53,7 +54,7 @@ function GameModal({ game, onClose, onSave }) {
             <span style={{ fontSize: 13, color: form.is_active ? '#22c55e' : 'rgba(255,255,255,.35)' }}>{form.is_active ? 'Active' : 'Inactive'}</span>
           </div>
         </div>
-        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
+        {error && <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {error}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
           <button onClick={submit} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>{saving ? 'Saving…' : isNew ? 'Add Game' : 'Save'}</button>
           <button onClick={onClose} style={{ padding: '11px 16px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.4)', fontSize: 13, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>

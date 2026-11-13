@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import StatusBadge from './ui/StatusBadge'
+import Icon from './ui/Icon'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 const fmt   = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -126,7 +127,7 @@ function TabSummary({ playerId }) {
       .catch(e => setErr(e.message))
   }, [playerId])
 
-  if (err) return <div style={{ color: '#f87171', padding: 16 }}>⚠ {err}</div>
+  if (err) return <div style={{ color: '#f87171', padding: 16 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>
   if (!data) return <div style={{ color: 'rgba(255,255,255,.3)', padding: 16 }}>Loading…</div>
 
   const s = data
@@ -201,7 +202,7 @@ function TabSummary({ playerId }) {
             </div>
           </div>
         )}
-        {(!s.next_level) && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>Max level reached 🏆</div>}
+        {(!s.next_level) && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>Max level reached <Icon name="trophy" size={13} style={{ verticalAlign: '-2px', marginLeft:6 }} /></div>}
 
         {/* Recent level changes */}
         {s.recent_level_changes?.length > 0 && (
@@ -257,7 +258,7 @@ function TabTransactionList({ playerId, tabKey, columns, renderRow, emptyMsg = '
           : tabKey === 'scores' || tabKey === 'redeems'    ? ['all','pending','completed','rejected']
           :                                                  ['all','pending','approved','rejected']
         } />
-      {err && <div style={{ color: '#f87171', marginBottom: 10 }}>⚠ {err}</div>}
+      {err && <div style={{ color: '#f87171', marginBottom: 10 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>}
       {loading ? <div style={{ color: 'rgba(255,255,255,.3)', padding: 20 }}>Loading…</div> : (
         <>
           {rows.length === 0 ? <Empty msg={emptyMsg} /> : (
@@ -397,7 +398,7 @@ function TabTransactions({ playerId }) {
         </select>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>{total} transactions</span>
       </div>
-      {err && <div style={{ color: '#f87171', marginBottom: 10 }}>⚠ {err}</div>}
+      {err && <div style={{ color: '#f87171', marginBottom: 10 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>}
       {loading ? <div style={{ color: 'rgba(255,255,255,.3)', padding: 20 }}>Loading…</div> : (
         <>
           {rows.length === 0 ? <Empty msg="No transactions found" /> : (
@@ -442,7 +443,7 @@ function TabPlayerLevel({ playerId }) {
 
   useEffect(() => { load(1) }, [playerId]) // eslint-disable-line
 
-  if (err)    return <div style={{ color: '#f87171', padding: 16 }}>⚠ {err}</div>
+  if (err)    return <div style={{ color: '#f87171', padding: 16 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>
   if (loading) return <div style={{ color: 'rgba(255,255,255,.3)', padding: 20 }}>Loading…</div>
   if (!data)  return null
 
@@ -519,7 +520,7 @@ function TabBonuses({ playerId }) {
 
   return (
     <div>
-      {err && <div style={{ color: '#f87171', marginBottom: 10 }}>⚠ {err}</div>}
+      {err && <div style={{ color: '#f87171', marginBottom: 10 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>}
       {loading ? <div style={{ color: 'rgba(255,255,255,.3)', padding: 20 }}>Loading…</div> : (
         <>
           {rows.length === 0 ? <Empty msg="No bonus transactions" /> : (
@@ -550,14 +551,14 @@ function TabBonuses({ playerId }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const TABS = [
-  { key: 'summary',      label: '📊 Summary'     },
-  { key: 'deposits',     label: '💵 Deposits'    },
-  { key: 'withdrawals',  label: '🏦 Withdraw' },
-  { key: 'scores',       label: '🎮 Scores'      },
-  { key: 'redeems',      label: '💰 Redeems'     },
-  { key: 'transactions', label: '📋 Transactions' },
-  { key: 'player_level', label: '⭐ Level'       },
-  { key: 'bonuses',      label: '🎁 Bonuses'     },
+  { key: 'summary',      label: 'Summary',      icon: 'chart'   },
+  { key: 'deposits',     label: 'Deposits',     icon: 'cash'    },
+  { key: 'withdrawals',  label: 'Withdraws',    icon: 'bank'    },
+  { key: 'scores',       label: 'Scores',       icon: 'gamepad' },
+  { key: 'redeems',      label: 'Redeems',      icon: 'money'   },
+  { key: 'transactions', label: 'Transactions', icon: 'list'    },
+  { key: 'player_level', label: 'Level',        icon: 'star'    },
+  { key: 'bonuses',      label: 'Bonuses',      icon: 'gift'    },
 ]
 
 export default function PlayerWalletModal({ playerId, playerName, onClose }) {
@@ -670,14 +671,14 @@ export default function PlayerWalletModal({ playerId, playerName, onClose }) {
           <div className="wallet-header">
             <div style={{ paddingBottom: 14 }}>
               <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
-                💳 Wallet Overview
+                <Icon name="wallet" size={18} style={{ verticalAlign: '-2px', marginRight: 8 }} /> Wallet Overview
               </h2>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>{playerName}</div>
             </div>
             <button
               onClick={onClose}
               style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.5)', fontSize: 18, cursor: 'pointer', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, fontFamily: 'sans-serif', flexShrink: 0, marginBottom: 14 }}
-            >✕</button>
+            ><Icon name="x" size={18} /></button>
           </div>
 
           {/* Tab bar */}
@@ -699,7 +700,7 @@ export default function PlayerWalletModal({ playerId, playerName, onClose }) {
                   whiteSpace: 'nowrap',
                   transition: 'color .15s',
                 }}
-              >{t.label}</button>
+              ><Icon name={t.icon} size={13} style={{ verticalAlign:'-2px', marginRight:6 }} />{t.label}</button>
             ))}
           </div>
 

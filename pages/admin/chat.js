@@ -10,6 +10,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
+import Icon from '../../components/ui/Icon'
 
 const fmtTime = d => d ? new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
@@ -154,8 +155,8 @@ function EmojiButton({ onPick, disabled }) {
   return (
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button type="button" onClick={() => setOpen(o => !o)} disabled={disabled} title="Emoji"
-        style={{ width: 40, height: 40, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 18, cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        🙂
+        style={{ width: 40, height: 40, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><path d="M9 9h.01M15 9h.01" /></svg>
       </button>
       {open && (
         <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, width: 268, background: '#0e1a2e', border: '1px solid rgba(251,191,36,.25)', borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.6)', padding: 8, display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 2, zIndex: 30 }}>
@@ -177,7 +178,7 @@ function EmojiButton({ onPick, disabled }) {
 function Ticks({ read }) {
   return (
     <span style={{ marginLeft: 5, fontSize: 11, letterSpacing: '-3px', color: read ? '#53bdeb' : 'rgba(255,255,255,.55)' }}>
-      ✓✓
+      <svg width="18" height="11" viewBox="0 0 20 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 7l3.2 3.2L11 3.5" /><path d="M7.5 10L8 10.2 14.8 3.5" /></svg>
     </span>
   )
 }
@@ -512,7 +513,7 @@ export default function AdminChat() {
                     {/* Close (resolve) this conversation and clear it from the list. */}
                     <button onClick={closeConversation} title="Close conversation"
                       style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.28)', borderRadius: 9, color: '#f87171', fontSize: 16, lineHeight: 1, cursor: 'pointer' }}>
-                      ✕
+                      <Icon name="x" size={16} />
                     </button>
                   </div>
                 </div>
@@ -639,7 +640,7 @@ function CannedManager({ replies, onClose, onSaved }) {
       <div onClick={e => e.stopPropagation()} style={{ background: '#0b1626', border: '1px solid rgba(251,191,36,.3)', borderRadius: 18, padding: 26, width: '100%', maxWidth: 560, maxHeight: '86vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>Saved Replies</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}><Icon name="x" size={16} /></button>
         </div>
         <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.4)', margin: '0 0 18px', lineHeight: 1.6 }}>
           Give each reply a short key. In a chat, type <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>/</span> to pick one, or
@@ -651,7 +652,7 @@ function CannedManager({ replies, onClose, onSaved }) {
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '130px 1fr auto', gap: 8, alignItems: 'start' }}>
               <input value={r.key} onChange={e => set(i, 'key', e.target.value)} placeholder="key" style={{ ...inp, fontFamily: 'monospace' }} />
               <textarea value={r.text} onChange={e => set(i, 'text', e.target.value)} placeholder="The full message" rows={2} style={{ ...inp, resize: 'vertical' }} />
-              <button onClick={() => setRows(rs => rs.filter((_, j) => j !== i))} style={{ padding: '8px 10px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>✕</button>
+              <button onClick={() => setRows(rs => rs.filter((_, j) => j !== i))} style={{ padding: '8px 10px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}><Icon name="x" size={16} /></button>
             </div>
           ))}
         </div>
@@ -660,7 +661,7 @@ function CannedManager({ replies, onClose, onSaved }) {
           + Add reply
         </button>
 
-        {err && <p style={{ color: '#f87171', fontSize: 12.5, marginTop: 12 }}>⚠ {err}</p>}
+        {err && <p style={{ color: '#f87171', fontSize: 12.5, marginTop: 12 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</p>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={save} disabled={saving} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>

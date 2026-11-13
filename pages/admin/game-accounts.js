@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
+import Icon from '../../components/ui/Icon'
 
 function SetupModal({ account, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -32,7 +33,7 @@ function SetupModal({ account, onClose, onSave }) {
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>
             Setup Game Account
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', display:'inline-flex' }}><Icon name="x" size={18} /></button>
         </div>
 
         {/* Player info */}
@@ -68,12 +69,12 @@ function SetupModal({ account, onClose, onSave }) {
           ))}
         </div>
 
-        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
+        {error && <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {error}</div>}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '11px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: 'rgba(255,255,255,.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Cancel</button>
           <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '11px', background: saving ? 'rgba(16,185,129,.4)' : 'linear-gradient(135deg,#10b981,#059669)', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-            {saving ? '⏳ Saving…' : '✓ Activate Account'}
+            {saving ? 'Saving…' : 'Activate Account'}
           </button>
         </div>
       </div>
@@ -203,7 +204,7 @@ export default function AdminGameAccounts() {
 
       {toast && (
         <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: toast.type === 'error' ? 'rgba(239,68,68,.95)' : 'rgba(16,185,129,.95)', borderRadius: 12, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>
-          {toast.type === 'error' ? '⚠ ' : '✓ '}{toast.msg}
+          <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}><Icon name={toast.type === 'error' ? 'alert' : 'check'} size={16} stroke={2.4} /> {toast.msg}</span>
         </div>
       )}
 
@@ -248,7 +249,7 @@ export default function AdminGameAccounts() {
                 <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
-                  {filter === 'pending' ? '✅ No pending game accounts!' : 'No accounts found'}
+                  {filter === 'pending' ? 'No pending game accounts' : 'No accounts found'}
                 </td></tr>
               ) : filtered.map((a, i) => (
                 <tr key={a.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
@@ -282,7 +283,7 @@ export default function AdminGameAccounts() {
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => setModalAccount(a)} style={{ padding: '6px 12px', background: a.status === 'pending' ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: a.status === 'pending' ? '#050505' : '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", whiteSpace: 'nowrap' }}>
-                        {a.status === 'pending' ? '⚡ Setup' : '✏️ Edit'}
+                        {a.status === 'pending' ? 'Setup' : 'Edit'}
                       </button>
                       {a.status === 'active' && (
                         <button onClick={() => handleSuspend(a.id)} style={{ padding: '6px 10px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, color: '#f87171', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>

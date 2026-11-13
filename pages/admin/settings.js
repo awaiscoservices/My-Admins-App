@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
+import Icon from '../../components/ui/Icon'
 
 const fmt = c => c != null ? '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''
 
@@ -278,7 +279,7 @@ export default function AdminSettings() {
               </div>
               {settings?.maintenance_mode && (
                 <div style={{ marginTop: 16, padding: '14px 16px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171' }}>⚠ Maintenance mode is ACTIVE</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171' }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> Maintenance mode is ACTIVE</div>
                   <div style={{ fontSize: 12, color: 'rgba(239,68,68,.7)', marginTop: 4 }}>All player-facing pages are currently blocked. Disable to restore access.</div>
                 </div>
               )}

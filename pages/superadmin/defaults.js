@@ -17,6 +17,7 @@ import Head from 'next/head'
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout'
 import { supabase } from '../../lib/supabase'
 import LevelDrawer, { fmtD, fmtX } from '../../components/levels/LevelDrawer'
+import Icon from '../../components/ui/Icon'
 
 const G    = '#fbbf24'
 const DIM  = 'rgba(255,255,255,.45)'
@@ -291,7 +292,7 @@ export default function SuperAdminDefaults() {
                 )}
                 <button onClick={() => removeRow(tab, i, describe(tab, row))}
                   style={{ padding: '5px 9px', background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
-                  ✕
+                  <Icon name="x" size={16} />
                 </button>
               </span>
             </div>

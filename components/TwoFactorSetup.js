@@ -12,6 +12,7 @@
  */
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import Icon from './ui/Icon'
 
 export default function TwoFactorSetup({ onClose, onChange, forced = false }) {
   const [factors, setFactors] = useState(null)   // null = loading
@@ -67,7 +68,7 @@ export default function TwoFactorSetup({ onClose, onChange, forced = false }) {
       <div style={{ background: '#0b1626', border: '1px solid rgba(251,191,36,.3)', borderRadius: 18, padding: 28, width: '100%', maxWidth: 420 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>Two-Factor Authentication</h2>
-          {!forced && <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>}
+          {!forced && <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', display:'inline-flex' }}><Icon name="x" size={18} /></button>}
         </div>
 
         {forced && !hasFactor && (
@@ -97,7 +98,7 @@ export default function TwoFactorSetup({ onClose, onChange, forced = false }) {
         ) : hasFactor ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 12, marginBottom: 16 }}>
-              <span style={{ color: '#22c55e', fontWeight: 800, fontSize: 13 }}>✓ Two-factor is on</span>
+              <span style={{ color: '#22c55e', fontWeight: 800, fontSize: 13 }}><Icon name="check" size={13} stroke={2.6} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Two-factor is on</span>
               <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 12 }}>You’ll enter a code each time you sign in.</span>
             </div>
             {!forced && (
@@ -117,7 +118,7 @@ export default function TwoFactorSetup({ onClose, onChange, forced = false }) {
           </>
         )}
 
-        {err && <p style={{ color: '#f87171', fontSize: 12.5, marginTop: 14, textAlign: 'center' }}>⚠ {err}</p>}
+        {err && <p style={{ color: '#f87171', fontSize: 12.5, marginTop: 14, textAlign: 'center' }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</p>}
       </div>
     </div>
   )

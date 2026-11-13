@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
+import Icon from '../../components/ui/Icon'
 
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
@@ -24,7 +25,7 @@ function PlayerModal({ player, onClose, onAction, onWallet }) {
       <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, color: '#fff' }}>Player Details</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', display:'inline-flex' }}><Icon name="x" size={18} /></button>
         </div>
         <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '16px', marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8, fontFamily: 'monospace' }}>{player.username || player.full_name}</div>
@@ -35,17 +36,17 @@ function PlayerModal({ player, onClose, onAction, onWallet }) {
             <div><div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)' }}>JOINED</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{fmtDate(player.created_at)}</div></div>
           </div>
         </div>
-        {error && <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {error}</div>}
+        {error && <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {error}</div>}
 
         {/* Wallet + Profile links */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <button
             onClick={() => { onClose(); onWallet(player) }}
             style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg,rgba(59,130,246,.2),rgba(99,102,241,.2))', border: '1px solid rgba(99,102,241,.4)', borderRadius: 10, color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>
-            💳 Wallet Overview
+            <Icon name="wallet" size={16} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Wallet Overview
           </button>
           <Link href={`/admin/players/${player.id}`} style={{ flex: 1, padding: '10px', background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, color: '#fbbf24', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit',sans-serif", textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            👤 Full Profile →
+            <Icon name="user" size={16} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Full Profile →
           </Link>
         </div>
 
@@ -190,7 +191,7 @@ export default function AdminPlayers() {
                         onClick={() => setWalletPlayer(r)}
                         title="Wallet Overview"
                         style={{ padding: '6px 10px', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 8, color: '#818cf8', fontSize: 14, cursor: 'pointer', lineHeight: 1 }}>
-                        💳
+                        <Icon name="wallet" size={16} />
                       </button>
                       <button
                         onClick={() => setSelected(r)}

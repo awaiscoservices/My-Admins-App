@@ -16,6 +16,7 @@
  * columns on it must merge: { ...original, ...body }.
  */
 import { useState } from 'react'
+import Icon from '../ui/Icon'
 
 export const c2d  = cents => cents != null ? (cents / 100).toFixed(2) : ''
 export const d2c  = str   => str !== '' && str != null ? Math.round(parseFloat(str) * 100) : null
@@ -124,7 +125,7 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
               ? <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(255,255,255,.35)' }}>{subtitle}</p>
               : (level?.id ? <p style={{ margin: '3px 0 0', fontSize: 12, color: 'rgba(255,255,255,.35)' }}>ID: {level.id}</p> : null)}
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', cursor: 'pointer', lineHeight: 1, display:'inline-flex' }}><Icon name="x" size={18} /></button>
         </div>
 
         <div style={{ flex: 1, padding: '24px 24px 32px', overflowY: 'auto' }}>
@@ -147,7 +148,7 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
                 </div>
               </Field>
               <Field label="Badge Icon (emoji/text)">
-                <input style={inp} value={form.badge_icon} onChange={e => set('badge_icon', e.target.value)} placeholder="⭐ or 🥇" />
+                <input style={inp} value={form.badge_icon} onChange={e => set('badge_icon', e.target.value)} placeholder="star, crown, gem, trophy…" />
               </Field>
             </Row2>
             <div style={{ marginTop: 14 }}>
@@ -205,7 +206,7 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
             </Row2>
           </Section>
 
-          {err && <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}>⚠ {err}</div>}
+          {err && <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, color: '#f87171', fontSize: 13 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>}
         </div>
 
         <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,.07)', display: 'flex', gap: 10, flexShrink: 0, background: '#0b1626' }}>

@@ -4,6 +4,7 @@ import { adminFetch } from '../../lib/adminFetch'
 import AdminLayout from '../layout/AdminLayout'
 import StatusBadge from '../ui/StatusBadge'
 import { centsToDisplay } from '../ui/MoneyDisplay'
+import Icon from '../ui/Icon'
 
 const G = '#fbbf24'
 const fmt = (d) => new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -14,31 +15,31 @@ const KINDS = {
     title: 'Game Loads', sub: 'Load the credits into the player’s game account, then mark it loaded.',
     amount: r => r.amount_cents,
     fields: r => [['Game', r._game?.name], ['Game username', r._game?.username]],
-    ok: { id: 'completed', label: '✓ Mark loaded' }, canReject: true,
+    ok: { id: 'completed', label: 'Mark loaded' }, canReject: true,
   },
   redemptions: {
     title: 'Redeem', sub: 'Approve to credit the amount to the player’s wallet. You can change the amount.',
     amount: r => r.amount_cents, amountInput: true,
     fields: r => [['Game', r._game?.name], ['Game username', r._game?.username], ['Player note', r.player_notes]],
-    ok: { id: 'completed', label: '✓ Approve & credit wallet' }, canReject: true,
+    ok: { id: 'completed', label: 'Approve & credit wallet' }, canReject: true,
   },
   withdrawals: {
     title: 'Withdraw', sub: 'Send the money to the player first, then mark it paid.',
     amount: r => r.amount_cents, refInput: true,
     fields: r => [['Method', r.method], ['Pay to', r.destination], ['Payout reference', r.payout_reference]],
-    ok: { id: 'completed', label: '✓ Mark paid' }, canReject: true,
+    ok: { id: 'completed', label: 'Mark paid' }, canReject: true,
   },
   kyc: {
     title: 'KYC Review', sub: 'Check the ID photos against the details, then verify or reject.',
     fields: r => [['Legal name', r.full_legal_name], ['Date of birth', r.dob], ['Address', r.address], ['ID', [r.id_type, r.id_number].filter(Boolean).join(' · ')]],
-    docs: true, ok: { id: 'verified', label: '✓ Verify' }, canReject: true,
+    docs: true, ok: { id: 'verified', label: 'Verify' }, canReject: true,
     extra: { id: 'more_info_required', label: 'Ask for more info', needsReason: true },
   },
   support: {
     title: 'Support Tickets', sub: 'Reply to the player and resolve the ticket.',
     fields: r => [['Category', r.category], ['Subject', r.subject]],
     message: r => r.message, replyBox: true,
-    ok: { id: 'resolved', label: '✓ Reply & resolve', needsReason: true },
+    ok: { id: 'resolved', label: 'Reply & resolve', needsReason: true },
     extra: { id: 'in_progress', label: 'Mark in progress' },
   },
 }
@@ -102,8 +103,8 @@ function Row({ kind, cfg, r, onAct }) {
 
       {cfg.docs && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          {r._docs?.front ? <a href={r._docs.front} target="_blank" rel="noreferrer" style={{ ...btn('rgba(251,191,36,.12)', G, '1px solid rgba(251,191,36,.35)'), textDecoration: 'none' }}>📄 ID front</a> : <span style={{ fontSize: 12, color: 'rgba(255,255,255,.35)' }}>No front photo</span>}
-          {r._docs?.back && <a href={r._docs.back} target="_blank" rel="noreferrer" style={{ ...btn('rgba(251,191,36,.12)', G, '1px solid rgba(251,191,36,.35)'), textDecoration: 'none' }}>📄 ID back</a>}
+          {r._docs?.front ? <a href={r._docs.front} target="_blank" rel="noreferrer" style={{ ...btn('rgba(251,191,36,.12)', G, '1px solid rgba(251,191,36,.35)'), textDecoration: 'none' }}><Icon name="image" size={13} style={{ verticalAlign:'-2px', marginRight:5 }} /> ID front</a> : <span style={{ fontSize: 12, color: 'rgba(255,255,255,.35)' }}>No front photo</span>}
+          {r._docs?.back && <a href={r._docs.back} target="_blank" rel="noreferrer" style={{ ...btn('rgba(251,191,36,.12)', G, '1px solid rgba(251,191,36,.35)'), textDecoration: 'none' }}><Icon name="image" size={13} style={{ verticalAlign:'-2px', marginRight:5 }} /> ID back</a>}
         </div>
       )}
 
@@ -121,7 +122,7 @@ function Row({ kind, cfg, r, onAct }) {
             {cfg.extra && <button disabled={!!busy} onClick={() => go(cfg.extra.id, cfg.extra.needsReason)} style={btn('transparent', G, '1px solid rgba(251,191,36,.4)')}>{cfg.extra.label}</button>}
             {cfg.canReject && (rejecting
               ? <button disabled={!!busy} onClick={() => go('rejected', true)} style={btn('rgba(239,68,68,.15)', '#f87171', '1px solid rgba(239,68,68,.4)')}>{busy === 'rejected' ? 'Working…' : 'Confirm reject'}</button>
-              : <button disabled={!!busy} onClick={() => setRejecting(true)} style={btn('rgba(239,68,68,.08)', '#f87171', '1px solid rgba(239,68,68,.3)')}>✕ Reject</button>)}
+              : <button disabled={!!busy} onClick={() => setRejecting(true)} style={btn('rgba(239,68,68,.08)', '#f87171', '1px solid rgba(239,68,68,.3)')}><Icon name="x" size={13} stroke={2.6} style={{ verticalAlign: '-2px', marginRight: 5 }} /> Reject</button>)}
             {kind !== 'kyc' && kind !== 'support' && r.status === 'pending' && <button disabled={!!busy} onClick={() => go('under_review', false)} style={btn('transparent', 'rgba(255,255,255,.6)', '1px solid rgba(255,255,255,.2)')}>Mark under review</button>}
           </div>
         </div>
@@ -167,10 +168,10 @@ export default function RequestQueue({ kind }) {
         ))}
         <button onClick={load} style={{ ...btn('transparent', 'rgba(255,255,255,.6)', '1px solid rgba(255,255,255,.15)'), borderRadius: 99 }}>↻ Refresh</button>
       </div>
-      {toast && <div style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.35)', color: '#10b981', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700, marginBottom: 14 }}>✓ {toast}</div>}
+      {toast && <div style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.35)', color: '#10b981', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700, marginBottom: 14 }}><Icon name="check" size={13} stroke={2.6} style={{ verticalAlign: '-2px', marginRight: 5 }} /> {toast}</div>}
       {loadErr && <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: '#f87171', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700, marginBottom: 14 }}>{loadErr}</div>}
       {loading ? <div style={{ color: 'rgba(255,255,255,.4)', padding: 30, textAlign: 'center' }}>Loading…</div>
-        : rows.length === 0 && !loadErr ? <div style={{ color: 'rgba(255,255,255,.35)', padding: 40, textAlign: 'center' }}><div style={{ fontSize: 30 }}>✅</div>Nothing here</div>
+        : rows.length === 0 && !loadErr ? <div style={{ color: 'rgba(255,255,255,.35)', padding: 40, textAlign: 'center' }}><div style={{ display:'flex', justifyContent:'center', marginBottom:8, color:'#10b981' }}><Icon name="checkCircle" size={30} /></div>Nothing here</div>
         : rows.map(r => <Row key={r.id} kind={kind} cfg={cfg} r={r} onAct={act} />)}
     </AdminLayout>
   )
