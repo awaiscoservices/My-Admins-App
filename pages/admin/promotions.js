@@ -304,9 +304,65 @@ function ReferralTab({ tiers, onSave, saving }) {
   )
 }
 
-// ─── Toggle switch ────────────────────────────────────────────────────────────
+// ─── Bonus Balance tab ────────────────────────────────────────────────────────
+// Universal settings (one global row, every casino shares them) for how
+// bonus-funded scores redeem.
+function BonusBalanceTab({ config, onSave, saving }) {
+  const [pct, setPct]       = useState('')
+  const [mult, setMult]     = useState(false)
 
-// ─── Payment Methods tab ───────────────────────────────────────────────────────
+  useEffect(() => {
+    setPct(config?.redeemable_pct ?? '')
+    setMult(!!config?.apply_multiplier)
+  }, [config])
+
+  // Worked example so the operator sees exactly what the numbers do.
+  const p = parseFloat(pct) || 0
+  const example = mult
+    ? `$10 loaded from Bonus → ×5 = $50, then ${p}% = $${(10 * 5 * p / 100).toFixed(2)} redeemable`
+    : `$10 loaded from Bonus → ${p}% = $${(10 * p / 100).toFixed(2)} redeemable`
+
+  return (
+    <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: 'rgba(251,191,36,.07)', border: BDR_GOLD, borderRadius: 14, padding: '14px 18px', fontSize: 12.5, color: DIM, lineHeight: 1.6 }}>
+        These settings are <strong style={{ color: G }}>universal</strong> — they apply to every casino. They control money that players loaded into games from their <strong style={{ color: G }}>Bonus balance</strong> (and Wheel of Fortune winnings, which always land in Bonus).
+      </div>
+
+      {/* Redeemable % */}
+      <div style={{ background: BG_CARD, border: BDR, borderRadius: 14, padding: '18px 20px' }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Bonus redeemable %</div>
+        <div style={{ fontSize: 12, color: DIM2, marginBottom: 12 }}>How much of bonus-funded winnings a player can redeem.</div>
+        <div style={{ position: 'relative', width: 120 }}>
+          <input type="number" min="0" max="100" step="0.5" value={pct}
+            onChange={e => setPct(e.target.value)} placeholder="10"
+            style={{ width: '100%', padding: '10px 28px 10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.05)', border: BDR, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: "'Outfit',sans-serif", outline: 'none', MozAppearance: 'textfield' }} />
+          <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: G, fontWeight: 700, pointerEvents: 'none' }}>%</span>
+        </div>
+      </div>
+
+      {/* Multiplier toggle */}
+      <div style={{ background: BG_CARD, border: BDR, borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Apply redeem multiplier to bonus play</div>
+          <div style={{ fontSize: 12, color: DIM2 }}>When on, the level's redeem multiplier (e.g. 5×) applies to bonus-funded loads before the % is taken. When off, the % is of the load amount only.</div>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }}>
+          <input type="checkbox" checked={mult} onChange={e => setMult(e.target.checked)} style={{ width: 18, height: 18, accentColor: G }} />
+          <span style={{ fontSize: 12, color: DIM, fontFamily: "'Outfit',sans-serif" }}>{mult ? 'On' : 'Off'}</span>
+        </label>
+      </div>
+
+      <div style={{ fontSize: 12, color: DIM, fontStyle: 'italic' }}>Example: {example}</div>
+
+      <div>
+        <button onClick={() => onSave({ redeemable_pct: pct, apply_multiplier: mult })} disabled={saving}
+          style={{ padding: '11px 28px', borderRadius: 10, background: saving ? 'rgba(255,255,255,.08)' : 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', color: saving ? DIM : '#000', fontSize: 13, fontWeight: 800, cursor: saving ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+          {saving ? 'Saving…' : 'Save Bonus Balance settings'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function PlayerBonuses() {
@@ -315,9 +371,11 @@ export default function PlayerBonuses() {
   const [levels, setLevels]     = useState([])
   const [bonusMap, setBonusMap] = useState({})   // { [pmId]: { [levelId]: { [day]: percent } } }
   const [referralTiers, setReferralTiers] = useState([])
+  const [bonusConfig, setBonusConfig] = useState(null)
   const [loading, setLoading]   = useState(true)
   const [savingCell, setSavingCell] = useState(null)
   const [savingReferral, setSavingReferral] = useState(null)
+  const [savingConfig, setSavingConfig] = useState(false)
   const [toast, setToast]       = useState(null)
 
   function showToast(msg, type = 'success') {
@@ -332,6 +390,11 @@ export default function PlayerBonuses() {
       setPaymentMethods(d.paymentMethods || [])
       setLevels(d.levels || [])
       setReferralTiers(d.referralTiers || [])
+
+      try {
+        const bc = await apiFetch('/api/admin/bonuses/bonus-config')
+        setBonusConfig(bc.config || null)
+      } catch { /* leave null — tab shows defaults */ }
 
       // Build bonusMap from flat bonuses array
       const map = {}
@@ -382,6 +445,19 @@ export default function PlayerBonuses() {
     setSavingReferral(null)
   }
 
+  async function handleConfigSave(next) {
+    setSavingConfig(true)
+    try {
+      const r = await apiFetch('/api/admin/bonuses/bonus-config', {
+        method: 'PUT',
+        body: JSON.stringify(next),
+      })
+      setBonusConfig(r.config)
+      showToast('Bonus Balance settings saved')
+    } catch (e) { showToast(e.message, 'error') }
+    setSavingConfig(false)
+  }
+
   return (
     <AdminLayout>
       <Head><title>Player Bonuses — Admin</title></Head>
@@ -399,7 +475,7 @@ export default function PlayerBonuses() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 12, width: 'fit-content', marginBottom: 24 }}>
-        {[['deposit','💰 Deposit Bonuses'], ['referral','🤝 Referral Bonuses']].map(([key, label]) => (
+        {[['deposit','💰 Deposit Bonuses'], ['referral','🤝 Referral Bonuses'], ['bonus','🎁 Bonus Balance']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
             fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700,
@@ -463,6 +539,15 @@ export default function PlayerBonuses() {
             onSave={handleReferralSave}
             saving={savingReferral}
           />
+        )
+      )}
+
+      {/* ── Bonus Balance tab ── */}
+      {tab === 'bonus' && (
+        loading ? (
+          <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
+        ) : (
+          <BonusBalanceTab config={bonusConfig} onSave={handleConfigSave} saving={savingConfig} />
         )
       )}
     </AdminLayout>
