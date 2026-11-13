@@ -12,6 +12,12 @@ import PlayerWalletModal from '../../components/PlayerWalletModal'
 const fmt     = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
+// Cash / Bonus wallet pill — which balance the winnings came from.
+function BucketPill({ bucket }) {
+  const isBonus = bucket === 'bonus'
+  return <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:99, textTransform:'capitalize', background: isBonus ? 'rgba(168,85,247,.15)' : 'rgba(255,255,255,.08)', color: isBonus ? '#a855f7' : 'rgba(255,255,255,.4)' }}>{bucket || 'cash'}</span>
+}
+
 function ReviewModal({ item, onClose, onAction }) {
   const [notes, setNotes]       = useState('')
   const [approvedAmt, setApprovedAmt] = useState(String((item.amount_cents || 0) / 100))
@@ -36,7 +42,14 @@ function ReviewModal({ item, onClose, onAction }) {
         </div>
         <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
           <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4, fontFamily:'monospace' }}>{item.profiles?.username || item.profiles?.full_name}</div>
-          <div style={{ fontSize:13, color:'#f59e0b', fontWeight:700, marginTop:8 }}>Requested: {fmt(item.amount_cents)}</div>
+          {item.source_bucket === 'bonus' ? (
+            <div style={{ marginTop:8 }}>
+              <div style={{ fontSize:13, color:'#fff', fontWeight:700 }}>Winnings entered: {fmt(item.qualifying_load_cents)} <span style={{ fontSize:10, fontWeight:800, padding:'1px 7px', borderRadius:99, background:'rgba(168,85,247,.15)', color:'#a855f7', marginLeft:4 }}>bonus</span></div>
+              <div style={{ fontSize:13, color:'#fbbf24', fontWeight:700, marginTop:3 }}>Pays player: {fmt(item.amount_cents)}</div>
+            </div>
+          ) : (
+            <div style={{ fontSize:13, color:'#f59e0b', fontWeight:700, marginTop:8 }}>Requested: {fmt(item.amount_cents)} <span style={{ fontSize:10, fontWeight:800, padding:'1px 7px', borderRadius:99, background:'rgba(255,255,255,.08)', color:'rgba(255,255,255,.4)', marginLeft:4 }}>cash</span></div>
+          )}
           <div style={{ fontSize:11, color:'rgba(255,255,255,.4)', marginTop:4 }}>
             Game: {item.game_accounts?.game_panels?.name} · Account: {item.game_accounts?.game_username}
           </div>
@@ -160,16 +173,16 @@ export default function AdminRedemptions() {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'rgba(255,255,255,.04)' }}>
-                {['Reference','Player','Game Account','Requested','Approved','Status','Date','Actions'].map(h => (
+                {['Reference','Player','Game Account','Wallet','Requested','Approved','Status','Date','Actions'].map(h => (
                   <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={9} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={9} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
                   {filter === 'pending' ? '✅ No pending redeems!' : 'No redemptions found'}
                 </td></tr>
               ) : rows.map(r => (
@@ -186,8 +199,16 @@ export default function AdminRedemptions() {
                     <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{r.game_accounts?.game_panels?.name || '—'}</div>
                     <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.game_accounts?.game_username}</div>
                   </td>
+                  <td style={{ padding:'12px 14px' }}><BucketPill bucket={r.source_bucket} /></td>
                   <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#f59e0b' }}>{fmt(r.amount_cents)}</div>
+                    {r.source_bucket === 'bonus' ? (<>
+                      {/* Admin sees the full winnings the player entered; the
+                          player only ever sees the payout. */}
+                      <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{fmt(r.qualifying_load_cents)}</div>
+                      <div style={{ fontSize:10, color:'#fbbf24', fontWeight:700 }}>pays {fmt(r.amount_cents)}</div>
+                    </>) : (
+                      <div style={{ fontSize:13, fontWeight:700, color:'#f59e0b' }}>{fmt(r.amount_cents)}</div>
+                    )}
                   </td>
                   <td style={{ padding:'12px 14px', fontSize:13, color: r.approved_cents > 0 ? '#22c55e' : 'rgba(255,255,255,.25)', fontWeight:700 }}>
                     {r.approved_cents > 0 ? fmt(r.approved_cents) : '—'}
