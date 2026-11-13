@@ -32,11 +32,12 @@ export default async function handler(req, res) {
   await supabaseAdmin.from('audit_logs').insert({
     tenant_id: gate.tenantId,
     action: 'referral_bonus_update',
-    performed_by: user.id,
+    actor_id: user.id,
+    actor_role: user.role,
     target_type: 'referral_bonus_tier',
     target_id: String(deposit_number),
-    details: { deposit_number, bonus_percent },
-  })
+    metadata: { deposit_number, bonus_percent, is_active: is_active ?? true },
+  }).then(() => {}, () => {})
 
   return res.status(200).json({ success: true })
 }
