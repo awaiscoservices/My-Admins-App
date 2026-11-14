@@ -162,7 +162,11 @@ export default function AdminLayout({ children }) {
   // top each time. Remember where it was and put it back so the active page
   // stays where you left it instead of jumping up.
   const navRef = useRef(null)
+  // Runs only once the panel is authorized — before that the <nav> is not
+  // mounted (the "Verifying access…" screen is shown instead), so navRef is
+  // null and there is nothing to restore or listen on.
   useEffect(() => {
+    if (!authorized) return
     const el = navRef.current
     if (!el) return
     try {
@@ -172,7 +176,7 @@ export default function AdminLayout({ children }) {
     const onScroll = () => { try { sessionStorage.setItem('adminNavScroll', String(el.scrollTop)) } catch {} }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [authorized])
 
   useEffect(() => { loadAdminData() }, [])
 
