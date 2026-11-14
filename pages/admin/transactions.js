@@ -47,16 +47,21 @@ const typeColor = t => TYPE_META[t]?.color || 'rgba(255,255,255,.5)'
 
 // Order the tabs: known types first in a sensible order, then anything else
 // alphabetically. New types land at the end instead of disappearing.
+// Fixed display order: Deposit, Withdraw, Scores, Redeem, Bonus, then the rest.
 const TYPE_ORDER = [
-  'deposit', 'deposit_bonus', 'bonus', 'referral_bonus',
-  'withdrawal', 'withdrawal_refund', 'game_load', 'game_load_refund',
-  'redeem', 'spin_bet', 'spin_win',
-  'adjustment', 'adjustment_credit', 'adjustment_debit', 'refund',
+  'deposit',
+  'withdrawal', 'withdrawal_refund',
+  'game_load', 'game_load_refund',
+  'redeem',
+  'bonus', 'deposit_bonus', 'referral_bonus',
+  'spin_bet', 'spin_win',
+  'adjustment_credit', 'adjustment_debit', 'adjustment',
+  'refund',
 ]
 
 // Core tabs that stay visible even when no row of that type exists yet.
 const BASE_TYPES = [
-  'deposit', 'withdrawal', 'game_load', 'redeem',
+  'deposit', 'withdrawal', 'game_load', 'redeem', 'bonus',
   'adjustment_credit', 'adjustment_debit',
 ]
 function orderTypes(types) {
