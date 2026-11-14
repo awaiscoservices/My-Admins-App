@@ -26,8 +26,9 @@ export default function AdminStaff() {
   const [loading,  setLoading]  = useState(true)
   const [role,     setRole]     = useState('')
   const [toast,    setToast]    = useState(null)
-  const [modal,    setModal]    = useState(null)   // 'invite' | { type:'role'|'deactivate', member }
-  const [invite,   setInvite]   = useState({ email:'', role:'admin', tenant_id:'' })
+  const [modal,    setModal]    = useState(null)   // 'create' | { type:'role'|'deactivate', member }
+  const [invite,   setInvite]   = useState({ email:'', full_name:'', password:'', role:'admin', tenant_id:'' })
+  const [created,  setCreated]  = useState(null)   // { email, password, role } — shown after a save
   const [tenants,  setTenants]  = useState([])
   const [saving,   setSaving]   = useState(false)
   const [myId,     setMyId]     = useState(null)
@@ -110,23 +111,35 @@ export default function AdminStaff() {
     load()
   }
 
-  async function sendInvite() {
+  // Make a strong random password the admin can hand over (or overwrite).
+  function genPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%'
+    let p = ''
+    const arr = new Uint32Array(14)
+    ;(window.crypto || window.msCrypto).getRandomValues(arr)
+    for (let i = 0; i < 14; i++) p += chars[arr[i] % chars.length]
+    setInvite(i => ({ ...i, password: p }))
+  }
+
+  async function createStaff() {
     if (!invite.email.trim()) { showToast('Email required', 'error'); return }
+    if (invite.password.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/admin/staff/invite', {
+    const res = await fetch('/api/admin/staff/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(
-        invite.tenant_id ? invite : { email: invite.email, role: invite.role }
+        invite.tenant_id ? invite : { email: invite.email, full_name: invite.full_name, password: invite.password, role: invite.role }
       ),
     })
     const json = await res.json()
     setSaving(false)
-    if (!res.ok) { showToast(json.error || 'Invite failed', 'error'); return }
-    showToast(`Invite sent to ${invite.email}`)
+    if (!res.ok) { showToast(json.error || 'Could not create staff', 'error'); return }
+    // Show the credentials so the admin can copy and send them.
+    setCreated({ email: invite.email.trim(), password: invite.password, role: invite.role })
     setModal(null)
-    setInvite({ email:'', role:'admin', tenant_id:'' })
+    setInvite({ email:'', full_name:'', password:'', role:'admin', tenant_id:'' })
     load()
   }
 
@@ -148,12 +161,49 @@ export default function AdminStaff() {
         </div>
       )}
 
-      {/* Invite modal */}
-      {modal === 'invite' && (
+      {/* Credentials shown after a staff account is created */}
+      {created && (
+        <div style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#0d1f35', border:'1px solid rgba(34,197,94,.3)', borderRadius:20, padding:28, maxWidth:420, width:'100%' }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:6, fontFamily:"'Cinzel',serif" }}>Staff account created ✅</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:18 }}>Send these login details to the <strong style={{color:'#fbbf24'}}>{created.role}</strong>. They sign in on the normal login page.</div>
+            {[['Email', created.email], ['Password', created.password]].map(([k,v]) => (
+              <div key={k} style={{ marginBottom:12 }}>
+                <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>{k}</label>
+                <div style={{ display:'flex', gap:8 }}>
+                  <div style={{ flex:1, padding:'10px 12px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:8, color:'#fff', fontSize:14, fontFamily:'monospace', wordBreak:'break-all' }}>{v}</div>
+                  <button onClick={() => { navigator.clipboard?.writeText(v); showToast(`${k} copied`) }} style={{ padding:'0 14px', background:'rgba(251,191,36,.15)', border:'1px solid rgba(251,191,36,.35)', borderRadius:8, color:'#fbbf24', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>Copy</button>
+                </div>
+              </div>
+            ))}
+            <button onClick={() => { navigator.clipboard?.writeText(`Email: ${created.email}\nPassword: ${created.password}`); showToast('Both copied') }}
+              style={{ width:'100%', marginTop:6, marginBottom:10, padding:'10px 0', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)', borderRadius:10, color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+              Copy both
+            </button>
+            <button onClick={() => setCreated(null)} style={{ width:'100%', padding:'10px 0', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create staff modal */}
+      {modal === 'create' && (
         <div style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
           <div style={{ background:'#0d1f35', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:28, maxWidth:400, width:'100%' }}>
-            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:20, fontFamily:"'Cinzel',serif" }}>Invite Staff Member</div>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:20, fontFamily:"'Cinzel',serif" }}>Add Staff Member</div>
             <FieldInput label="Email Address" value={invite.email} onChange={v => setInvite(i => ({...i, email:v}))} type="email" />
+            <div style={{ marginTop:14 }}>
+              <FieldInput label="Full Name (optional)" value={invite.full_name} onChange={v => setInvite(i => ({...i, full_name:v}))} />
+            </div>
+            <div style={{ marginTop:14 }}>
+              <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>Password</label>
+              <div style={{ display:'flex', gap:8 }}>
+                <input type="text" value={invite.password} onChange={e => setInvite(i => ({...i, password:e.target.value}))} placeholder="Min 8 characters"
+                  style={{ flex:1, padding:'9px 12px', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.12)', borderRadius:8, color:'#fff', fontSize:14, fontFamily:'monospace', outline:'none', boxSizing:'border-box' }} />
+                <button type="button" onClick={genPassword} style={{ padding:'0 14px', background:'rgba(251,191,36,.15)', border:'1px solid rgba(251,191,36,.35)', borderRadius:8, color:'#fbbf24', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>Generate</button>
+              </div>
+            </div>
             <div style={{ marginTop:14, marginBottom:20 }}>
               <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>Role</label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -188,8 +238,8 @@ export default function AdminStaff() {
             )}
 
             <div style={{ display:'flex', gap:10 }}>
-              <button onClick={sendInvite} disabled={saving} style={{ flex:1, padding:'10px 0', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-                {saving ? 'Sending…' : 'Send Invite'}
+              <button onClick={createStaff} disabled={saving} style={{ flex:1, padding:'10px 0', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+                {saving ? 'Creating…' : 'Create Account'}
               </button>
               <button onClick={() => setModal(null)} style={{ padding:'10px 18px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'rgba(255,255,255,.5)', fontSize:13, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                 Cancel
@@ -231,8 +281,8 @@ export default function AdminStaff() {
           <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Manage admin team members and roles</p>
         </div>
         {canManage && (
-          <button onClick={() => setModal('invite')} style={{ padding:'10px 20px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
-            + Invite Staff
+          <button onClick={() => setModal('create')} style={{ padding:'10px 20px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
+            + Add Staff
           </button>
         )}
       </div>
