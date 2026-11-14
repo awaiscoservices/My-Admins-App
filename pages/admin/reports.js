@@ -179,18 +179,14 @@ export default function AdminReports() {
           ))}
         </div>
 
-        {/* ── Shift filter: All + the 3 shifts ── */}
-        <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:12, flexWrap:'wrap', marginBottom:14 }}>
-          {SHIFT_FILTERS.map(sf => (
-            <button key={sf.id} onClick={() => setShift(sf.id)} style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:12.5, fontWeight:700, background: shift===sf.id ? 'rgba(99,102,241,.7)' : 'transparent', color: shift===sf.id ? '#fff' : 'rgba(255,255,255,.5)', transition:'all .15s' }}>{sf.label}</button>
-          ))}
-        </div>
-
         {/* ── Filters ── */}
         <div style={{ display:'flex', gap:12, marginBottom:22, flexWrap:'wrap', alignItems:'center' }}>
           <DateRange from={dates.from} to={dates.to} onChange={setDates} />
           <select value={group} onChange={e => setGroup(e.target.value)} style={inputStyle}>
             {GROUPS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
+          <select value={shift} onChange={e => setShift(e.target.value)} style={inputStyle}>
+            {SHIFT_FILTERS.map(sf => <option key={sf.id} value={sf.id}>{sf.label}</option>)}
           </select>
           <button onClick={exportCsv} disabled={!rows.length}
             style={{ marginLeft:'auto', padding:'9px 18px', background: rows.length ? 'rgba(34,197,94,.14)' : 'rgba(255,255,255,.04)', border:'1px solid '+(rows.length ? 'rgba(34,197,94,.4)' : 'rgba(255,255,255,.1)'), borderRadius:10, color: rows.length ? '#22c55e' : 'rgba(255,255,255,.3)', fontSize:13, fontWeight:700, cursor: rows.length ? 'pointer' : 'not-allowed', fontFamily:'inherit' }}>
