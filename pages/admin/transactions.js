@@ -26,7 +26,7 @@ const TYPE_META = {
   deposit_bonus:    { label: 'Deposit Bonus',  color: '#fbbf24' },
   bonus:            { label: 'Bonus',          color: '#fbbf24' },
   referral_bonus:   { label: 'Referral Bonus', color: '#a855f7' },
-  withdrawal:       { label: 'Withdrawal',     color: '#ef4444' },
+  withdrawal:       { label: 'Withdraw',       color: '#ef4444' },
   withdrawal_refund:{ label: 'Withdraw Refund',color: '#06b6d4' },
   game_load:        { label: 'Score',          color: '#ef4444' },
   game_load_refund: { label: 'Score Refund',   color: '#06b6d4' },

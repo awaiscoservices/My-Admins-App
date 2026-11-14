@@ -312,14 +312,14 @@ export default function AdminDashboard() {
             <div className="stat-grid" style={{ marginBottom:28 }}>
               {/* Money & volume in range */}
               <StatCard icon="dollar"   label="Deposits"         value={fmt(s.total_deposits_cents)}    sub={`${fmtNum(s.deposits_count)} in range`}        color={green}  />
-              <StatCard icon="upload"   label="Withdrawals"      value={fmt(s.total_withdrawals_cents)} sub={`${fmtNum(s.withdrawals_count)} in range`}     color={red}    />
+              <StatCard icon="upload"   label="Withdraw"         value={fmt(s.total_withdrawals_cents)} sub={`${fmtNum(s.withdrawals_count)} in range`}     color={red}    />
               <StatCard icon="trendUp"  label="Net Revenue"      value={fmt(totalRevenue)}              sub="Deposits minus withdrawals"                   color={gold}   />
               <StatCard icon="userPlus" label="New Players"      value={fmtNum(s.new_players_range)}    sub="Registered in range"                          color={blue}   />
 
               <StatCard icon="card"     label="Avg Deposit"      value={fmt(avgDeposit)}                sub="Per transaction"                              color={cyan}   />
-              <StatCard icon="bars"     label="Avg Withdrawal"   value={fmt(avgWithdraw)}               sub="Per transaction"                              color={orange} />
+              <StatCard icon="bars"     label="Avg Withdraw"     value={fmt(avgWithdraw)}               sub="Per transaction"                              color={orange} />
               <StatCard icon="trophy"   label="Score Loads"      value={fmtNum(s.game_loads_range)}     sub="In range"                                     color={gold}   />
-              <StatCard icon="gift"     label="Redemptions"      value={fmtNum(s.redemptions_range)}    sub="In range"                                     color={pink}   />
+              <StatCard icon="gift"     label="Redeem"           value={fmtNum(s.redemptions_range)}    sub="In range"                                     color={pink}   />
 
               {/* Live queues — current state, not date-bound */}
               <StatCard icon="users"    label="Total Players"      value={fmtNum(s.total_players)}        sub="All time"                     color={blue}   live />
@@ -342,20 +342,20 @@ export default function AdminDashboard() {
                   labels={labels}
                   series={[
                     { label:'Deposits',    color:green, values: depDays.map(d => d.value) },
-                    { label:'Withdrawals', color:red,   values: wdDays.map(d => d.value) },
+                    { label:'Withdraw',    color:red,   values: wdDays.map(d => d.value) },
                     { label:'Net',         color:gold,  values: netDays },
                   ]}
                 />
               </Panel>
 
-              <Panel title="Deposits vs Withdrawals" color={cyan} icon="pie">
+              <Panel title="Deposits vs Withdraw" color={cyan} icon="pie">
                 <Donut
                   size={150} thickness={24}
                   centerLabel={fmtShort((s.total_deposits_cents || 0) + (s.total_withdrawals_cents || 0))}
                   centerSub="total flow"
                   segments={[
                     { label:'Deposits',    value: s.total_deposits_cents || 0,    color:green, display: fmt(s.total_deposits_cents) },
-                    { label:'Withdrawals', value: s.total_withdrawals_cents || 0, color:red,   display: fmt(s.total_withdrawals_cents) },
+                    { label:'Withdraw',    value: s.total_withdrawals_cents || 0, color:red,   display: fmt(s.total_withdrawals_cents) },
                   ]}
                 />
               </Panel>
@@ -368,7 +368,7 @@ export default function AdminDashboard() {
                 <BarChart color={green} height={120}
                   data={depDays.map(d => ({ ...d, display: fmt(d.value) }))} />
               </Panel>
-              <Panel title="Withdrawals by Day" color={red}
+              <Panel title="Withdraw by Day" color={red}
                 right={<span style={{ fontSize:18, fontWeight:800, color:red }}>{fmt(s.total_withdrawals_cents)}</span>}>
                 <BarChart color={red} height={120}
                   data={wdDays.map(d => ({ ...d, display: fmt(d.value) }))} />
@@ -391,7 +391,7 @@ export default function AdminDashboard() {
                   centerSub="awaiting"
                   segments={[
                     { label:'Deposits',    value: s.pending_deposits || 0,    color:green  },
-                    { label:'Withdrawals', value: s.pending_withdrawals || 0, color:red    },
+                    { label:'Withdraw',    value: s.pending_withdrawals || 0, color:red    },
                     { label:'KYC',         value: s.pending_kyc || 0,         color:pink   },
                     { label:'Scores',      value: s.pending_game_loads || 0,  color:gold   },
                     { label:'Redeems',     value: s.pending_redemptions || 0, color:purple },
