@@ -137,7 +137,7 @@ export default async function handler(req, res) {
         report, group_by: gran, range: { from: startISO, to: endISO },
         kpis: [
           money('Deposits', depTotal),
-          money('Withdrawals', wdTotal),
+          money('Withdraw', wdTotal),
           money('Net Revenue', depTotal - wdTotal),
           num('New Players', playerRows.length),
           num('Deposit Count', depRows.length),
@@ -156,7 +156,7 @@ export default async function handler(req, res) {
           dimension: 'Flow',
           items: [
             { key: 'Deposits', count: depRows.length, amount_cents: depTotal },
-            { key: 'Withdrawals', count: wdRows.length, amount_cents: wdTotal },
+            { key: 'Withdraw', count: wdRows.length, amount_cents: wdTotal },
           ],
         },
         shift_breakdown: { dimension: 'shift', items: breakdownBy(depRows.map(r => ({ ...r, shift: shiftLabelOf(r.created_at) })), 'shift') },
