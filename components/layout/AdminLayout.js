@@ -1,7 +1,7 @@
 // Casinoze Support — Admin Layout
 // Used by all staff pages at casinozoesupport.com/admin/*
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
@@ -157,6 +157,22 @@ export default function AdminLayout({ children }) {
   const [menuOpen, setMenuOpen]           = useState(false)
   const [show2fa, setShow2fa]             = useState(false)
   const [force2fa, setForce2fa]           = useState(false)
+
+  // The layout remounts on every page, which reset the sidebar scroll to the
+  // top each time. Remember where it was and put it back so the active page
+  // stays where you left it instead of jumping up.
+  const navRef = useRef(null)
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    try {
+      const saved = sessionStorage.getItem('adminNavScroll')
+      if (saved != null) el.scrollTop = parseInt(saved, 10) || 0
+    } catch {}
+    const onScroll = () => { try { sessionStorage.setItem('adminNavScroll', String(el.scrollTop)) } catch {} }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => { loadAdminData() }, [])
 
@@ -454,7 +470,7 @@ export default function AdminLayout({ children }) {
       <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 64, left: 0, bottom: 0, zIndex: 50, background: 'var(--panel-gradient,rgba(6,11,24,.98))', borderRight: '1px solid rgba(251,191,36,.1)', display: 'flex', flexDirection: 'column' }}>
         {/* No identity card here. Who you are signed in as is shown once, in
             the top bar. */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '12px', scrollbarWidth: 'none' }}>
+        <nav ref={navRef} style={{ flex: 1, overflowY: 'auto', padding: '12px', scrollbarWidth: 'none' }}>
           {NAV_SECTIONS.map(section => {
             const visibleItems = section.items.filter(item => canSee(item.roles))
             if (visibleItems.length === 0) return null
