@@ -14,6 +14,7 @@ const NAV_SECTIONS = [
     icon: 'grid',
     items: [
       { href: '/admin',              icon: 'home',    label: 'Dashboard',       roles: ['admin','super_admin','finance','game_ops','support','kyc_agent','risk','reporting','marketing'] },
+      { href: '/admin/reports',      icon: 'chart',   label: 'Reports',         roles: ['admin','super_admin','finance','reporting'] },
     ],
   },
   {
@@ -86,6 +87,7 @@ const ICONS = {
   clock:    'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2',
   layers:   'M12 3l9 5-9 5-9-5 9-5zM3 14l9 5 9-5M3 10.5l9 5 9-5',
   grid:     'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  chart:    'M3 3v18h18M8 14v3M13 10v7M18 6v11',
   home:    'M3 11l9-8 9 8M5 10v10h14V10',
   users:   'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M9.5 10a4 4 0 100-8 4 4 0 000 8zM21 20v-2a4 4 0 00-3-3.9M16 2.1a4 4 0 010 7.8',
   shield:  'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4',
