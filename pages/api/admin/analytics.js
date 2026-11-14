@@ -1,22 +1,51 @@
 /**
- * GET /api/admin/analytics
+ * GET /api/admin/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD
  * Returns platform-wide KPIs and chart data for the admin dashboard.
+ *
+ * Every volume/flow metric (deposits, withdrawals, new players, scores,
+ * redemptions, the charts) is computed over the [from, to] window the
+ * dashboard's single date filter sends. When no range is given it defaults
+ * to the last 30 days. The live queue counts (pending approvals, active
+ * game accounts) are current-state, not date-bound, so they ignore the
+ * range — there is no "pending as of last month".
+ *
  * Accessible to all staff roles.
  */
 import { guardAdmin, scopeToTenant, PERMS } from '../../../lib/adminGuard'
 import { SETTLED } from '../../../lib/statuses'
 
-function daysAgo(n) {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
+const MS_DAY = 86400000
+
+// Resolve the window. `from`/`to` are 'YYYY-MM-DD' (local calendar days);
+// default is the last 30 days ending today.
+function resolveRange(req) {
+  const { from, to } = req.query
+  const end = to ? new Date(to + 'T23:59:59.999') : new Date()
+  let start
+  if (from) {
+    start = new Date(from + 'T00:00:00')
+  } else {
+    start = new Date(end)
+    start.setDate(start.getDate() - 29)
+    start.setHours(0, 0, 0, 0)
+  }
+  return { start, end, startISO: start.toISOString(), endISO: end.toISOString() }
 }
 
-function last7DayLabels() {
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - 6 + i); return days[d.getDay()]
+// Bucket rows into one slot per calendar day across the range. Capped at 92
+// days so a huge range cannot produce a thousand bars.
+function bucketByDay(rows, start, end, field) {
+  const s0 = new Date(start); s0.setHours(0, 0, 0, 0)
+  const e0 = new Date(end);   e0.setHours(0, 0, 0, 0)
+  const n = Math.min(Math.floor((e0 - s0) / MS_DAY) + 1, 92)
+  const buckets = Array(n).fill(0)
+  ;(rows || []).forEach(r => {
+    const idx = Math.floor((new Date(r.created_at) - s0) / MS_DAY)
+    if (idx >= 0 && idx < n) buckets[idx] += field ? (r[field] || 0) : 1
+  })
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(s0.getTime() + i * MS_DAY)
+    return { label: `${d.getMonth() + 1}/${d.getDate()}`, value: buckets[i] }
   })
 }
 
@@ -30,102 +59,63 @@ export default async function handler(req, res) {
   // numbers to a single casino's staff — which is what it used to do.
   const q = (table, select, opts) => scopeToTenant(gate.db.from(table).select(select, opts), gate)
 
-  const today = daysAgo(0)
-  const ago7  = daysAgo(7)
-  const ago14 = daysAgo(14)
+  const { start, end, startISO, endISO } = resolveRange(req)
+  const inRange = (query) => query.gte('created_at', startISO).lte('created_at', endISO)
 
-  // Run all queries in parallel
   const [
-    playersRes,
-    newTodayRes,
-    new7dRes,
-    new14dRes,
-    signups14dRes,
-    depositsRes,
-    withdrawalsRes,
-    activeGARes,
-    pendingGARes,
+    playersRes,          // all-time total
+    newPlayersRes,       // registered in range (rows, for count + sparkline)
+    depositsRes,         // settled deposits in range (rows, for total + by-day)
+    withdrawalsRes,      // settled withdrawals in range
+    gameLoadsRes,        // score loads in range
+    redemptionsRes,      // redemptions in range
     pendingDepRes,
     pendingWdRes,
     pendingKycRes,
-    openTicketsRes,
-    deposits7dRes,
-    withdrawals7dRes,
-    gameLoads7dRes,
     pendingGameLoadsRes,
-    redemptions7dRes,
     pendingRedemptionsRes,
+    openTicketsRes,
+    activeGARes,
+    pendingGARes,
     recentTxRes,
   ] = await Promise.all([
-    // Players
-    q('profiles', 'id', { count:'exact', head:true }).eq('role','player'),
-    q('profiles', 'id', { count:'exact', head:true }).eq('role','player').gte('created_at', today),
-    q('profiles', 'id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago7),
-    q('profiles', 'id', { count:'exact', head:true }).eq('role','player').gte('created_at', ago14),
-    q('profiles', 'created_at').eq('role','player').gte('created_at', ago14).order('created_at'),
+    q('profiles', 'id', { count: 'exact', head: true }).eq('role', 'player'),
+    inRange(q('profiles', 'created_at').eq('role', 'player')).order('created_at'),
 
-    // Financial totals (all time approved)
-    q('deposits', 'amount_cents').in('status', SETTLED.deposits),
-    q('withdrawals', 'amount_cents').in('status', SETTLED.withdrawals),
+    inRange(q('deposits', 'amount_cents, created_at').in('status', SETTLED.deposits)),
+    inRange(q('withdrawals', 'amount_cents, created_at').in('status', SETTLED.withdrawals)),
 
-    // Game accounts
-    q('game_accounts', 'id', { count:'exact', head:true }).eq('status','active'),
-    q('game_accounts', 'id', { count:'exact', head:true }).eq('status','pending'),
+    inRange(q('game_loads', 'id', { count: 'exact', head: true })),
+    inRange(q('redemptions', 'id', { count: 'exact', head: true })),
 
-    // Pending queues
-    q('deposits', 'id', { count:'exact', head:true }).eq('status','pending'),
-    q('withdrawals', 'id', { count:'exact', head:true }).eq('status','pending'),
-    q('kyc_records', 'id', { count:'exact', head:true }).eq('status','pending'),
-    q('support_tickets', 'id', { count:'exact', head:true }).eq('status','open'),
+    // Live queues — current state, not date-bound.
+    q('deposits', 'id', { count: 'exact', head: true }).eq('status', 'pending'),
+    q('withdrawals', 'id', { count: 'exact', head: true }).eq('status', 'pending'),
+    q('kyc_records', 'id', { count: 'exact', head: true }).eq('status', 'pending'),
+    q('game_loads', 'id', { count: 'exact', head: true }).eq('status', 'pending'),
+    q('redemptions', 'id', { count: 'exact', head: true }).eq('status', 'pending'),
+    q('support_tickets', 'id', { count: 'exact', head: true }).eq('status', 'open'),
 
-    // 7d charts
-    q('deposits', 'amount_cents, created_at').in('status', SETTLED.deposits).gte('created_at', ago7),
-    q('withdrawals', 'amount_cents, created_at').in('status', SETTLED.withdrawals).gte('created_at', ago7),
+    q('game_accounts', 'id', { count: 'exact', head: true }).eq('status', 'active'),
+    q('game_accounts', 'id', { count: 'exact', head: true }).eq('status', 'pending'),
 
-    // Game loads (scores) — 7d count + pending
-    q('game_loads', 'id', { count:'exact', head:true }).gte('created_at', ago7),
-    q('game_loads', 'id', { count:'exact', head:true }).eq('status','pending'),
-
-    // Redemptions — 7d count + pending
-    q('redemptions', 'id', { count:'exact', head:true }).gte('created_at', ago7),
-    q('redemptions', 'id', { count:'exact', head:true }).eq('status','pending'),
-
-    // Recent ledger transactions
-    q('ledger', 'reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(username)')
-      .in('type', ['deposit','withdrawal'])
-      .order('created_at', { ascending:false })
+    // Recent ledger transactions within the range.
+    inRange(q('ledger', 'reference_id, user_id, type, amount_cents, direction, created_at, profiles!user_id(username)')
+      .in('type', ['deposit', 'withdrawal']))
+      .order('created_at', { ascending: false })
       .limit(20),
   ])
 
-  // Totals
-  const totalDepositsCents    = (depositsRes.data    || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
-  const totalWithdrawalsCents = (withdrawalsRes.data  || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
-  const deposits7dCents       = (deposits7dRes.data   || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
-  const withdrawals7dCents    = (withdrawals7dRes.data || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
+  const sum = (rows) => (rows || []).reduce((s, r) => s + (r.amount_cents || 0), 0)
+  const totalDepositsCents    = sum(depositsRes.data)
+  const totalWithdrawalsCents = sum(withdrawalsRes.data)
+  const depositsCount    = depositsRes.data?.length || 0
+  const withdrawalsCount = withdrawalsRes.data?.length || 0
+  const newPlayersCount  = newPlayersRes.data?.length || 0
 
-  // 7-day bucket helper
-  const bucketByDay = (rows, field = 'amount_cents') => {
-    const buckets = Array(7).fill(0)
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6); cutoff.setHours(0,0,0,0)
-    ;(rows || []).forEach(r => {
-      const idx = Math.floor((new Date(r.created_at) - cutoff) / 86400000)
-      if (idx >= 0 && idx < 7) buckets[idx] += (r[field] || 0)
-    })
-    return last7DayLabels().map((label, i) => ({ label, value: buckets[i] }))
-  }
-
-  // 14-day signup sparkline
-  const signupBuckets = Array(14).fill(0)
-  const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate() - 13); cutoff14.setHours(0,0,0,0)
-  ;(signups14dRes.data || []).forEach(r => {
-    const idx = Math.floor((new Date(r.created_at) - cutoff14) / 86400000)
-    if (idx >= 0 && idx < 14) signupBuckets[idx]++
-  })
-
-  // Recent transactions
   const recentTransactions = (recentTxRes.data || []).map(tx => ({
     reference_id: tx.reference_id,
-    player_name:  tx.profiles?.username || `player${String(tx.user_id || '').replace(/-/g,'').slice(0, 8)}`,
+    player_name:  tx.profiles?.username || `player${String(tx.user_id || '').replace(/-/g, '').slice(0, 8)}`,
     type:         tx.direction === 'credit' ? 'deposit' : 'withdrawal',
     amount_cents: tx.amount_cents,
     status:       'approved',
@@ -133,42 +123,35 @@ export default async function handler(req, res) {
   }))
 
   return res.status(200).json({
+    // Echo the resolved window so the UI can show it.
+    range: { from: startISO, to: endISO },
+
     // Players
-    total_players:      playersRes.count  || 0,
-    new_players_today:  newTodayRes.count || 0,
-    new_players_7d:     new7dRes.count    || 0,
-    new_players_14d:    new14dRes.count   || 0,
-    signups_by_day:     signupBuckets.map(value => ({ value })),
+    total_players:     playersRes.count || 0,
+    new_players_range: newPlayersCount,
+    signups_by_day:    bucketByDay(newPlayersRes.data, start, end),
 
-    // Financials (all time)
+    // Financials (within range)
     total_deposits_cents:    totalDepositsCents,
-    deposits_count:          depositsRes.data?.length || 0,
+    deposits_count:          depositsCount,
     total_withdrawals_cents: totalWithdrawalsCents,
-    withdrawals_count:       withdrawalsRes.data?.length || 0,
+    withdrawals_count:       withdrawalsCount,
+    deposits_by_day:         bucketByDay(depositsRes.data, start, end, 'amount_cents'),
+    withdrawals_by_day:      bucketByDay(withdrawalsRes.data, start, end, 'amount_cents'),
 
-    // 7-day financials
-    deposits_7d_cents:    deposits7dCents,
-    withdrawals_7d_cents: withdrawals7dCents,
-    deposits_by_day:      bucketByDay(deposits7dRes.data),
-    withdrawals_by_day:   bucketByDay(withdrawals7dRes.data),
+    // Scores / redemptions (within range)
+    game_loads_range:   gameLoadsRes.count   || 0,
+    redemptions_range:  redemptionsRes.count || 0,
 
-    // Pending queues
-    pending_deposits:    pendingDepRes.count  || 0,
-    pending_withdrawals: pendingWdRes.count   || 0,
-    pending_kyc:         pendingKycRes.count  || 0,
-    open_tickets:        openTicketsRes.count || 0,
-
-    // Game accounts
+    // Live queues (current state)
+    pending_deposits:    pendingDepRes.count         || 0,
+    pending_withdrawals: pendingWdRes.count          || 0,
+    pending_kyc:         pendingKycRes.count          || 0,
+    pending_game_loads:  pendingGameLoadsRes.count    || 0,
+    pending_redemptions: pendingRedemptionsRes.count  || 0,
+    open_tickets:        openTicketsRes.count         || 0,
     active_game_accounts:  activeGARes.count  || 0,
-    pending_game_accounts: pendingGARes.count  || 0,
-
-    // Scores / Game loads
-    game_loads_7d:        gameLoads7dRes.count        || 0,
-    pending_game_loads:   pendingGameLoadsRes.count   || 0,
-
-    // Redemptions
-    redemptions_7d:       redemptions7dRes.count      || 0,
-    pending_redemptions:  pendingRedemptionsRes.count || 0,
+    pending_game_accounts: pendingGARes.count || 0,
 
     // Recent
     recent_transactions: recentTransactions,
