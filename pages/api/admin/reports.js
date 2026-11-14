@@ -33,6 +33,8 @@ function shiftOf(ts) {
   return { key: '3', label: 'Night (4–12)' }
 }
 const shiftLabelOf = ts => shiftOf(ts).label
+const SHIFT_BY_KEY = { '1': 'morning', '2': 'evening', '3': 'night' }
+const shiftIdOf = ts => SHIFT_BY_KEY[shiftOf(ts).key]
 
 // Chronological bucket key + label for a timestamp at the chosen granularity.
 function bucketOf(ts, gran) {
@@ -87,9 +89,14 @@ export default async function handler(req, res) {
   const q = (table, select) => scopeToTenant(gate.db.from(table).select(select), gate)
   const { start, end, startISO, endISO } = resolveRange(req)
   const inRange = (query) => query.gte('created_at', startISO).lte('created_at', endISO)
-  const gran = ['day', 'week', 'month', 'shift'].includes(req.query.group_by) ? req.query.group_by : 'day'
+  const gran = ['day', 'week', 'month'].includes(req.query.group_by) ? req.query.group_by : 'day'
   const report = req.query.report || 'overview'
   const CAP = 5000
+
+  // Shift filter — All, or one of the 3 shifts. Applied in JS since the shift
+  // is derived from the hour of created_at.
+  const shift = ['morning', 'evening', 'night'].includes(req.query.shift) ? req.query.shift : 'all'
+  const matchesShift = r => shift === 'all' || shiftIdOf(r.created_at) === shift
 
   const money = (label, cents) => ({ label, value: cents, money: true })
   const num   = (label, n) => ({ label, value: n })
@@ -111,7 +118,9 @@ export default async function handler(req, res) {
         inRange(q('withdrawals', 'amount_cents, created_at').in('status', SETTLED.withdrawals)),
         inRange(q('profiles', 'created_at').eq('role', 'player')),
       ])
-      const depRows = dep.data || [], wdRows = wd.data || []
+      const depRows = (dep.data || []).filter(matchesShift)
+      const wdRows = (wd.data || []).filter(matchesShift)
+      const playerRows = (players.data || []).filter(matchesShift)
       const depTotal = depRows.reduce((s, r) => s + (r.amount_cents || 0), 0)
       const wdTotal  = wdRows.reduce((s, r) => s + (r.amount_cents || 0), 0)
       const depSeries = timeSeries(depRows, gran)
@@ -130,7 +139,7 @@ export default async function handler(req, res) {
           money('Deposits', depTotal),
           money('Withdrawals', wdTotal),
           money('Net Revenue', depTotal - wdTotal),
-          num('New Players', (players.data || []).length),
+          num('New Players', playerRows.length),
           num('Deposit Count', depRows.length),
           num('Withdraw Count', wdRows.length),
         ],
@@ -295,7 +304,7 @@ export default async function handler(req, res) {
     const { data, error } = await query
     if (error) return res.status(500).json({ error: error.message })
 
-    let rows = data || []
+    let rows = (data || []).filter(matchesShift)
     if (!cfg.noPlayers) rows = await withPlayers(rows)
     // Tag every row with its shift, so the detail table and CSV carry it.
     rows = rows.map(r => ({ ...r, shift: shiftLabelOf(r.created_at) }))

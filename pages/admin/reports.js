@@ -21,11 +21,14 @@ const GROUPS = [
   { id: 'day',   label: 'Daily' },
   { id: 'week',  label: 'Weekly' },
   { id: 'month', label: 'Monthly' },
-  { id: 'shift', label: 'By Shift' },
 ]
-// The 3 operating shifts, in order, always shown even with zero activity.
-const SHIFTS = ['Morning (12–8)', 'Evening (8–4)', 'Night (4–12)']
-const SHIFT_COLORS = { 'Morning (12–8)': '#fbbf24', 'Evening (8–4)': '#22c55e', 'Night (4–12)': '#6366f1' }
+// Shift filter: All + the 3 operating shifts.
+const SHIFT_FILTERS = [
+  { id: 'all',     label: 'All Shifts' },
+  { id: 'morning', label: 'Morning (12–8)' },
+  { id: 'evening', label: 'Evening (8–4)' },
+  { id: 'night',   label: 'Night (4–12)' },
+]
 
 const fmtMoney = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum   = n => Number(n || 0).toLocaleString()
@@ -90,6 +93,7 @@ function LineChart({ labels, datasets, height = 200, fmtVal = v => v }) {
 export default function AdminReports() {
   const [report, setReport] = useState('overview')
   const [group, setGroup]   = useState('day')
+  const [shift, setShift]   = useState('all')
   const [metric, setMetric] = useState('amount') // amount | count (bar reports)
   const [dates, setDates]   = useState(() => {
     const to = new Date(); const from = new Date(); from.setDate(to.getDate() - 29)
@@ -98,14 +102,14 @@ export default function AdminReports() {
   const [data, setData]     = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [report, group, dates])
+  useEffect(() => { load() }, [report, group, shift, dates])
 
   async function load() {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { setData(null); setLoading(false); return }
-      const params = new URLSearchParams({ report, group_by: group })
+      const params = new URLSearchParams({ report, group_by: group, shift })
       if (dates.from) params.set('from', dates.from)
       if (dates.to)   params.set('to', dates.to)
       const res = await fetch(`/api/admin/reports?${params}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
@@ -172,6 +176,13 @@ export default function AdminReports() {
         <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:12, flexWrap:'wrap', marginBottom:14 }}>
           {REPORTS.map(r => (
             <button key={r.id} onClick={() => setReport(r.id)} style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:12.5, fontWeight:700, background: report===r.id ? 'rgba(251,191,36,.75)' : 'transparent', color: report===r.id ? '#111' : 'rgba(255,255,255,.5)', transition:'all .15s' }}>{r.label}</button>
+          ))}
+        </div>
+
+        {/* ── Shift filter: All + the 3 shifts ── */}
+        <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,.04)', padding:4, borderRadius:12, flexWrap:'wrap', marginBottom:14 }}>
+          {SHIFT_FILTERS.map(sf => (
+            <button key={sf.id} onClick={() => setShift(sf.id)} style={{ padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:12.5, fontWeight:700, background: shift===sf.id ? 'rgba(99,102,241,.7)' : 'transparent', color: shift===sf.id ? '#fff' : 'rgba(255,255,255,.5)', transition:'all .15s' }}>{sf.label}</button>
           ))}
         </div>
 
@@ -252,29 +263,6 @@ export default function AdminReports() {
                 })}
               </div>
             </div>
-
-            {/* ── By Shift ── */}
-            {d.shift_breakdown && (
-              <div style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, padding:'20px', marginBottom:22 }}>
-                <h3 style={{ fontSize:13, fontWeight:700, color:gold, margin:'0 0 16px', textTransform:'uppercase', letterSpacing:'.06em' }}>By Shift</h3>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
-                  {SHIFTS.map(label => {
-                    const it = (d.shift_breakdown.items || []).find(x => x.key === label) || { count: 0, amount_cents: 0 }
-                    const c = SHIFT_COLORS[label] || gold
-                    return (
-                      <div key={label} style={{ background:'rgba(255,255,255,.03)', border:`1px solid ${c}33`, borderRadius:14, padding:'16px 18px' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                          <span style={{ width:9, height:9, borderRadius:'50%', background:c }} />
-                          <span style={{ fontSize:11.5, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase', color:'rgba(255,255,255,.7)' }}>{label}</span>
-                        </div>
-                        <div style={{ fontSize:22, fontWeight:800, color:c }}>{fmtMoney(it.amount_cents)}</div>
-                        <div style={{ fontSize:12, color:'rgba(255,255,255,.4)', marginTop:4 }}>{fmtNum(it.count)} records</div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* ── Detailed table ── */}
             {cols.length > 0 && (
