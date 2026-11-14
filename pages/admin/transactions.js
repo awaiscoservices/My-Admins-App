@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import DateRange, { inDateRange } from '../../components/ui/DateRange'
+import { CATEGORIES, categoryTypes, typeLabel, typeColor } from '../../lib/txMeta'
 
 const fmt = c => {
   if (c === null || c === undefined) return '—'
@@ -11,68 +12,6 @@ const fmt = c => {
   return c < 0 ? '−' + str : '+' + str
 }
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
-
-/**
- * Known ledger types → how they show (label + colour). Every entry the ledger
- * can hold lives here, so adding a wallet entry type means adding one line.
- *
- * The filter tabs are NOT hardcoded from this map, though — they are built
- * from the types actually present in the data (see `typesInData` below), so a
- * brand-new type still appears in the filter the moment it hits the ledger,
- * even before it is listed here (it just shows greyed with a prettified name).
- */
-const TYPE_META = {
-  deposit:          { label: 'Deposit',        color: '#22c55e' },
-  deposit_bonus:    { label: 'Bonus',          color: '#fbbf24' },
-  bonus:            { label: 'Bonus',          color: '#fbbf24' },
-  referral_bonus:   { label: 'Referral Bonus', color: '#a855f7' },
-  withdrawal:       { label: 'Withdraw',       color: '#ef4444' },
-  withdrawal_refund:{ label: 'Withdraw Refund',color: '#06b6d4' },
-  game_load:        { label: 'Score',          color: '#ef4444' },
-  game_load_refund: { label: 'Score Refund',   color: '#06b6d4' },
-  redeem:           { label: 'Redeem',         color: '#22c55e' },
-  redemption:       { label: 'Redeem',         color: '#22c55e' },
-  spin_bet:         { label: 'Spin Bet',       color: '#f97316' },
-  spin_win:         { label: 'Spin Win',       color: '#fbbf24' },
-  adjustment:       { label: 'Adjustment',     color: '#a855f7' },
-  adjustment_credit:{ label: 'Adj. Credit',    color: '#a855f7' },
-  adjustment_debit: { label: 'Adj. Debit',     color: '#f97316' },
-  refund:           { label: 'Refund',         color: '#06b6d4' },
-}
-
-// Prettify an unknown type: "some_new_type" → "Some New Type".
-const prettify = t => (t || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-const typeLabel = t => TYPE_META[t]?.label || prettify(t) || '—'
-const typeColor = t => TYPE_META[t]?.color || 'rgba(255,255,255,.5)'
-
-// Order the tabs: known types first in a sensible order, then anything else
-// alphabetically. New types land at the end instead of disappearing.
-// Fixed display order: Deposit, Withdraw, Scores, Redeem, Bonus, then the rest.
-const TYPE_ORDER = [
-  'deposit',
-  'withdrawal', 'withdrawal_refund',
-  'game_load', 'game_load_refund',
-  'redeem',
-  'deposit_bonus', 'referral_bonus', 'bonus',
-  'spin_bet', 'spin_win',
-  'adjustment_credit', 'adjustment_debit', 'adjustment',
-  'refund',
-]
-
-// Core tabs that stay visible even when no row of that type exists yet.
-const BASE_TYPES = [
-  'deposit', 'withdrawal', 'game_load', 'redeem', 'deposit_bonus',
-  'adjustment_credit', 'adjustment_debit',
-]
-function orderTypes(types) {
-  return [...types].sort((a, b) => {
-    const ia = TYPE_ORDER.indexOf(a), ib = TYPE_ORDER.indexOf(b)
-    if (ia !== -1 && ib !== -1) return ia - ib
-    if (ia !== -1) return -1
-    if (ib !== -1) return 1
-    return a.localeCompare(b)
-  })
-}
 
 export default function AdminTransactions() {
   const [rows, setRows] = useState([])
@@ -103,15 +42,16 @@ export default function AdminTransactions() {
     }
   }
 
-  // Tabs = the core types that should ALWAYS be available (even with zero
-  // rows right now) + any other type actually present in the data. So the
-  // standard tabs never vanish on an empty day, and any new ledger type
-  // (referral bonus, spins, …) still appears automatically.
-  const typesInData = Array.from(new Set(rows.map(r => r.type).filter(Boolean)))
-  const tabs = ['all', ...orderTypes(Array.from(new Set([...BASE_TYPES, ...typesInData])))]
+  // Unified category tabs — same set and sequence used in the player wallet
+  // modal and the player app (All, Deposits, Withdraws, Scores, Redeems,
+  // Bonuses, Adjustments). Shared from lib/txMeta.
+  const tabs = CATEGORIES
 
   const filtered = rows.filter(r => {
-    if (filter !== 'all' && r.type !== filter) return false
+    if (filter !== 'all') {
+      const types = categoryTypes(filter)
+      if (types && !types.includes(r.type)) return false
+    }
     if (!inDateRange(r.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
@@ -129,8 +69,8 @@ export default function AdminTransactions() {
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, flexWrap: 'wrap' }}>
-          {tabs.map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', transition: 'all .15s', whiteSpace: 'nowrap' }}>{s === 'all' ? 'All' : typeLabel(s)}</button>
+          {tabs.map(c => (
+            <button key={c.key} onClick={() => setFilter(c.key)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === c.key ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === c.key ? '#fff' : 'rgba(255,255,255,.4)', transition: 'all .15s', whiteSpace: 'nowrap' }}>{c.label}</button>
           ))}
         </div>
         <input type="text" placeholder="Search username or reference…" value={search} onChange={e => setSearch(e.target.value)}

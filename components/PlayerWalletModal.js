@@ -16,6 +16,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import StatusBadge from './ui/StatusBadge'
 import Icon from './ui/Icon'
+import { CATEGORIES, categoryTypes, typeLabel, typeColor } from '../lib/txMeta'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 const fmt   = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -37,6 +38,16 @@ function Tile({ label, value, sub, color = '#fbbf24' }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'Outfit',sans-serif" }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// ─── level-rule row (Min WD / Max x / …) ──────────────────────────────────────
+function RuleRow({ label, value, mute }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: mute ? 'rgba(255,255,255,.5)' : '#fff' }}>{value}</span>
     </div>
   )
 }
@@ -107,7 +118,7 @@ function FilterBar({ value, onChange, options = ['all','pending','approved','rej
 // ─── XP progress bar ──────────────────────────────────────────────────────────
 function XpBar({ pct, color = '#fbbf24' }) {
   return (
-    <div style={{ height: 8, background: 'rgba(255,255,255,.08)', borderRadius: 99, overflow: 'hidden' }}>
+    <div style={{ height: 5, background: 'rgba(255,255,255,.08)', borderRadius: 99, overflow: 'hidden' }}>
       <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 99, transition: 'width .4s ease' }} />
     </div>
   )
@@ -203,6 +214,28 @@ function TabSummary({ playerId }) {
           </div>
         )}
         {(!s.next_level) && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>Max level reached <Icon name="trophy" size={13} style={{ verticalAlign: '-2px', marginLeft:6 }} /></div>}
+
+        {/* Level rules — same redeem/withdraw limits the player sees on their profile */}
+        {s.current_level && (
+          <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(96,165,250,.3)' }}>
+              <div style={{ background: 'rgba(96,165,250,.14)', padding: '6px 9px', borderBottom: '1px solid rgba(96,165,250,.24)', fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#93c5fd', display: 'flex', alignItems: 'center', gap: 5 }}><Icon name="bank" size={12} /> Withdraw</div>
+              <div style={{ padding: 9, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <RuleRow label="Min WD" value={s.current_level.min_withdrawal_cents != null ? fmt(s.current_level.min_withdrawal_cents) : '—'} />
+                <RuleRow label="Max WD" value={s.current_level.max_withdrawal_cents != null ? fmt(s.current_level.max_withdrawal_cents) : '—'} />
+                <RuleRow label="Window" value="24h" mute />
+              </div>
+            </div>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(167,139,250,.3)' }}>
+              <div style={{ background: 'rgba(167,139,250,.14)', padding: '6px 9px', borderBottom: '1px solid rgba(167,139,250,.24)', fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#c4b5fd', display: 'flex', alignItems: 'center', gap: 5 }}><Icon name="gamepad" size={12} /> Redeem</div>
+              <div style={{ padding: 9, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <RuleRow label="Min x" value={s.current_level.min_redeem_multiplier != null ? parseFloat(s.current_level.min_redeem_multiplier).toFixed(1) + 'x' : '—'} />
+                <RuleRow label="Max x" value={s.current_level.max_redeem_multiplier != null ? parseFloat(s.current_level.max_redeem_multiplier).toFixed(1) + 'x' : '—'} />
+                <RuleRow label="Cap" value={s.current_level.max_redeem_cap_cents != null ? fmt(s.current_level.max_redeem_cap_cents) : '—'} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Recent level changes */}
         {s.recent_level_changes?.length > 0 && (
@@ -358,43 +391,35 @@ function TabRedeems({ playerId }) {
 }
 
 // ─── Transactions tab ─────────────────────────────────────────────────────────
-const TX_COLORS = { deposit: '#3b82f6', withdrawal: '#f59e0b', bonus: '#a855f7', adjustment: '#fbbf24', game_load: '#ef4444', redemption: '#22c55e' }
-function txColor(type) { for (const [k, c] of Object.entries(TX_COLORS)) { if (type?.includes(k)) return c } return 'rgba(255,255,255,.5)' }
-
 function TabTransactions({ playerId }) {
   const [rows, setRows]     = useState([])
   const [total, setTotal]   = useState(0)
   const [pages, setPages]   = useState(1)
   const [page, setPage]     = useState(1)
-  const [type, setType]     = useState('')
+  const [cat, setCat]       = useState('all')
   const [loading, setLoading] = useState(true)
   const [err, setErr]       = useState(null)
 
-  const load = useCallback(async (p = 1, t = type) => {
+  const load = useCallback(async (p = 1, c = cat) => {
     setLoading(true); setErr(null)
     try {
       const qs = new URLSearchParams({ player_id: playerId, tab: 'transactions', page: p, limit: 25 })
-      if (t) qs.set('type', t)
+      const types = categoryTypes(c)
+      if (types) qs.set('types', types.join(','))
       const d = await apiFetch(`/api/admin/players/wallet-summary?${qs}`)
       setRows(d.rows || []); setTotal(d.total || 0); setPages(d.pages || 1); setPage(p)
     } catch(e) { setErr(e.message) }
     setLoading(false)
-  }, [playerId, type])
+  }, [playerId, cat])
 
-  useEffect(() => { load(1, '') }, [playerId]) // eslint-disable-line
+  useEffect(() => { load(1, 'all') }, [playerId]) // eslint-disable-line
 
   return (
     <div>
       <div style={{ marginBottom: 14, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={type} onChange={e => { setType(e.target.value); load(1, e.target.value) }}
+        <select value={cat} onChange={e => { setCat(e.target.value); load(1, e.target.value) }}
           style={{ padding: '6px 12px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, color: '#fff', fontSize: 12, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
-          <option value="">All Types</option>
-          <option value="deposit">Deposits</option>
-          <option value="withdrawal">Withdraw</option>
-          <option value="game_load">Game Loads</option>
-          <option value="redemption">Redeem</option>
-          <option value="bonus">Bonuses</option>
-          <option value="adjustment">Adjustments</option>
+          {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>{total} transactions</span>
       </div>
@@ -406,7 +431,7 @@ function TabTransactions({ playerId }) {
               headers={['Type', 'Amount', 'Balance After', 'Reference', 'Description', 'Date']}
               rows={rows.map((r, i) => (
                 <tr key={r.id || i} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${txColor(r.type)}22`, color: txColor(r.type), textTransform: 'capitalize' }}>{(r.type || '').replace(/_/g, ' ')}</span></td>
+                  <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${typeColor(r.type)}22`, color: typeColor(r.type) }}>{typeLabel(r.type)}</span></td>
                   <td style={tdS}><span style={{ fontSize: 13, fontWeight: 700, color: r.amount_cents >= 0 ? '#22c55e' : '#ef4444' }}>{r.amount_cents >= 0 ? '+' : ''}{fmt(r.amount_cents)}</span></td>
                   <td style={{ ...tdS, fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>{fmt(r.balance_after_cents)}</td>
                   <td style={tdS}><span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{r.reference_id || '—'}</span></td>
@@ -528,7 +553,7 @@ function TabBonuses({ playerId }) {
               headers={['Type', 'Amount', 'Balance After', 'Reference', 'Description', 'Date']}
               rows={rows.map((r, i) => (
                 <tr key={r.id || i} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: 'rgba(168,85,247,.15)', color: '#a855f7', textTransform: 'capitalize' }}>{(r.type || '').replace(/_/g, ' ')}</span></td>
+                  <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${typeColor(r.type)}22`, color: typeColor(r.type) }}>{typeLabel(r.type)}</span></td>
                   <td style={tdS}><span style={{ fontSize: 13, fontWeight: 700, color: r.amount_cents >= 0 ? '#a855f7' : '#ef4444' }}>{r.amount_cents >= 0 ? '+' : ''}{fmt(r.amount_cents)}</span></td>
                   <td style={{ ...tdS, fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>{fmt(r.balance_after_cents)}</td>
                   <td style={tdS}><span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{r.reference_id || '—'}</span></td>
@@ -552,11 +577,11 @@ function TabBonuses({ playerId }) {
 
 const TABS = [
   { key: 'summary',      label: 'Summary',      icon: 'chart'   },
+  { key: 'transactions', label: 'Transactions', icon: 'list'    },
   { key: 'deposits',     label: 'Deposits',     icon: 'cash'    },
   { key: 'withdrawals',  label: 'Withdraws',    icon: 'bank'    },
   { key: 'scores',       label: 'Scores',       icon: 'gamepad' },
   { key: 'redeems',      label: 'Redeems',      icon: 'money'   },
-  { key: 'transactions', label: 'Transactions', icon: 'list'    },
   { key: 'player_level', label: 'Level',        icon: 'star'    },
   { key: 'bonuses',      label: 'Bonuses',      icon: 'gift'    },
 ]

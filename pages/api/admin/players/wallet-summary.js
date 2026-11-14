@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       { data: levelHistory },
     ] = await Promise.all([
       supabaseAdmin.from('wallets').select('*').eq('user_id', player_id).single(),
-      supabaseAdmin.from('profiles').select('id, player_level_id, player_levels(id,name,accent_color,min_xp,deposit_threshold_cents,display_order)').eq('id', player_id).single(),
+      supabaseAdmin.from('profiles').select('id, tenant_id, total_xp, player_level_id, player_levels(id,name,accent_color,min_xp,display_order,min_withdrawal_cents,max_withdrawal_cents,min_redeem_multiplier,max_redeem_multiplier,max_redeem_cap_cents,deposit_bonus_pct)').eq('id', player_id).single(),
       supabaseAdmin.from('deposits').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('withdrawals').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
       supabaseAdmin.from('game_loads').select('*', { count: 'exact', head: true }).eq('user_id', player_id).eq('status', 'pending'),
@@ -68,12 +68,16 @@ export default async function handler(req, res) {
     const levelId = profile?.player_level_id
     const currentLevel = profile?.player_levels || null
 
-    // Next level
+    // Next level — scoped to the player's own tenant. Level names and
+    // display_orders repeat across tenants, so an unscoped lookup would pick
+    // up another casino's level and show the wrong "progress to" target.
     let nextLevel = null
-    if (currentLevel?.min_xp != null) {
+    if (currentLevel?.display_order != null) {
       const { data: nl } = await supabaseAdmin
         .from('player_levels')
-        .select('id, name, accent_color, min_xp, deposit_threshold_cents, display_order')
+        .select('id, name, accent_color, min_xp, display_order')
+        .eq('tenant_id', profile.tenant_id)
+        .eq('is_active', true)
         .gt('display_order', currentLevel.display_order || 0)
         .order('display_order', { ascending: true })
         .limit(1)
@@ -81,7 +85,8 @@ export default async function handler(req, res) {
       nextLevel = nl
     }
 
-    const currentXp  = w.total_xp || 0
+    // XP lives on the profile, not the wallet.
+    const currentXp  = profile?.total_xp || 0
     const xpThresh   = nextLevel?.min_xp || currentLevel?.min_xp || 1
     const xpPct      = nextLevel ? Math.min(100, Math.round((currentXp / xpThresh) * 100)) : 100
 
@@ -102,7 +107,15 @@ export default async function handler(req, res) {
         pending_withdraw_count: pendingWd    || 0,
         pending_scores_count:   pendingScores || 0,
         pending_redeem_count:   pendingRedeem || 0,
-        current_level:   currentLevel ? { id: levelId, name: currentLevel.name, color: currentLevel.accent_color } : null,
+        current_level:   currentLevel ? {
+          id: levelId, name: currentLevel.name, color: currentLevel.accent_color,
+          min_withdrawal_cents:   currentLevel.min_withdrawal_cents,
+          max_withdrawal_cents:   currentLevel.max_withdrawal_cents,
+          min_redeem_multiplier:  currentLevel.min_redeem_multiplier,
+          max_redeem_multiplier:  currentLevel.max_redeem_multiplier,
+          max_redeem_cap_cents:   currentLevel.max_redeem_cap_cents,
+          deposit_bonus_pct:      currentLevel.deposit_bonus_pct,
+        } : null,
         current_xp:      currentXp,
         next_level:      nextLevel,
         xp_progress_pct: xpPct,
@@ -205,13 +218,14 @@ export default async function handler(req, res) {
   // ── TRANSACTIONS tab ──────────────────────────────────────────────────────────
   // FIX: `notes` → `description` (ledger column was renamed)
   if (tab === 'transactions') {
-    const { from_date, to_date, type } = req.query
+    const { from_date, to_date, type, types } = req.query
     let q = supabaseAdmin.from('ledger')
       .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at', { count: 'exact' })
       .eq('user_id', player_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
-    if (type) q = q.eq('type', type)
+    const typeList = types ? types.split(',').filter(Boolean) : (type ? [type] : [])
+    if (typeList.length) q = q.in('type', typeList)
     if (from_date) q = q.gte('created_at', from_date)
     if (to_date)   q = q.lte('created_at', to_date)
     const { data, count, error } = await q
@@ -250,7 +264,7 @@ export default async function handler(req, res) {
     let q = supabaseAdmin.from('ledger')
       .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at', { count: 'exact' })
       .eq('user_id', player_id)
-      .in('type', ['bonus', 'bonus_deposit', 'bonus_referral', 'bonus_adjustment', 'bonus_conversion'])
+      .in('type', ['deposit_bonus', 'promotion_credit', 'referral_bonus', 'level_bonus', 'bonus'])
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
     if (from_date) q = q.gte('created_at', from_date)

@@ -8,6 +8,7 @@ import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../../components/PlayerWalletModal'
 import Icon from '../../../components/ui/Icon'
+import { typeLabel, typeColor } from '../../../lib/txMeta'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -422,7 +423,7 @@ export default function AdminPlayerDetail() {
               ) : transactions.map(tx => (
                 <tr key={tx.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
                   <td style={{ padding: '11px 14px', fontSize: 10, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{tx.reference_id}</td>
-                  <td style={{ padding: '11px 14px', fontSize: 11, color: 'rgba(255,255,255,.6)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{tx.type?.replace(/_/g, ' ')}</td>
+                  <td style={{ padding: '11px 14px' }}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${typeColor(tx.type)}22`, color: typeColor(tx.type), whiteSpace: 'nowrap' }}>{typeLabel(tx.type)}</span></td>
                   <td style={{ padding: '11px 14px', fontSize: 11, color: 'rgba(255,255,255,.4)', textTransform: 'capitalize' }}>{tx.wallet_bucket}</td>
                   <td style={{ padding: '11px 14px' }}><MoneyDisplay cents={tx.amount_cents} size="sm" color={txTypeColor(tx.type)} /></td>
                   <td style={{ padding: '11px 14px' }}>
