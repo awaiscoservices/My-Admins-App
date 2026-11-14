@@ -23,7 +23,7 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short
  */
 const TYPE_META = {
   deposit:          { label: 'Deposit',        color: '#22c55e' },
-  deposit_bonus:    { label: 'Deposit Bonus',  color: '#fbbf24' },
+  deposit_bonus:    { label: 'Bonus',          color: '#fbbf24' },
   bonus:            { label: 'Bonus',          color: '#fbbf24' },
   referral_bonus:   { label: 'Referral Bonus', color: '#a855f7' },
   withdrawal:       { label: 'Withdraw',       color: '#ef4444' },
@@ -53,7 +53,7 @@ const TYPE_ORDER = [
   'withdrawal', 'withdrawal_refund',
   'game_load', 'game_load_refund',
   'redeem',
-  'bonus', 'deposit_bonus', 'referral_bonus',
+  'deposit_bonus', 'referral_bonus', 'bonus',
   'spin_bet', 'spin_win',
   'adjustment_credit', 'adjustment_debit', 'adjustment',
   'refund',
@@ -61,7 +61,7 @@ const TYPE_ORDER = [
 
 // Core tabs that stay visible even when no row of that type exists yet.
 const BASE_TYPES = [
-  'deposit', 'withdrawal', 'game_load', 'redeem', 'bonus',
+  'deposit', 'withdrawal', 'game_load', 'redeem', 'deposit_bonus',
   'adjustment_credit', 'adjustment_debit',
 ]
 function orderTypes(types) {
