@@ -12,15 +12,55 @@ const fmt = c => {
 }
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-const TYPE_COLORS = {
-  deposit: '#22c55e',
-  withdrawal: '#ef4444',
-  game_load: '#ef4444',
-  redemption: '#22c55e',
-  adjustment_credit: '#a855f7',
-  adjustment_debit: '#f97316',
-  bonus: '#fbbf24',
-  refund: '#06b6d4',
+/**
+ * Known ledger types → how they show (label + colour). Every entry the ledger
+ * can hold lives here, so adding a wallet entry type means adding one line.
+ *
+ * The filter tabs are NOT hardcoded from this map, though — they are built
+ * from the types actually present in the data (see `typesInData` below), so a
+ * brand-new type still appears in the filter the moment it hits the ledger,
+ * even before it is listed here (it just shows greyed with a prettified name).
+ */
+const TYPE_META = {
+  deposit:          { label: 'Deposit',        color: '#22c55e' },
+  deposit_bonus:    { label: 'Deposit Bonus',  color: '#fbbf24' },
+  bonus:            { label: 'Bonus',          color: '#fbbf24' },
+  referral_bonus:   { label: 'Referral Bonus', color: '#a855f7' },
+  withdrawal:       { label: 'Withdrawal',     color: '#ef4444' },
+  withdrawal_refund:{ label: 'Withdraw Refund',color: '#06b6d4' },
+  game_load:        { label: 'Score',          color: '#ef4444' },
+  game_load_refund: { label: 'Score Refund',   color: '#06b6d4' },
+  redeem:           { label: 'Redeem',         color: '#22c55e' },
+  redemption:       { label: 'Redeem',         color: '#22c55e' },
+  spin_bet:         { label: 'Spin Bet',       color: '#f97316' },
+  spin_win:         { label: 'Spin Win',       color: '#fbbf24' },
+  adjustment:       { label: 'Adjustment',     color: '#a855f7' },
+  adjustment_credit:{ label: 'Adj. Credit',    color: '#a855f7' },
+  adjustment_debit: { label: 'Adj. Debit',     color: '#f97316' },
+  refund:           { label: 'Refund',         color: '#06b6d4' },
+}
+
+// Prettify an unknown type: "some_new_type" → "Some New Type".
+const prettify = t => (t || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+const typeLabel = t => TYPE_META[t]?.label || prettify(t) || '—'
+const typeColor = t => TYPE_META[t]?.color || 'rgba(255,255,255,.5)'
+
+// Order the tabs: known types first in a sensible order, then anything else
+// alphabetically. New types land at the end instead of disappearing.
+const TYPE_ORDER = [
+  'deposit', 'deposit_bonus', 'bonus', 'referral_bonus',
+  'withdrawal', 'withdrawal_refund', 'game_load', 'game_load_refund',
+  'redeem', 'spin_bet', 'spin_win',
+  'adjustment', 'adjustment_credit', 'adjustment_debit', 'refund',
+]
+function orderTypes(types) {
+  return [...types].sort((a, b) => {
+    const ia = TYPE_ORDER.indexOf(a), ib = TYPE_ORDER.indexOf(b)
+    if (ia !== -1 && ib !== -1) return ia - ib
+    if (ia !== -1) return -1
+    if (ib !== -1) return 1
+    return a.localeCompare(b)
+  })
 }
 
 export default function AdminTransactions() {
@@ -30,24 +70,17 @@ export default function AdminTransactions() {
   const [dates, setDates] = useState({ from: '', to: '' })
   const [loading, setLoading] = useState(true)
 
-  const TX_TYPES = ['all', 'deposit', 'withdrawal', 'game_load', 'redemption', 'adjustment_credit', 'adjustment_debit']
-  const TX_LABELS = { game_load: 'Score', adjustment_credit: 'Adj. Credit', adjustment_debit: 'Adj. Debit' }
-
-  useEffect(() => { load() }, [filter])
+  // Fetch everything once (newest 500) and filter type/search/date on the
+  // client. That is what lets the type tabs be driven by the real data.
+  useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    // Was querying ledger_entries, which does not exist — the table is
-    // `ledger` — so this page always showed nothing. Now goes through the
-    // scoped API route, which also applies the tenant filter.
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { setRows([]); return }
 
-      const params = new URLSearchParams({ limit: '500' })
-      if (filter !== 'all') params.set('type', filter)
-
-      const res = await fetch(`/api/admin/transactions/list?${params}`, {
+      const res = await fetch(`/api/admin/transactions/list?limit=500`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const d = await res.json()
@@ -59,7 +92,13 @@ export default function AdminTransactions() {
     }
   }
 
+  // Every type present in the data → the tabs. Any new ledger type appears
+  // here automatically; nothing to update per type.
+  const typesInData = orderTypes(Array.from(new Set(rows.map(r => r.type).filter(Boolean))))
+  const tabs = ['all', ...typesInData]
+
   const filtered = rows.filter(r => {
+    if (filter !== 'all' && r.type !== filter) return false
     if (!inDateRange(r.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
@@ -77,8 +116,8 @@ export default function AdminTransactions() {
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 10, flexWrap: 'wrap' }}>
-          {TX_TYPES.map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', textTransform: 'capitalize', transition: 'all .15s', whiteSpace: 'nowrap' }}>{TX_LABELS[s] || s.replace(/_/g, ' ')}</button>
+          {tabs.map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: "'Outfit',sans-serif", fontSize: 11, fontWeight: 700, background: filter === s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter === s ? '#fff' : 'rgba(255,255,255,.4)', transition: 'all .15s', whiteSpace: 'nowrap' }}>{s === 'all' ? 'All' : typeLabel(s)}</button>
           ))}
         </div>
         <input type="text" placeholder="Search username or reference…" value={search} onChange={e => setSearch(e.target.value)}
@@ -100,7 +139,7 @@ export default function AdminTransactions() {
               {loading ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No transactions found</td></tr>
               : filtered.map(r => {
-                const color = TYPE_COLORS[r.type] || 'rgba(255,255,255,.5)'
+                const color = typeColor(r.type)
                 const isCredit = r.amount_cents >= 0
                 return (
                   <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
@@ -111,7 +150,7 @@ export default function AdminTransactions() {
                       <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{r.profiles?.username || r.profiles?.full_name}</div>
                     </td>
                     <td style={{ padding: '12px 14px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: color + '22', color, textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{TX_LABELS[r.type] || r.type?.replace(/_/g, ' ')}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: color + '22', color, textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{typeLabel(r.type)}</span>
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 800, color: isCredit ? '#22c55e' : '#ef4444' }}>{fmt(r.amount_cents)}</td>
                     <td style={{ padding: '12px 14px' }}>
