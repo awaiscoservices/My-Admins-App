@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import Icon from '../../components/ui/Icon'
+import DateRange, { inDateRange } from '../../components/ui/DateRange'
 
 const fmtDate = d => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 
@@ -75,6 +76,7 @@ export default function AdminNotifications() {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [dates, setDates] = useState({ from: '', to: '' })
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [toast, setToast] = useState(null)
@@ -114,6 +116,7 @@ export default function AdminNotifications() {
   const CHANNEL_COLORS = { in_app: '#06b6d4', email: '#a855f7', sms: '#f97316', push: '#22c55e' }
 
   const filtered = rows.filter(r => {
+    if (!inDateRange(r.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
     return r.title?.toLowerCase().includes(s) || r.user_name?.toLowerCase().includes(s) || r.message?.toLowerCase().includes(s)
@@ -141,6 +144,7 @@ export default function AdminNotifications() {
         </div>
         <input type="text" placeholder="Search title, player…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 220 }} />
+        <DateRange from={dates.from} to={dates.to} onChange={setDates} />
       </div>
 
       <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>

@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import Icon from '../../components/ui/Icon'
+import DateRange, { inDateRange } from '../../components/ui/DateRange'
 
 function SetupModal({ account, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -131,6 +132,7 @@ export default function AdminGameAccounts() {
   const [modalAccount, setModalAccount] = useState(null)
   const [toast, setToast] = useState(null)
   const [search, setSearch] = useState('')
+  const [dates, setDates] = useState({ from: '', to: '' })
 
   useEffect(() => { loadAccounts() }, [filter])
 
@@ -191,6 +193,7 @@ export default function AdminGameAccounts() {
   }
 
   const filtered = accounts.filter(a => {
+    if (!inDateRange(a.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
     return a.profiles?.username?.toLowerCase().includes(s) ||
@@ -231,6 +234,7 @@ export default function AdminGameAccounts() {
           onChange={e => setSearch(e.target.value)}
           style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }}
         />
+        <DateRange from={dates.from} to={dates.to} onChange={setDates} />
       </div>
 
       {/* Table */}

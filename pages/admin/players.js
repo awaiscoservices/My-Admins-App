@@ -6,6 +6,7 @@ import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
 import Icon from '../../components/ui/Icon'
+import DateRange, { inDateRange } from '../../components/ui/DateRange'
 
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
@@ -66,6 +67,7 @@ export default function AdminPlayers() {
   const [rows, setRows]           = useState([])
   const [filter, setFilter]       = useState('all')
   const [search, setSearch]       = useState('')
+  const [dates, setDates]         = useState({ from: '', to: '' })
   const [loading, setLoading]     = useState(true)
   const [selected, setSelected]   = useState(null)   // quick-action modal
   const [walletPlayer, setWalletPlayer] = useState(null) // wallet modal
@@ -115,6 +117,7 @@ export default function AdminPlayers() {
   }
 
   const filtered = rows.filter(r => {
+    if (!inDateRange(r.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
     return (r.username || r.full_name)?.toLowerCase().includes(s) || r.phone?.toLowerCase().includes(s)
@@ -156,6 +159,7 @@ export default function AdminPlayers() {
         </div>
         <input type="text" placeholder="Search username or phone…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding: '9px 14px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none', minWidth: 240 }} />
+        <DateRange from={dates.from} to={dates.to} onChange={setDates} />
       </div>
 
       <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
