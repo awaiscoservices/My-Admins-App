@@ -504,11 +504,11 @@ export default function AdminLayout({ children }) {
                     <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
                       title={item.label}
                       className={`admin-nav${active ? ' active' : ''}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 3, textDecoration: 'none', fontSize: 14, fontWeight: active ? 700 : 500, color: active ? '#050505' : 'rgba(255,255,255,.7)', background: active ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : 'transparent', boxShadow: active ? '0 0 20px rgba(251,191,36,.25)' : 'none' }}>
+                      style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 3, textDecoration: 'none', fontSize: 14, fontWeight: active ? 700 : 500, color: active ? '#050505' : 'rgba(255,255,255,.7)', background: active ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : 'transparent', boxShadow: active ? '0 0 20px rgba(251,191,36,.25)' : 'none' }}>
                       <Icon name={item.icon} />
                       <span className="rail-label" style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>
                       {pending > 0 && (
-                        <span style={{ background: active ? '#050505' : (PENDING_COLORS[item.href] || '#ef4444'), color: active ? GOLD : '#fff', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 99, flexShrink: 0 }}>{pending}</span>
+                        <span className="rail-badge" style={{ background: active ? '#050505' : (PENDING_COLORS[item.href] || '#ef4444'), color: active ? GOLD : '#fff', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 99, flexShrink: 0 }}>{pending}</span>
                       )}
                     </Link>
                   )
@@ -588,6 +588,23 @@ export default function AdminLayout({ children }) {
 
         .admin-nav:not(.active):hover { background: rgba(251,191,36,.08) !important; color: #fff !important; }
         .admin-sidebar nav::-webkit-scrollbar { display: none; }
+
+        /* Notification badge. Collapsed, the full count pill has nowhere to go
+           and gets clipped at the rail edge, so show it as a small dot pinned
+           to the icon's top-right corner. Expanded (hover/focus/mobile), it
+           becomes the normal count pill at the end of the row again. */
+        .admin-sidebar .rail-badge {
+          position: absolute; top: 5px; left: 27px;
+          width: 9px; min-width: 9px; height: 9px; padding: 0 !important;
+          font-size: 0 !important; line-height: 0; border-radius: 99px;
+          border: 2px solid var(--panel, #060b18); box-sizing: content-box;
+        }
+        .admin-sidebar:hover .rail-badge,
+        .admin-sidebar:focus-within .rail-badge {
+          position: static; top: auto; left: auto;
+          width: auto; min-width: 0; height: auto; padding: 2px 7px !important;
+          font-size: 10px !important; line-height: normal; border: none;
+        }
         .tbtab:not(.active):hover { background: rgba(255,255,255,.09) !important; color: #fff !important; border-color: rgba(255,255,255,.2) !important; }
         .tbtab.active:hover { filter: brightness(1.06); }
         @media (max-width: 1400px) { .topbar-tabs { max-width: 620px !important; } .tbtab { font-size: 12px !important; padding: 10px 8px !important; } }
@@ -599,6 +616,7 @@ export default function AdminLayout({ children }) {
           .admin-sidebar .rail-label { opacity: 1 !important; max-width: none !important; pointer-events: auto !important; }
           .admin-sidebar .rail-btn { gap: 8px !important; padding-left: 12px !important; padding-right: 12px !important; }
           .admin-sidebar .rail-section { height: auto !important; padding: 4px 12px 8px !important; }
+          .admin-sidebar .rail-badge { position: static !important; top: auto !important; left: auto !important; width: auto !important; min-width: 0 !important; height: auto !important; padding: 2px 7px !important; font-size: 10px !important; line-height: normal !important; border: none !important; }
           .admin-main { margin-left: 0 !important; }
           .mobile-ham { display: flex !important; }
           .admin-content { padding: 16px 12px !important; }
