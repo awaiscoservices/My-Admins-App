@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   const { page = 0, limit = 25, search = '', type = '' } = req.query
   const pageNum = Math.max(0, parseInt(page) || 0)
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 25))
+  const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 25))
   const offset = pageNum * limitNum
 
   let q = gate.db

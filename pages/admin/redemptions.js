@@ -9,6 +9,7 @@ import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
 import Icon from '../../components/ui/Icon'
+import DateRange, { inDateRange } from '../../components/ui/DateRange'
 
 const fmt     = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
@@ -81,6 +82,7 @@ export default function AdminRedemptions() {
   const [items,    setItems]    = useState([])
   const [filter,   setFilter]   = useState('pending')
   const [search,   setSearch]   = useState('')
+  const [dates,    setDates]    = useState({ from: '', to: '' })
   const [loading,  setLoading]  = useState(true)
   const [selected, setSelected] = useState(null)
   const [walletFor, setWalletFor] = useState(null)
@@ -128,6 +130,7 @@ export default function AdminRedemptions() {
   }
 
   const rows = items.filter(r => {
+    if (!inDateRange(r.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
     return r.profiles?.username?.toLowerCase().includes(s) ||
@@ -167,6 +170,7 @@ export default function AdminRedemptions() {
         </div>
         <input type="text" placeholder="Search username, reference, account…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding:'9px 14px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', minWidth:260 }} />
+        <DateRange from={dates.from} to={dates.to} onChange={setDates} />
       </div>
 
       <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, overflow:'hidden' }}>

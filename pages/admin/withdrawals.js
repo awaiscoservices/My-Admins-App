@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import Icon from '../../components/ui/Icon'
+import DateRange, { inDateRange } from '../../components/ui/DateRange'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
@@ -69,6 +70,7 @@ export default function AdminWithdrawals() {
   const [items,    setItems]    = useState([])
   const [filter,   setFilter]   = useState('pending')
   const [search,   setSearch]   = useState('')
+  const [dates,    setDates]    = useState({ from: '', to: '' })
   const [loading,  setLoading]  = useState(true)
   const [selected, setSelected] = useState(null)
   const [walletFor, setWalletFor] = useState(null)
@@ -116,6 +118,7 @@ export default function AdminWithdrawals() {
   }
 
   const rows = items.filter(r => {
+    if (!inDateRange(r.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const s = search.toLowerCase()
     return r.profiles?.username?.toLowerCase().includes(s) ||
@@ -154,6 +157,7 @@ export default function AdminWithdrawals() {
         </div>
         <input type="text" placeholder="Search username or reference…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding:'9px 14px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', minWidth:240 }} />
+        <DateRange from={dates.from} to={dates.to} onChange={setDates} />
       </div>
 
       <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, overflow:'hidden' }}>

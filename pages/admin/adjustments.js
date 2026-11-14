@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
+import DateRange, { inDateRange } from '../../components/ui/DateRange'
 
 const fmt     = cents => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 const fmtDate = d => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
@@ -23,6 +24,7 @@ export default function AdminAdjustments() {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState('')
+  const [dates,   setDates]   = useState({ from: '', to: '' })
   const [toast,   setToast]   = useState(null)
   const [page,    setPage]    = useState(0)
   const PAGE_SIZE = 50
@@ -61,6 +63,7 @@ export default function AdminAdjustments() {
   }
 
   const filtered = items.filter(item => {
+    if (!inDateRange(item.created_at, dates.from, dates.to)) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -89,11 +92,14 @@ export default function AdminAdjustments() {
           <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', margin:0 }}>Adjustments</h1>
           <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Audit log of all manual wallet adjustments</p>
         </div>
-        <input
-          type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search player, ref, reason…"
-          style={{ padding:'9px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', width:240 }}
-        />
+        <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+          <DateRange from={dates.from} to={dates.to} onChange={setDates} />
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search player, ref, reason…"
+            style={{ padding:'9px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', width:240 }}
+          />
+        </div>
       </div>
 
       {loading ? (
