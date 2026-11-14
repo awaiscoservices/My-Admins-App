@@ -225,7 +225,9 @@ export default async function handler(req, res) {
     // Settled rows come from the ledger (the source of truth). Open/rejected
     // requests aren't in the ledger yet, so merge them in with their real
     // status — exactly what the player sees on their own transactions page.
-    const SETTLED = ['approved', 'completed', 'paid']
+    // "Settled" is per-table (SETTLED): a withdrawal is only done once 'paid',
+    // but a game load / redeem in 'processing' has already moved money (it has
+    // a ledger row), so merging it would double it up — hence excluded here.
     const [{ data: led }, { data: deps }, { data: wds }, { data: gls }, { data: reds }] = await Promise.all([
       supabaseAdmin.from('ledger')
         .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at')
@@ -240,12 +242,12 @@ export default async function handler(req, res) {
       .filter(l => want(l.type))
       .map(l => ({ ...l, status: 'completed' }))
 
-    const openOnly = arr => (arr || []).filter(r => !SETTLED.includes(r.status))
+    const open = (arr, settled) => (arr || []).filter(r => !settled.includes(r.status))
     const reqRows = [
-      ...(want('deposit')    ? openOnly(deps).map(d => ({ id: `dep-${d.id}`, type: 'deposit',    wallet_bucket: 'cash', amount_cents: d.amount_cents, direction: 'credit', balance_after_cents: null, reference_id: d.reference_id, description: d.payment_method_name || 'Deposit', status: d.status, rejection_reason: d.rejection_reason, created_at: d.created_at })) : []),
-      ...(want('withdrawal') ? openOnly(wds).map(w => ({ id: `wd-${w.id}`,  type: 'withdrawal', wallet_bucket: 'cash', amount_cents: w.amount_cents, direction: 'debit',  balance_after_cents: null, reference_id: w.reference_id, description: w.method || 'Withdraw', status: w.status, rejection_reason: w.rejection_reason, created_at: w.created_at })) : []),
-      ...(want('game_load')  ? openOnly(gls).map(g => ({ id: `gl-${g.id}`,  type: 'game_load',  wallet_bucket: 'cash', amount_cents: g.amount_cents, direction: 'debit',  balance_after_cents: null, reference_id: g.reference_id, description: g.game_panel_name || 'Scores', status: g.status, rejection_reason: g.rejection_reason, created_at: g.created_at })) : []),
-      ...(want('redemption') ? openOnly(reds).map(r => ({ id: `red-${r.id}`, type: 'redemption', wallet_bucket: 'cash', amount_cents: r.amount_cents, direction: 'credit', balance_after_cents: null, reference_id: r.reference_id, description: r.game_panel_name || 'Redeem', status: r.status, rejection_reason: r.rejection_reason, created_at: r.created_at })) : []),
+      ...(want('deposit')    ? open(deps, SETTLED.deposits).map(d => ({ id: `dep-${d.id}`, type: 'deposit',    wallet_bucket: 'cash', amount_cents: d.amount_cents, direction: 'credit', balance_after_cents: null, reference_id: d.reference_id, description: d.payment_method_name || 'Deposit', status: d.status, rejection_reason: d.rejection_reason, created_at: d.created_at })) : []),
+      ...(want('withdrawal') ? open(wds, SETTLED.withdrawals).map(w => ({ id: `wd-${w.id}`,  type: 'withdrawal', wallet_bucket: 'cash', amount_cents: w.amount_cents, direction: 'debit',  balance_after_cents: null, reference_id: w.reference_id, description: w.method || 'Withdraw', status: w.status, rejection_reason: w.rejection_reason, created_at: w.created_at })) : []),
+      ...(want('game_load')  ? open(gls, SETTLED.game_loads).map(g => ({ id: `gl-${g.id}`,  type: 'game_load',  wallet_bucket: 'cash', amount_cents: g.amount_cents, direction: 'debit',  balance_after_cents: null, reference_id: g.reference_id, description: g.game_panel_name || 'Scores', status: g.status, rejection_reason: g.rejection_reason, created_at: g.created_at })) : []),
+      ...(want('redemption') ? open(reds, SETTLED.redemptions).map(r => ({ id: `red-${r.id}`, type: 'redemption', wallet_bucket: 'cash', amount_cents: r.amount_cents, direction: 'credit', balance_after_cents: null, reference_id: r.reference_id, description: r.game_panel_name || 'Redeem', status: r.status, rejection_reason: r.rejection_reason, created_at: r.created_at })) : []),
     ]
 
     const merged = [...ledgerRows, ...reqRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
