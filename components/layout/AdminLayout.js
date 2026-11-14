@@ -135,15 +135,18 @@ const PENDING_COLORS = {
   '/admin/chat':          '#8b5cf6',
 }
 
-// 7 topbar quick-action tabs with badge counts
+// 7 topbar quick-action tabs with badge counts. Each carries the same roles
+// as its page's read permission, so a staff member only ever sees the tabs
+// they can actually use — a support agent was shown every tab (Deposits,
+// Withdraw, KYC…) and thought they had full access.
 const TOPBAR_TABS = [
-  { href: '/admin/game-accounts', label: 'Games',       color: '#06b6d4' },
-  { href: '/admin/deposits',      label: 'Deposits',    color: '#10b981' },
-  { href: '/admin/game-loads',    label: 'Scores',      color: '#fbbf24' },
-  { href: '/admin/redemptions',   label: 'Redeem', color: '#f59e0b' },
-  { href: '/admin/withdrawals',   label: 'Withdraw', color: '#3b82f6' },
-  { href: '/admin/kyc',           label: 'KYC',         color: '#ec4899' },
-  { href: '/admin/chat',          label: 'Support',     color: '#8b5cf6' },
+  { href: '/admin/game-accounts', label: 'Games',       color: '#06b6d4', roles: ['super_admin','admin','game_ops','support','finance'] },
+  { href: '/admin/deposits',      label: 'Deposits',    color: '#10b981', roles: ['super_admin','admin','finance'] },
+  { href: '/admin/game-loads',    label: 'Scores',      color: '#fbbf24', roles: ['super_admin','admin','game_ops'] },
+  { href: '/admin/redemptions',   label: 'Redeem',      color: '#f59e0b', roles: ['super_admin','admin','finance','game_ops'] },
+  { href: '/admin/withdrawals',   label: 'Withdraw',    color: '#3b82f6', roles: ['super_admin','admin','finance'] },
+  { href: '/admin/kyc',           label: 'KYC',         color: '#ec4899', roles: ['super_admin','admin','kyc_agent','risk'] },
+  { href: '/admin/chat',          label: 'Support',     color: '#8b5cf6', roles: ['super_admin','admin','support'] },
 ]
 
 export default function AdminLayout({ children }) {
@@ -329,7 +332,17 @@ export default function AdminLayout({ children }) {
   const isActive = (href) => href === '/admin' ? router.pathname === '/admin' : router.pathname.startsWith(href)
   const canSee   = (roles) => profile && roles.includes(profile.role)
 
-  const currentLabel = NAV_SECTIONS.flatMap(s => s.items).find(i => isActive(i.href))?.label || 'Dashboard'
+  const currentItem  = NAV_SECTIONS.flatMap(s => s.items).find(i => isActive(i.href))
+  const currentLabel = currentItem?.label || 'Dashboard'
+
+  // Client-side access guard. The APIs already refuse an action the role is
+  // not allowed to take, but the page shells still rendered for anyone signed
+  // in — so a support agent reaching /admin/deposits by URL or top tab saw the
+  // full page (just empty) and assumed they had access. If the current route
+  // maps to a nav item the role is not in, show Access Denied instead of the
+  // page. Routes with no nav match (e.g. player detail) fall through to the
+  // server guard as before.
+  const routeAllowed = !currentItem || !profile || currentItem.roles.includes(profile.role)
 
   if (!authorized) return (
     <div style={{ minHeight: '100vh', background: '#060b18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Outfit',sans-serif" }}>
@@ -382,7 +395,7 @@ export default function AdminLayout({ children }) {
 
         {/* Centre — 6 quick-action tabs */}
         <div className="topbar-tabs" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center', maxWidth: 820, margin: '0 16px' }}>
-          {TOPBAR_TABS.map(tab => {
+          {TOPBAR_TABS.filter(tab => canSee(tab.roles)).map(tab => {
             const count  = pendingCounts[tab.href] || 0
             const active = isActive(tab.href)
             return (
@@ -518,7 +531,16 @@ export default function AdminLayout({ children }) {
 
       <div className="admin-main" style={{ marginLeft: 72, paddingTop: 64, minHeight: '100vh' }}>
         <main className="admin-content" style={{ padding: '28px', maxWidth: 1400, margin: '0 auto', overflowX: 'hidden' }}>
-          {children}
+          {routeAllowed ? children : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '60vh', color: 'rgba(255,255,255,.5)' }}>
+              <div style={{ color: GOLD, marginBottom: 16 }}><Icon name="shield" size={44} /></div>
+              <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 22, color: '#fff', margin: 0 }}>Access Denied</h2>
+              <p style={{ fontSize: 14, marginTop: 8, maxWidth: 420 }}>
+                Your role (<strong style={{ color: GOLD }}>{profile?.role?.replace('_',' ')}</strong>) doesn’t have access to this page. If you think this is a mistake, ask an admin.
+              </p>
+              <Link href="/admin" style={{ marginTop: 20, padding: '10px 20px', background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', borderRadius: 10, color: '#050505', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Go to Dashboard</Link>
+            </div>
+          )}
         </main>
       </div>
 
