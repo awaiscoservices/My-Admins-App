@@ -16,6 +16,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import StatusBadge from './ui/StatusBadge'
 import Icon from './ui/Icon'
+import TransactionList from './TransactionList'
 import { CATEGORIES, categoryTypes, typeLabel, typeColor } from '../lib/txMeta'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -426,22 +427,7 @@ function TabTransactions({ playerId }) {
       {err && <div style={{ color: '#f87171', marginBottom: 10 }}><Icon name="alert" size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} /> {err}</div>}
       {loading ? <div style={{ color: 'rgba(255,255,255,.3)', padding: 20 }}>Loading…</div> : (
         <>
-          {rows.length === 0 ? <Empty msg="No transactions found" /> : (
-            <DataTable
-              headers={['Type', 'Amount', 'Balance After', 'Reference', 'Description', 'Date']}
-              rows={rows.map((r, i) => (
-                <tr key={r.id || i} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={tdS}><span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${typeColor(r.type)}22`, color: typeColor(r.type) }}>{typeLabel(r.type)}</span></td>
-                  <td style={tdS}><span style={{ fontSize: 13, fontWeight: 700, color: r.amount_cents >= 0 ? '#22c55e' : '#ef4444' }}>{r.amount_cents >= 0 ? '+' : ''}{fmt(r.amount_cents)}</span></td>
-                  <td style={{ ...tdS, fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>{fmt(r.balance_after_cents)}</td>
-                  <td style={tdS}><span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{r.reference_id || '—'}</span></td>
-                  {/* FIX: was r.notes — ledger column is `description` */}
-                  <td style={{ ...tdS, fontSize: 12, color: 'rgba(255,255,255,.35)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description || '—'}</td>
-                  <td style={{ ...tdS, fontSize: 11, color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{fmtTs(r.created_at)}</td>
-                </tr>
-              ))}
-            />
-          )}
+          {rows.length === 0 ? <Empty msg="No transactions found" /> : <TransactionList rows={rows} />}
           <Pager page={page} pages={pages} total={total} onPage={p => load(p)} />
         </>
       )}

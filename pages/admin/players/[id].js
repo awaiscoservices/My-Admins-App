@@ -8,7 +8,7 @@ import MoneyDisplay from '../../../components/ui/MoneyDisplay'
 import StatusBadge from '../../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../../components/PlayerWalletModal'
 import Icon from '../../../components/ui/Icon'
-import { typeLabel, typeColor } from '../../../lib/txMeta'
+import TransactionList from '../../../components/TransactionList'
 
 // ─── TAB BUTTON ─────────────────────────────────────────────
 function Tab({ label, active, onClick, badge }) {
@@ -408,36 +408,9 @@ export default function AdminPlayerDetail() {
 
       {/* ── TAB: TRANSACTIONS ── */}
       {activeTab === 'transactions' && (
-        <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Type', 'Bucket', 'Amount', 'Direction', 'Balance After', 'Date'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No transactions yet</td></tr>
-              ) : transactions.map(tx => (
-                <tr key={tx.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={{ padding: '11px 14px', fontSize: 10, fontWeight: 800, color: '#fbbf24', fontFamily: 'monospace' }}>{tx.reference_id}</td>
-                  <td style={{ padding: '11px 14px' }}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: `${typeColor(tx.type)}22`, color: typeColor(tx.type), whiteSpace: 'nowrap' }}>{typeLabel(tx.type)}</span></td>
-                  <td style={{ padding: '11px 14px', fontSize: 11, color: 'rgba(255,255,255,.4)', textTransform: 'capitalize' }}>{tx.wallet_bucket}</td>
-                  <td style={{ padding: '11px 14px' }}><MoneyDisplay cents={tx.amount_cents} size="sm" color={txTypeColor(tx.type)} /></td>
-                  <td style={{ padding: '11px 14px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: tx.direction === 'credit' ? '#10b981' : '#f87171', textTransform: 'uppercase' }}>
-                      {tx.direction === 'credit' ? '+' : '−'} {tx.direction}
-                    </span>
-                  </td>
-                  <td style={{ padding: '11px 14px' }}><MoneyDisplay cents={tx.balance_after_cents} size="sm" color="rgba(255,255,255,.5)" /></td>
-                  <td style={{ padding: '11px 14px', fontSize: 11, color: 'rgba(255,255,255,.3)', whiteSpace: 'nowrap' }}>{new Date(tx.created_at).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        transactions.length === 0
+          ? <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, padding: '30px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No transactions yet</div>
+          : <TransactionList rows={transactions} />
       )}
 
       {/* ── TAB: KYC ── */}
