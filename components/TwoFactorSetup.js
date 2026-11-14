@@ -84,8 +84,15 @@ export default function TwoFactorSetup({ onClose, onChange, forced = false }) {
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,.55)', lineHeight: 1.6, margin: '0 0 14px' }}>
               Scan this with Google Authenticator, Authy or any authenticator app, then enter the 6-digit code it shows.
             </p>
-            <div style={{ background: '#fff', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'center', marginBottom: 12 }}
+            <div className="qr2fa" style={{ background: '#fff', borderRadius: 12, padding: 16, width: 220, maxWidth: '100%', boxSizing: 'border-box', margin: '0 auto 12px' }}
               dangerouslySetInnerHTML={{ __html: enroll.qr }} />
+            <style>{`
+              /* Supabase returns the QR as a raw SVG (or data-URL img) at its
+                 own size; force it to fill the square box crisply so it isn't
+                 tiny, blurry or pushed to one side. */
+              .qr2fa svg, .qr2fa img { display: block; width: 100%; height: auto; }
+              .qr2fa svg { shape-rendering: crispEdges; }
+            `}</style>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', textAlign: 'center', margin: '0 0 14px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
               Can’t scan? Key: {enroll.secret}
             </p>
