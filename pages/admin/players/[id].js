@@ -131,6 +131,22 @@ export default function AdminPlayerDetail() {
 
   useEffect(() => { if (id) loadPlayer() }, [id])
 
+  // The Transactions tab uses the same merged source the wallet modal and the
+  // player app use (settled ledger + open/rejected requests), so it reads
+  // identically everywhere — rejected items included.
+  useEffect(() => {
+    if (!id || activeTab !== 'transactions') return
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch(`/api/admin/players/wallet-summary?player_id=${encodeURIComponent(id)}&tab=transactions&limit=100`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const d = await res.json()
+      if (res.ok) setTransactions(d.rows || [])
+    })()
+  }, [id, activeTab])
+
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)

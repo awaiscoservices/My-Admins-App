@@ -218,19 +218,40 @@ export default async function handler(req, res) {
   // ── TRANSACTIONS tab ──────────────────────────────────────────────────────────
   // FIX: `notes` → `description` (ledger column was renamed)
   if (tab === 'transactions') {
-    const { from_date, to_date, type, types } = req.query
-    let q = supabaseAdmin.from('ledger')
-      .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at', { count: 'exact' })
-      .eq('user_id', player_id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limitNum - 1)
+    const { type, types } = req.query
     const typeList = types ? types.split(',').filter(Boolean) : (type ? [type] : [])
-    if (typeList.length) q = q.in('type', typeList)
-    if (from_date) q = q.gte('created_at', from_date)
-    if (to_date)   q = q.lte('created_at', to_date)
-    const { data, count, error } = await q
-    if (error) return res.status(500).json({ error: error.message })
-    return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
+    const want = t => !typeList.length || typeList.includes(t)
+
+    // Settled rows come from the ledger (the source of truth). Open/rejected
+    // requests aren't in the ledger yet, so merge them in with their real
+    // status — exactly what the player sees on their own transactions page.
+    const SETTLED = ['approved', 'completed', 'paid']
+    const [{ data: led }, { data: deps }, { data: wds }, { data: gls }, { data: reds }] = await Promise.all([
+      supabaseAdmin.from('ledger')
+        .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at')
+        .eq('user_id', player_id).order('created_at', { ascending: false }).limit(500),
+      supabaseAdmin.from('deposits').select('id, reference_id, status, amount_cents, payment_method_name, rejection_reason, created_at').eq('user_id', player_id).order('created_at', { ascending: false }).limit(100),
+      supabaseAdmin.from('withdrawals').select('id, reference_id, status, amount_cents, method, rejection_reason, created_at').eq('user_id', player_id).order('created_at', { ascending: false }).limit(100),
+      supabaseAdmin.from('game_loads').select('id, reference_id, status, amount_cents, game_panel_name, rejection_reason, created_at').eq('user_id', player_id).order('created_at', { ascending: false }).limit(100),
+      supabaseAdmin.from('redemptions').select('id, reference_id, status, amount_cents, game_panel_name, rejection_reason, created_at').eq('user_id', player_id).order('created_at', { ascending: false }).limit(100),
+    ])
+
+    const ledgerRows = (led || [])
+      .filter(l => want(l.type))
+      .map(l => ({ ...l, status: 'completed' }))
+
+    const openOnly = arr => (arr || []).filter(r => !SETTLED.includes(r.status))
+    const reqRows = [
+      ...(want('deposit')    ? openOnly(deps).map(d => ({ id: `dep-${d.id}`, type: 'deposit',    wallet_bucket: 'cash', amount_cents: d.amount_cents, direction: 'credit', balance_after_cents: null, reference_id: d.reference_id, description: d.payment_method_name || 'Deposit', status: d.status, rejection_reason: d.rejection_reason, created_at: d.created_at })) : []),
+      ...(want('withdrawal') ? openOnly(wds).map(w => ({ id: `wd-${w.id}`,  type: 'withdrawal', wallet_bucket: 'cash', amount_cents: w.amount_cents, direction: 'debit',  balance_after_cents: null, reference_id: w.reference_id, description: w.method || 'Withdraw', status: w.status, rejection_reason: w.rejection_reason, created_at: w.created_at })) : []),
+      ...(want('game_load')  ? openOnly(gls).map(g => ({ id: `gl-${g.id}`,  type: 'game_load',  wallet_bucket: 'cash', amount_cents: g.amount_cents, direction: 'debit',  balance_after_cents: null, reference_id: g.reference_id, description: g.game_panel_name || 'Scores', status: g.status, rejection_reason: g.rejection_reason, created_at: g.created_at })) : []),
+      ...(want('redemption') ? openOnly(reds).map(r => ({ id: `red-${r.id}`, type: 'redemption', wallet_bucket: 'cash', amount_cents: r.amount_cents, direction: 'credit', balance_after_cents: null, reference_id: r.reference_id, description: r.game_panel_name || 'Redeem', status: r.status, rejection_reason: r.rejection_reason, created_at: r.created_at })) : []),
+    ]
+
+    const merged = [...ledgerRows, ...reqRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    const total = merged.length
+    const rows = merged.slice(offset, offset + limitNum)
+    return res.status(200).json({ rows, total, page: pageNum, pages: Math.ceil(total / limitNum) })
   }
 
   // ── PLAYER LEVEL tab ──────────────────────────────────────────────────────────

@@ -19,9 +19,22 @@ const fmtDate = d => d ? new Date(d).toLocaleString('en-US', { month: 'short', d
 
 const GRID = '2.2fr 1.3fr 1fr 1fr 1fr'
 
-function StatusPill() {
+const STATUS_STYLE = {
+  completed: { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.3)',  color: '#22c55e', label: 'Completed' },
+  approved:  { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.3)',  color: '#22c55e', label: 'Completed' },
+  paid:      { bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.3)',  color: '#22c55e', label: 'Paid' },
+  pending:   { bg: 'rgba(251,191,36,0.12)',border: 'rgba(251,191,36,0.35)',color: '#fbbf24', label: 'Pending' },
+  under_review: { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', color: '#3b82f6', label: 'Processing' },
+  processing:{ bg: 'rgba(59,130,246,0.12)',border: 'rgba(59,130,246,0.35)',color: '#3b82f6', label: 'Processing' },
+  rejected:  { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.3)',  color: '#ef4444', label: 'Rejected' },
+  failed:    { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.3)',  color: '#ef4444', label: 'Failed' },
+  cancelled: { bg: 'rgba(255,255,255,0.05)',border: 'rgba(255,255,255,0.1)',color: 'rgba(255,255,255,0.4)', label: 'Cancelled' },
+}
+
+function StatusPill({ status }) {
+  const s = STATUS_STYLE[status] || STATUS_STYLE.completed
   return (
-    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', whiteSpace: 'nowrap' }}>Completed</span>
+    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: s.bg, border: `1px solid ${s.border}`, color: s.color, whiteSpace: 'nowrap' }}>{s.label}</span>
   )
 }
 
@@ -47,6 +60,8 @@ export default function TransactionList({ rows }) {
         {rows.map((row, i) => {
           const isCredit = row.direction ? row.direction === 'credit' : (row.amount_cents >= 0)
           const color = typeColor(row.type)
+          const status = row.status || 'completed'
+          const rejected = status === 'rejected' || status === 'failed'
           return (
             <div key={row.id || i} className="atx-row" style={{ display: 'grid', gridTemplateColumns: GRID, padding: '13px 18px', alignItems: 'center', borderTop: i ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
               {/* Transaction: icon + label + full detail + reference */}
@@ -60,13 +75,14 @@ export default function TransactionList({ rows }) {
                     <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: row.wallet_bucket === 'bonus' ? 'rgba(168,85,247,.15)' : 'rgba(255,255,255,.07)', color: row.wallet_bucket === 'bonus' ? '#a855f7' : 'rgba(255,255,255,.4)', textTransform: 'capitalize' }}>{row.wallet_bucket || 'cash'}</span>
                   </div>
                   {row.description && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{row.description}</div>}
+                  {rejected && row.rejection_reason && <div style={{ fontSize: 11, color: 'rgba(239,68,68,0.85)', marginTop: 2 }}>Reason: {row.rejection_reason}</div>}
                   {row.reference_id && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', fontFamily: 'monospace', marginTop: 1 }}>{row.reference_id}</div>}
                 </div>
               </div>
               {/* Date */}
               <div className="atx-sub" style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{fmtDate(row.created_at)}</div>
               {/* Status */}
-              <div className="atx-sub"><StatusPill /></div>
+              <div className="atx-sub"><StatusPill status={status} /></div>
               {/* Balance After */}
               <div className="atx-sub" style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>{row.balance_after_cents != null ? fmt(row.balance_after_cents) : '—'}</div>
               {/* Amount */}
