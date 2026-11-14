@@ -53,6 +53,12 @@ const TYPE_ORDER = [
   'redeem', 'spin_bet', 'spin_win',
   'adjustment', 'adjustment_credit', 'adjustment_debit', 'refund',
 ]
+
+// Core tabs that stay visible even when no row of that type exists yet.
+const BASE_TYPES = [
+  'deposit', 'withdrawal', 'game_load', 'redeem',
+  'adjustment_credit', 'adjustment_debit',
+]
 function orderTypes(types) {
   return [...types].sort((a, b) => {
     const ia = TYPE_ORDER.indexOf(a), ib = TYPE_ORDER.indexOf(b)
@@ -92,10 +98,12 @@ export default function AdminTransactions() {
     }
   }
 
-  // Every type present in the data → the tabs. Any new ledger type appears
-  // here automatically; nothing to update per type.
-  const typesInData = orderTypes(Array.from(new Set(rows.map(r => r.type).filter(Boolean))))
-  const tabs = ['all', ...typesInData]
+  // Tabs = the core types that should ALWAYS be available (even with zero
+  // rows right now) + any other type actually present in the data. So the
+  // standard tabs never vanish on an empty day, and any new ledger type
+  // (referral bonus, spins, …) still appears automatically.
+  const typesInData = Array.from(new Set(rows.map(r => r.type).filter(Boolean)))
+  const tabs = ['all', ...orderTypes(Array.from(new Set([...BASE_TYPES, ...typesInData])))]
 
   const filtered = rows.filter(r => {
     if (filter !== 'all' && r.type !== filter) return false
