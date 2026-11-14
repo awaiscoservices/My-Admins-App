@@ -131,6 +131,9 @@ export default function AdminStaff() {
   }
 
   const isSuperAdmin = role === 'super_admin'
+  // A tenant admin manages their own casino's staff too (the invite/update
+  // routes already allow it) — not only the platform super admin.
+  const canManage = role === 'admin' || role === 'super_admin'
 
   return (
     <AdminLayout>
@@ -227,7 +230,7 @@ export default function AdminStaff() {
           <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', margin:0 }}>Staff</h1>
           <p style={{ color:'rgba(255,255,255,.35)', fontSize:13, marginTop:4 }}>Manage admin team members and roles</p>
         </div>
-        {isSuperAdmin && (
+        {canManage && (
           <button onClick={() => setModal('invite')} style={{ padding:'10px 20px', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', border:'none', borderRadius:10, color:'#000', fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
             + Invite Staff
           </button>
@@ -262,7 +265,7 @@ export default function AdminStaff() {
                   <span style={{ padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${color}22`, color }}>
                     {member.role}
                   </span>
-                  {isSuperAdmin && !isMe && member.role !== 'super_admin' && member.status !== 'suspended' && (
+                  {canManage && !isMe && member.role !== 'super_admin' && member.status !== 'suspended' && (
                     <>
                       <button onClick={() => setModal({ type:'role', member })} style={{ padding:'7px 12px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'rgba(255,255,255,.5)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:"'Outfit',sans-serif" }}>
                         Change Role

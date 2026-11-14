@@ -35,6 +35,7 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('profiles').update({ role }).eq('id', user_id)
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id: target.tenant_id,
       actor_id: user.id, actor_role: actor.role,
       action: 'staff_role_changed', target_type: 'profile', target_id: user_id,
       description: `${target.full_name} role changed from ${target.role} to ${role}`,
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
       .then(() => {}, () => {})
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id: target.tenant_id,
       actor_id: user.id, actor_role: actor.role,
       action: 'staff_deactivated', target_type: 'profile', target_id: user_id,
       description: `${target.full_name} (${target.role}) deactivated`,

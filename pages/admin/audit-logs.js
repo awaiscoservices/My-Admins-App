@@ -50,15 +50,10 @@ export default function AdminAuditLogs() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setLoading(false); return }
 
-    const { data: actor } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
-    if (!actor || actor.role !== 'super_admin') {
-      showToast('super_admin only', 'error'); setLoading(false); return
-    }
-
-    // Through the guarded route, not the table. Querying from the browser
-    // left row-level security as the only thing deciding what you saw, and
-    // it lets any staff member read any casino's rows.
-    const res = await fetch(`/api/admin/audit-logs/list?page=${page + 1}&limit=${PAGE_SIZE}`, {
+    // The route decides who may read the log (super_admin, admin, risk,
+    // reporting) and scopes it to the caller's casino — no client-side role
+    // check, which locked every admin out with a "super_admin only" error.
+    const res = await fetch(`/api/admin/audit-logs/list?page=${page}&limit=${PAGE_SIZE}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
     const d = await res.json()
