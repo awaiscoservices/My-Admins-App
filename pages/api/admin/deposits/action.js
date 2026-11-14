@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       reviewed_at: new Date().toISOString(),
     }).eq('id', deposit_id)
 
-    await logAudit(supabaseAdmin, admin, 'deposit_marked_under_review', 'deposit', deposit_id, deposit, { status: 'under_review' })
+    await logAudit(supabaseAdmin, admin, 'deposit_marked_under_review', 'deposit', deposit_id, deposit, { status: 'under_review' }, tenantId)
     return res.status(200).json({ message: 'Marked under review' })
   }
 
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
       reference_id: deposit.reference_id,
     })
 
-    await logAudit(supabaseAdmin, admin, 'deposit_rejected', 'deposit', deposit_id, deposit, { status: 'rejected', rejection_reason: reason })
+    await logAudit(supabaseAdmin, admin, 'deposit_rejected', 'deposit', deposit_id, deposit, { status: 'rejected', rejection_reason: reason }, tenantId)
     return res.status(200).json({ message: 'Deposit rejected' })
   }
 
@@ -190,7 +190,8 @@ export default async function handler(req, res) {
 
   await logAudit(supabaseAdmin, admin, 'deposit_approved', 'deposit', deposit_id,
     { status: deposit.status },
-    { status: 'approved', amount_cents: deposit.amount_cents, bonus_cents: deposit.bonus_cents }
+    { status: 'approved', amount_cents: deposit.amount_cents, bonus_cents: deposit.bonus_cents },
+    tenantId
   )
 
   return res.status(200).json({
@@ -300,8 +301,9 @@ async function triggerReferralBonus(client, userId, depositId, amountCents, tena
   }).then(() => {}, () => {})
 }
 
-async function logAudit(client, actor, action, targetType, targetId, before, after) {
+async function logAudit(client, actor, action, targetType, targetId, before, after, tenantId) {
   await client.from('audit_logs').insert({
+    tenant_id:   tenantId,
     actor_id:    actor.id,
     actor_role:  actor.role,
     action,

@@ -25,11 +25,11 @@ export default async function handler(req, res) {
   if (id) {
     const { error } = await supabaseAdmin.from('promotions').update(payload).eq('id', id)
     if (error) return res.status(500).json({ error: error.message })
-    await supabaseAdmin.from('audit_logs').insert({ action: 'promo_update', performed_by: admin.id, target_type: 'promotion', target_id: id, details: { title } })
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'promo_update', target_type: 'promotion', target_id: id, description: `Promotion updated: ${title}`, metadata: { title } })
   } else {
     const { error } = await supabaseAdmin.from('promotions').insert({ ...payload, created_at: new Date().toISOString() })
     if (error) return res.status(500).json({ error: error.message })
-    await supabaseAdmin.from('audit_logs').insert({ action: 'promo_create', performed_by: admin.id, target_type: 'promotion', target_id: null, details: { title } })
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'promo_create', target_type: 'promotion', target_id: null, description: `Promotion created: ${title}`, metadata: { title } })
   }
 
   return res.status(200).json({ success: true })

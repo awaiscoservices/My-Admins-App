@@ -19,11 +19,13 @@ export default async function handler(req, res) {
   if (error) return res.status(500).json({ error: error.message })
 
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id: gate.tenantId,
+    actor_id: user.id,
+    actor_role: user.role,
     action: 'bonus_tier_delete',
-    performed_by: user.id,
     target_type: 'player_bonus',
     target_id: id,
-    details: {},
+    description: 'Deleted a bonus tier',
   })
 
   return res.status(200).json({ success: true })

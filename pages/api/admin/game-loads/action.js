@@ -115,6 +115,7 @@ export default async function handler(req, res) {
     if (rejectErr) return res.status(500).json({ error: rejectErr.message })
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id:   tenantId,
       actor_id:    actor.id,
       actor_role:  actor.role,
       action:      'game_load_rejected',
@@ -245,6 +246,7 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id:   tenantId,
     actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'game_load_approved',

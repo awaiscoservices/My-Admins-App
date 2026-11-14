@@ -34,7 +34,8 @@ export default async function handler(req, res) {
     action: 'setting_changed',
     target_type: 'platform_settings',
     target_id: key,
-    details: { key, value },
+    description: `Setting changed: ${key}`,
+    metadata: { key, value },
   }).then(() => {}, () => {})
 
   return res.status(200).json({ ok: true })

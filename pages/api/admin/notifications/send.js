@@ -35,9 +35,12 @@ export default async function handler(req, res) {
 
   await supabaseAdmin.from('audit_logs').insert({
     tenant_id: gate.tenantId,
-    action: 'notification_broadcast', performed_by: admin.id,
+    actor_id: admin.id,
+    actor_role: admin.role,
+    action: 'notification_broadcast',
     target_type: 'broadcast', target_id: null,
-    details: { title, target, sent_count: players.length }
+    description: `Sent "${title}" to ${players.length} player(s) (${target})`,
+    metadata: { title, target, sent_count: players.length }
   })
 
   return res.status(200).json({ success: true, sent_count: players.length })

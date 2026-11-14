@@ -30,6 +30,6 @@ export default async function handler(req, res) {
     if (!error) sent += Math.min(BATCH, rows.length - i)
   }
 
-  await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: user.id, action: 'broadcast_sent', target_type: 'notifications', details: { title, target, sent } }).then(() => {}, () => {})
+  await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: user.id, actor_role: user.role, action: 'broadcast_sent', target_type: 'notifications', description: `Broadcast "${title}" to ${sent} player(s) (${target})`, metadata: { title, target, sent } }).then(() => {}, () => {})
   return res.status(200).json({ message: 'Broadcast sent', sent })
 }

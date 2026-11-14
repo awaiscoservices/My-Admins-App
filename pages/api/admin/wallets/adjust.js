@@ -76,10 +76,12 @@ export default async function handler(req, res) {
   await supabaseAdmin.from('audit_logs').insert({
     tenant_id: tenantId,
     actor_id: actor.id,
+    actor_role: actor.role,
     action: 'wallet_adjustment',
     target_type: 'wallet',
     target_id: wallet.id,
-    details: { user_id, amount_cents, direction, reason, reference_id },
+    description: `Wallet ${direction} of $${(amount_cents / 100).toFixed(2)} — ${reason} (${reference_id})`,
+    metadata: { user_id, amount_cents, direction, reason, reference_id },
   })
 
   // Notify player

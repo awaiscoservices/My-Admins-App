@@ -21,6 +21,6 @@ export default async function handler(req, res) {
   }
   if (error) return res.status(500).json({ error: error.message })
 
-  await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: id ? 'game_updated' : 'game_created', target_type: 'game_panels', target_id: data.id, details: payload }).then(() => {}, () => {})
+  await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: user.id, actor_role: user.role, action: id ? 'game_updated' : 'game_created', target_type: 'game_panels', target_id: data.id, description: `Game panel ${id ? 'updated' : 'created'}: ${name}`, metadata: payload }).then(() => {}, () => {})
   return res.status(200).json({ message: 'Saved', game: data })
 }

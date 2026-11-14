@@ -70,7 +70,7 @@ export default async function handler(req, res) {
   if (action === 'suspend') {
     await supabaseAdmin.from('game_accounts').update({ status: 'suspended' }).eq('id', account_id)
     await logAudit(supabaseAdmin, admin, 'game_account_suspended', 'game_account', account_id,
-      { status: account.status }, { status: 'suspended' })
+      { status: account.status }, { status: 'suspended' }, account.tenant_id)
     return res.status(200).json({ message: 'Account suspended' })
   }
 
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
   if (action === 'reactivate') {
     await supabaseAdmin.from('game_accounts').update({ status: 'active' }).eq('id', account_id)
     await logAudit(supabaseAdmin, admin, 'game_account_reactivated', 'game_account', account_id,
-      { status: account.status }, { status: 'active' })
+      { status: account.status }, { status: 'active' }, account.tenant_id)
     return res.status(200).json({ message: 'Account reactivated' })
   }
 
@@ -149,14 +149,16 @@ export default async function handler(req, res) {
 
   await logAudit(supabaseAdmin, admin, 'game_account_activated', 'game_account', account_id,
     { status: account.status },
-    { status: 'active', game_username: game_username.trim(), activated_by: admin.full_name }
+    { status: 'active', game_username: game_username.trim(), activated_by: admin.full_name },
+    account.tenant_id
   )
 
   return res.status(200).json({ message: 'Game account activated successfully' })
 }
 
-async function logAudit(client, actor, action, targetType, targetId, before, after) {
+async function logAudit(client, actor, action, targetType, targetId, before, after, tenantId) {
   await client.from('audit_logs').insert({
+    tenant_id: tenantId,
     actor_id: actor.id,
     actor_role: actor.role,
     action, target_type: targetType, target_id: targetId,

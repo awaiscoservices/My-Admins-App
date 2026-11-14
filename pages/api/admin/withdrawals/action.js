@@ -72,6 +72,7 @@ export default async function handler(req, res) {
     if (procErr) return res.status(500).json({ error: procErr.message })
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id: tenantId,
       actor_id: actor.id, actor_role: actor.role,
       action: 'withdrawal_processing', target_type: 'withdrawal', target_id: withdrawal_id,
       description: `Withdraw ${withdrawal.reference_id} moved to processing`,
@@ -141,6 +142,7 @@ export default async function handler(req, res) {
     if (rejErr) return res.status(500).json({ error: rejErr.message })
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id:   tenantId,
       actor_id:    actor.id,
       actor_role:  actor.role,
       action:      'withdrawal_rejected',
@@ -308,6 +310,7 @@ export default async function handler(req, res) {
   }, { onConflict: 'user_id' })
 
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id:   tenantId,
     actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'withdrawal_approved',

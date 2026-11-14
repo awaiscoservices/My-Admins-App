@@ -52,11 +52,14 @@ export default async function handler(req, res) {
   if (result.error) return res.status(500).json({ error: result.error.message })
 
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id: gate.tenantId,
+    actor_id: user.id,
+    actor_role: user.role,
     action: id ? 'bonus_tier_update' : 'bonus_tier_create',
-    performed_by: user.id,
     target_type: 'player_bonus',
     target_id: result.data.id,
-    details: { name, day_number, bonus_percent },
+    description: `Bonus tier ${id ? 'updated' : 'created'}: ${name}`,
+    metadata: { name, day_number, bonus_percent },
   })
 
   return res.status(200).json({ success: true, id: result.data.id })

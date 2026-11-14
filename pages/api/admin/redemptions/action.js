@@ -79,6 +79,7 @@ export default async function handler(req, res) {
     await _recalculateLevelOnReject(playerId)
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id:   tenantId,
       actor_id:    actor.id,
       actor_role:  actor.role,
       action:      'redemption_rejected',
@@ -283,6 +284,7 @@ export default async function handler(req, res) {
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert({
+    tenant_id:   tenantId,
     actor_id:    actor.id,
     actor_role:  actor.role,
     action:      'redemption_approved',

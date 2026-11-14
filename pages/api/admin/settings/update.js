@@ -25,9 +25,12 @@ export default async function handler(req, res) {
 
   await supabaseAdmin.from('audit_logs').insert({
     tenant_id: gate.tenantId,
-    action: 'setting_update', performed_by: admin.id,
+    actor_id: admin.id,
+    actor_role: admin.role,
+    action: 'setting_update',
     target_type: 'settings', target_id: null,
-    details: { keys: updates.map(u => u.key) }
+    description: `Updated settings: ${updates.map(u => u.key).join(', ')}`,
+    metadata: { keys: updates.map(u => u.key) }
   })
 
   return res.status(200).json({ success: true })

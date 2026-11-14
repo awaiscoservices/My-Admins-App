@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     })
     if (createErr) return res.status(400).json({ error: createErr.message })
     await supabaseAdmin.from('profiles').update({ role, tenant_id: gate.tenantId, full_name: full_name?.trim() || email.split('@')[0] }).eq('id', newUser.user.id)
-    await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: 'staff_invited', target_type: 'profiles', target_id: newUser.user.id, details: { email, role } }).then(() => {}, () => {})
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: actor.id, actor_role: actor.role, action: 'staff_invited', target_type: 'profiles', target_id: newUser.user.id, description: `Invited ${email} as ${role}`, metadata: { email, role } }).then(() => {}, () => {})
     return res.status(201).json({ message: 'Staff invited', temp_password: tempPassword })
   }
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Cannot modify another super admin' })
 
     await supabaseAdmin.from('profiles').update({ role }).eq('id', staff_id)
-    await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: 'staff_role_changed', target_type: 'profiles', target_id: staff_id, details: { new_role: role } }).then(() => {}, () => {})
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: user.id, actor_role: user.role, action: 'staff_role_changed', target_type: 'profiles', target_id: staff_id, description: `Changed staff role to ${role}`, metadata: { new_role: role } }).then(() => {}, () => {})
     return res.status(200).json({ message: 'Role updated' })
   }
 
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
     await supabaseAdmin.from('profiles').update({ status: 'suspended' }).eq('id', staff_id)
     await supabaseAdmin.auth.admin.updateUserById(staff_id, { ban_duration: '876600h' })
-    await supabaseAdmin.from('audit_logs').insert({ actor_id: user.id, action: 'staff_deactivated', target_type: 'profiles', target_id: staff_id }).then(() => {}, () => {})
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: user.id, actor_role: user.role, action: 'staff_deactivated', target_type: 'profiles', target_id: staff_id, description: 'Staff member deactivated' }).then(() => {}, () => {})
     return res.status(200).json({ message: 'Staff deactivated' })
   }
 

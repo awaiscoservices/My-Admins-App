@@ -45,10 +45,25 @@ export default async function handler(req, res) {
   })
 
   await supabaseAdmin.from('audit_logs').insert({
-    action: `adjustment_${type}`, performed_by: admin.id,
-    target_type: 'player', target_id: user_id,
-    details: { amount_cents, reason, ref_id: refId },
+    tenant_id:   gate.tenantId,
+    actor_id:    admin.id,
+    actor_role:  admin.role,
+    action:      `adjustment_${type}`,
+    target_type: 'player',
+    target_id:   user_id,
+    description: `Wallet ${type} of $${(amount_cents / 100).toFixed(2)} — ${reason.trim()} (${refId})`,
+    metadata:    { amount_cents, reason: reason.trim(), reference_id: refId },
   })
+
+  // Notify the player their balance changed.
+  await supabaseAdmin.from('notifications').insert({
+    tenant_id: gate.tenantId,
+    user_id,
+    type:      type === 'credit' ? 'wallet_credited' : 'wallet_debited',
+    title:     type === 'credit' ? '💰 Wallet Credited' : '💸 Wallet Debited',
+    message:   `Your wallet was ${type === 'credit' ? 'credited' : 'debited'} $${(amount_cents / 100).toFixed(2)}. ${reason.trim()}`,
+    reference_id: refId,
+  }).then(() => {}, () => {})
 
   return res.status(200).json({ success: true, reference_id: refId })
 }

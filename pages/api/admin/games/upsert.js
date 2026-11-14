@@ -48,11 +48,11 @@ export default async function handler(req, res) {
   if (id) {
     const { error } = await supabaseAdmin.from('game_panels').update(payload).eq('id', id)
     if (error) return res.status(500).json({ error: error.message })
-    await supabaseAdmin.from('audit_logs').insert({ action: 'game_update', performed_by: admin.id, target_type: 'game_panel', target_id: id, details: { name } })
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'game_update', target_type: 'game_panel', target_id: id, description: `Game panel updated: ${name}`, metadata: { name } })
   } else {
     const { data, error } = await supabaseAdmin.from('game_panels').insert({ ...payload, created_at: new Date().toISOString() }).select('id').single()
     if (error) return res.status(500).json({ error: error.message })
-    await supabaseAdmin.from('audit_logs').insert({ action: 'game_create', performed_by: admin.id, target_type: 'game_panel', target_id: data.id, details: { name } })
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'game_create', target_type: 'game_panel', target_id: data.id, description: `Game panel created: ${name}`, metadata: { name } })
   }
 
   return res.status(200).json({ success: true })

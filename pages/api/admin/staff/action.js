@@ -35,9 +35,12 @@ export default async function handler(req, res) {
     if (invErr) return res.status(500).json({ error: invErr.message })
     await supabaseAdmin.from('profiles').update({ role, tenant_id: gate.tenantId }).eq('id', invited.user.id)
     await supabaseAdmin.from('audit_logs').insert({
-      action: 'staff_invite', performed_by: caller.id,
+      tenant_id: gate.tenantId,
+      actor_id: caller.id, actor_role: caller.role,
+      action: 'staff_invite',
       target_type: 'profile', target_id: invited.user.id,
-      details: { email, role }
+      description: `Invited ${email} as ${role}`,
+      metadata: { email, role }
     })
     return res.status(200).json({ success: true })
   }
@@ -47,9 +50,12 @@ export default async function handler(req, res) {
     const { error } = await supabaseAdmin.from('profiles').update({ role, updated_at: new Date().toISOString() }).eq('id', target_user_id)
     if (error) return res.status(500).json({ error: error.message })
     await supabaseAdmin.from('audit_logs').insert({
-      action: 'staff_role_change', performed_by: caller.id,
+      tenant_id: gate.tenantId,
+      actor_id: caller.id, actor_role: caller.role,
+      action: 'staff_role_change',
       target_type: 'profile', target_id: target_user_id,
-      details: { new_role: role }
+      description: `Changed staff role to ${role}`,
+      metadata: { new_role: role }
     })
     return res.status(200).json({ success: true })
   }
@@ -59,8 +65,11 @@ export default async function handler(req, res) {
     const { error } = await supabaseAdmin.from('profiles').update({ status: active ? 'active' : 'suspended', updated_at: new Date().toISOString() }).eq('id', target_user_id)
     if (error) return res.status(500).json({ error: error.message })
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id: gate.tenantId,
+      actor_id: caller.id, actor_role: caller.role,
       action: active ? 'staff_activate' : 'staff_deactivate',
-      performed_by: caller.id, target_type: 'profile', target_id: target_user_id
+      target_type: 'profile', target_id: target_user_id,
+      description: `Staff member ${active ? 'activated' : 'deactivated'}`,
     })
     return res.status(200).json({ success: true })
   }

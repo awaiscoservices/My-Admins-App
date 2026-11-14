@@ -89,5 +89,26 @@ export default async function handler(req, res) {
     description: `KYC ${action}d for user ${kyc.user_id}${action==='reject'?' — '+rejection_reason:''}`,
   })
 
+  // Notify the player of the decision. Without this a verification silently
+  // flipped and the player never knew they could now withdraw (or why they
+  // still cannot). Non-critical: never blocks the decision.
+  await supabaseAdmin.from('notifications').insert(
+    action === 'approve'
+      ? {
+          tenant_id: tenantId,
+          user_id:   kyc.user_id,
+          type:      'kyc_approved',
+          title:     'Identity Verified ✅',
+          message:   'Your identity verification was approved. You can now request withdrawals.',
+        }
+      : {
+          tenant_id: tenantId,
+          user_id:   kyc.user_id,
+          type:      'kyc_rejected',
+          title:     'Verification Needs Attention',
+          message:   `Your identity verification was rejected. Reason: ${rejection_reason.trim()}. Please re-submit your documents.`,
+        }
+  ).then(() => {}, () => {})
+
   return res.status(200).json({ ok: true, action, kyc_id })
 }

@@ -28,11 +28,14 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message })
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id: gate.tenantId,
       actor_id: admin.id,
+      actor_role: admin.role,
       action: 'risk_flag',
       target_type: 'player',
       target_id: user_id,
-      details: { reason, note },
+      description: `Player flagged — ${reason}${note ? ' ('+note+')' : ''}`,
+      metadata: { reason, note },
     })
 
     return res.status(200).json({ success: true })
@@ -54,11 +57,14 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message })
 
     await supabaseAdmin.from('audit_logs').insert({
+      tenant_id: flag.tenant_id,
       actor_id: admin.id,
+      actor_role: admin.role,
       action: 'risk_unflag',
       target_type: 'risk_flag',
       target_id: flag_id,
-      details: { user_id: flag?.user_id, note },
+      description: `Risk flag resolved${note ? ' — '+note : ''}`,
+      metadata: { user_id: flag?.user_id, note },
     })
 
     return res.status(200).json({ success: true })
