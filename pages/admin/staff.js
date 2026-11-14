@@ -125,22 +125,36 @@ export default function AdminStaff() {
     if (!invite.email.trim()) { showToast('Email required', 'error'); return }
     if (invite.password.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
     setSaving(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/admin/staff/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(
-        invite.tenant_id ? invite : { email: invite.email, full_name: invite.full_name, password: invite.password, role: invite.role }
-      ),
-    })
-    const json = await res.json()
-    setSaving(false)
-    if (!res.ok) { showToast(json.error || 'Could not create staff', 'error'); return }
-    // Show the credentials so the admin can copy and send them.
-    setCreated({ email: invite.email.trim(), password: invite.password, role: invite.role })
-    setModal(null)
-    setInvite({ email:'', full_name:'', password:'', role:'admin', tenant_id:'' })
-    load()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { showToast('Session expired — sign in again', 'error'); return }
+      const res = await fetch('/api/admin/staff/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(
+          invite.tenant_id ? invite : { email: invite.email, full_name: invite.full_name, password: invite.password, role: invite.role }
+        ),
+      })
+      // The route may answer with a non-JSON body (e.g. a 404/500 HTML page if
+      // it isn't deployed yet). Parsing that blindly used to throw and leave
+      // the button stuck on "Creating…". Read text first, then try JSON.
+      const raw = await res.text()
+      let json = {}
+      try { json = raw ? JSON.parse(raw) : {} } catch { json = {} }
+      if (!res.ok) {
+        showToast(json.error || `Could not create staff (HTTP ${res.status})`, 'error')
+        return
+      }
+      // Show the credentials so the admin can copy and send them.
+      setCreated({ email: invite.email.trim(), password: invite.password, role: invite.role })
+      setModal(null)
+      setInvite({ email:'', full_name:'', password:'', role:'admin', tenant_id:'' })
+      load()
+    } catch (e) {
+      showToast(e?.message || 'Network error — please try again', 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const isSuperAdmin = role === 'super_admin'
