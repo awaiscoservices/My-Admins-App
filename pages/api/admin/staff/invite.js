@@ -95,8 +95,20 @@ export default async function handler(req, res) {
   let invited = existing ? { user: existing } : null
 
   if (!existing) {
+    // Send the invite link back to THIS deployment's stable domain, not
+    // whatever the Supabase "Site URL" happens to be — it was pointing at an
+    // old Vercel preview deployment that Vercel then deleted, so every invite
+    // link 410'd. Derive the origin from the request (the admin is on the
+    // production panel when inviting), with an env override if set.
+    const envBase  = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_ADMIN_URL
+    const fwdProto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim()
+    const fwdHost  = req.headers['x-forwarded-host'] || req.headers.host
+    const base     = (envBase || req.headers.origin || (fwdHost ? `${fwdProto}://${fwdHost}` : ''))
+      .toString().replace(/\/+$/, '')
+
     const r = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { invited_role: role, is_staff: true, tenant_id: targetTenant },
+      ...(base ? { redirectTo: `${base}/auth/reset-password` } : {}),
     })
     if (r.error) return res.status(500).json({ error: r.error.message })
     invited = r.data
