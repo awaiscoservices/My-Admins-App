@@ -25,8 +25,18 @@ function resolveRange(req) {
   return { start, end, startISO: start.toISOString(), endISO: end.toISOString() }
 }
 
+// The 3 operating shifts. Morning 12am–8am, Evening 8am–4pm, Night 4pm–12am.
+function shiftOf(ts) {
+  const h = new Date(ts).getHours()
+  if (h < 8)  return { key: '1', label: 'Morning (12–8)' }
+  if (h < 16) return { key: '2', label: 'Evening (8–4)' }
+  return { key: '3', label: 'Night (4–12)' }
+}
+const shiftLabelOf = ts => shiftOf(ts).label
+
 // Chronological bucket key + label for a timestamp at the chosen granularity.
 function bucketOf(ts, gran) {
+  if (gran === 'shift') return shiftOf(ts)
   const d = new Date(ts)
   if (gran === 'month') {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -77,7 +87,7 @@ export default async function handler(req, res) {
   const q = (table, select) => scopeToTenant(gate.db.from(table).select(select), gate)
   const { start, end, startISO, endISO } = resolveRange(req)
   const inRange = (query) => query.gte('created_at', startISO).lte('created_at', endISO)
-  const gran = ['day', 'week', 'month'].includes(req.query.group_by) ? req.query.group_by : 'day'
+  const gran = ['day', 'week', 'month', 'shift'].includes(req.query.group_by) ? req.query.group_by : 'day'
   const report = req.query.report || 'overview'
   const CAP = 5000
 
@@ -140,6 +150,7 @@ export default async function handler(req, res) {
             { key: 'Withdrawals', count: wdRows.length, amount_cents: wdTotal },
           ],
         },
+        shift_breakdown: { dimension: 'shift', items: breakdownBy(depRows.map(r => ({ ...r, shift: shiftLabelOf(r.created_at) })), 'shift') },
         columns: [], rows: [], total_count: depRows.length + wdRows.length,
       })
     }
@@ -286,9 +297,21 @@ export default async function handler(req, res) {
 
     let rows = data || []
     if (!cfg.noPlayers) rows = await withPlayers(rows)
+    // Tag every row with its shift, so the detail table and CSV carry it.
+    rows = rows.map(r => ({ ...r, shift: shiftLabelOf(r.created_at) }))
 
     const series = timeSeries(rows, gran)
     const breakdown = breakdownBy(rows, cfg.breakdown)
+
+    // Always available: a split by shift, whatever the chosen grouping.
+    const shiftBreakdown = breakdownBy(rows, 'shift')
+
+    // Add a Shift column right before the date column.
+    const shiftCol = { key: 'shift', label: 'Shift', type: 'text' }
+    const di = cfg.columns.findIndex(c => c.type === 'date')
+    const columns = di === -1
+      ? [...cfg.columns, shiftCol]
+      : [...cfg.columns.slice(0, di), shiftCol, ...cfg.columns.slice(di)]
 
     return res.status(200).json({
       report, group_by: gran, range: { from: startISO, to: endISO },
@@ -300,7 +323,8 @@ export default async function handler(req, res) {
         counts: series.map(b => b.count),
       },
       breakdown: { dimension: cfg.breakdown, items: breakdown },
-      columns: cfg.columns,
+      shift_breakdown: { dimension: 'shift', items: shiftBreakdown },
+      columns,
       rows: rows.slice(0, 1000),
       total_count: rows.length,
     })

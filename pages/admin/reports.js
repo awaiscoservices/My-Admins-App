@@ -21,7 +21,11 @@ const GROUPS = [
   { id: 'day',   label: 'Daily' },
   { id: 'week',  label: 'Weekly' },
   { id: 'month', label: 'Monthly' },
+  { id: 'shift', label: 'By Shift' },
 ]
+// The 3 operating shifts, in order, always shown even with zero activity.
+const SHIFTS = ['Morning (12–8)', 'Evening (8–4)', 'Night (4–12)']
+const SHIFT_COLORS = { 'Morning (12–8)': '#fbbf24', 'Evening (8–4)': '#22c55e', 'Night (4–12)': '#6366f1' }
 
 const fmtMoney = c => '$' + ((c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtNum   = n => Number(n || 0).toLocaleString()
@@ -248,6 +252,29 @@ export default function AdminReports() {
                 })}
               </div>
             </div>
+
+            {/* ── By Shift ── */}
+            {d.shift_breakdown && (
+              <div style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, padding:'20px', marginBottom:22 }}>
+                <h3 style={{ fontSize:13, fontWeight:700, color:gold, margin:'0 0 16px', textTransform:'uppercase', letterSpacing:'.06em' }}>By Shift</h3>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+                  {SHIFTS.map(label => {
+                    const it = (d.shift_breakdown.items || []).find(x => x.key === label) || { count: 0, amount_cents: 0 }
+                    const c = SHIFT_COLORS[label] || gold
+                    return (
+                      <div key={label} style={{ background:'rgba(255,255,255,.03)', border:`1px solid ${c}33`, borderRadius:14, padding:'16px 18px' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                          <span style={{ width:9, height:9, borderRadius:'50%', background:c }} />
+                          <span style={{ fontSize:11.5, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase', color:'rgba(255,255,255,.7)' }}>{label}</span>
+                        </div>
+                        <div style={{ fontSize:22, fontWeight:800, color:c }}>{fmtMoney(it.amount_cents)}</div>
+                        <div style={{ fontSize:12, color:'rgba(255,255,255,.4)', marginTop:4 }}>{fmtNum(it.count)} records</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── Detailed table ── */}
             {cols.length > 0 && (
