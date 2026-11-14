@@ -159,6 +159,68 @@ export default async function handler(req, res) {
     })
   }
 
+  // ── Promo code bonus (deposit-type) ───────────────────────
+  // Separate from the method/level bonus above; also lands in the Bonus
+  // bucket. Recomputed from the promo so a stale snapshot can't over-credit.
+  let promoCredited = 0
+  if (deposit.promotion_id) {
+    const { data: promo } = await supabaseAdmin
+      .from('promotions')
+      .select('id, code, type, bonus_value, max_bonus_cents, current_uses')
+      .eq('id', deposit.promotion_id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+
+    if (promo && promo.type === 'deposit') {
+      let promoBonus = Math.floor(deposit.amount_cents * (Number(promo.bonus_value || 0) / 100))
+      if (promo.max_bonus_cents != null) promoBonus = Math.min(promoBonus, promo.max_bonus_cents)
+
+      if (promoBonus > 0) {
+        const bonusAfter = updatedWallet.bonus_balance_cents + promoBonus
+        const { data: w2 } = await supabaseAdmin.from('wallets')
+          .update({
+            bonus_balance_cents: bonusAfter,
+            total_bonus_cents:   updatedWallet.total_bonus_cents + promoBonus,
+            version:             updatedWallet.version + 1,
+          })
+          .eq('id', updatedWallet.id).eq('version', updatedWallet.version)
+          .select().single()
+
+        if (w2) {
+          promoCredited = promoBonus
+          updatedWallet.bonus_balance_cents = w2.bonus_balance_cents
+          updatedWallet.total_bonus_cents   = w2.total_bonus_cents
+          updatedWallet.version             = w2.version
+
+          await supabaseAdmin.from('ledger').insert({
+            tenant_id:           tenantId,
+            reference_id:        `${deposit.reference_id}-PROMO`,
+            user_id:             deposit.user_id,
+            type:                'promotion_credit',
+            wallet_bucket:       'bonus',
+            amount_cents:        promoBonus,
+            direction:           'credit',
+            balance_after_cents: bonusAfter,
+            deposit_id:          deposit.id,
+            description:         `Promo ${promo.code} bonus for ${deposit.reference_id}`,
+            created_by:          admin.id,
+            idempotency_key:     `${deposit.id}-promo-credit`,
+            metadata:            { promo_id: promo.id, code: promo.code },
+          }).then(() => {}, () => {})
+
+          await supabaseAdmin.from('promo_redemptions').insert({
+            tenant_id: tenantId, promotion_id: promo.id, user_id: deposit.user_id,
+            deposit_id: deposit.id, kind: 'deposit', bonus_cents: promoBonus,
+          }).then(() => {}, () => {})
+
+          await supabaseAdmin.from('promotions')
+            .update({ current_uses: (promo.current_uses || 0) + 1 })
+            .eq('id', promo.id).then(() => {}, () => {})
+        }
+      }
+    }
+  }
+
   // Update deposit status
   await supabaseAdmin.from('deposits').update({
     status:      'approved',
@@ -184,7 +246,7 @@ export default async function handler(req, res) {
     user_id:      deposit.user_id,
     type:         'deposit_approved',
     title:        'Deposit Approved! 🎉',
-    message:      `Your deposit of $${(deposit.amount_cents / 100).toFixed(2)} (${deposit.reference_id}) has been approved. ${deposit.bonus_cents > 0 ? `+$${(deposit.bonus_cents / 100).toFixed(2)} bonus added!` : ''} Your wallet has been credited.`,
+    message:      `Your deposit of $${(deposit.amount_cents / 100).toFixed(2)} (${deposit.reference_id}) has been approved. ${(deposit.bonus_cents + promoCredited) > 0 ? `+$${((deposit.bonus_cents + promoCredited) / 100).toFixed(2)} bonus added!` : ''} Your wallet has been credited.`,
     reference_id: deposit.reference_id,
   })
 
