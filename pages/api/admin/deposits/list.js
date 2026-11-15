@@ -21,7 +21,8 @@ export default async function handler(req, res) {
       id, reference_id, amount_cents, bonus_cents, total_credit_cents,
       status, player_reference, screenshot_url, player_notes, admin_notes,
       rejection_reason, created_at, reviewed_at,
-      payment_method_id, payment_method_name, user_id,
+      payment_method_id, user_id,
+      payment_methods ( name, logo_url ),
       profiles!deposits_user_id_fkey ( id, username )
     `)
     .order('created_at', { ascending: false })
@@ -49,7 +50,13 @@ export default async function handler(req, res) {
         proofUrl = signed?.signedUrl || null
       }
     }
-    return { ...r, profiles: maskPlayer(r.profiles), screenshot_url: proofUrl }
+    return {
+      ...r,
+      profiles: maskPlayer(r.profiles),
+      screenshot_url: proofUrl,
+      payment_method_name: r.payment_methods?.name || null,
+      payment_method_logo: r.payment_methods?.logo_url || null,
+    }
   }))
 
   return res.status(200).json({ deposits: rows })
