@@ -1,0 +1,36 @@
+name: CI
+
+# Safety gate: build (and lint) the admin app on every push and PR to main.
+# Vercel deploys automatically on push — this catches a broken build BEFORE
+# Vercel ships it. Placeholder Supabase env vars are only so the build can
+# evaluate the client module; no real secrets are needed to compile.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build
+        run: npm run build
