@@ -168,8 +168,8 @@ export default async function handler(req, res) {
     const CONFIGS = {
       deposits: {
         table: 'deposits',
-        select: 'id, reference_id, amount_cents, bonus_cents, status, created_at, user_id',
-        breakdown: 'status',
+        select: 'id, reference_id, amount_cents, bonus_cents, status, created_at, user_id, payment_method_id, payment_methods ( name )',
+        breakdown: 'method',
         kpis: (rows) => [
           money('Total Deposits', rows.reduce((s, r) => s + (r.amount_cents || 0), 0)),
           money('Bonus Given', rows.reduce((s, r) => s + (r.bonus_cents || 0), 0)),
@@ -179,6 +179,7 @@ export default async function handler(req, res) {
         columns: [
           { key: 'reference_id', label: 'Reference', type: 'ref' },
           { key: 'player', label: 'Player', type: 'text' },
+          { key: 'method', label: 'Method', type: 'text' },
           { key: 'amount_cents', label: 'Amount', type: 'money' },
           { key: 'bonus_cents', label: 'Bonus', type: 'money' },
           { key: 'status', label: 'Status', type: 'badge' },
@@ -187,8 +188,8 @@ export default async function handler(req, res) {
       },
       withdrawals: {
         table: 'withdrawals',
-        select: 'id, reference_id, amount_cents, status, created_at, user_id',
-        breakdown: 'status',
+        select: 'id, reference_id, amount_cents, status, created_at, user_id, method',
+        breakdown: 'method',
         kpis: (rows) => [
           money('Total Withdraw', rows.reduce((s, r) => s + (r.amount_cents || 0), 0)),
           num('Count', rows.length),
@@ -197,6 +198,7 @@ export default async function handler(req, res) {
         columns: [
           { key: 'reference_id', label: 'Reference', type: 'ref' },
           { key: 'player', label: 'Player', type: 'text' },
+          { key: 'method', label: 'Method', type: 'text' },
           { key: 'amount_cents', label: 'Amount', type: 'money' },
           { key: 'status', label: 'Status', type: 'badge' },
           { key: 'created_at', label: 'Date', type: 'date' },
@@ -306,8 +308,14 @@ export default async function handler(req, res) {
 
     let rows = (data || []).filter(matchesShift)
     if (!cfg.noPlayers) rows = await withPlayers(rows)
-    // Tag every row with its shift, so the detail table and CSV carry it.
-    rows = rows.map(r => ({ ...r, shift: shiftLabelOf(r.created_at) }))
+    // Tag every row with its shift, and a flat `method` name: withdrawals carry
+    // it as a text column, deposits as a joined payment_methods.name. Falls back
+    // to '—' so method-wise breakdown has a bucket for untagged rows.
+    rows = rows.map(r => ({
+      ...r,
+      method: r.method || r.payment_methods?.name || '—',
+      shift: shiftLabelOf(r.created_at),
+    }))
 
     const series = timeSeries(rows, gran)
     const breakdown = breakdownBy(rows, cfg.breakdown)
