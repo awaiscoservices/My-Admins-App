@@ -231,7 +231,7 @@ export default function AdminPlayerDetail() {
     </AdminLayout>
   )
 
-  const txTypeColor = (type) => ['deposit','deposit_bonus','redeem','referral_bonus','level_bonus','adjustment_credit','promotion_credit','refund'].includes(type) ? '#10b981' : '#f87171'
+  const txTypeColor = (type) => ['deposit','deposit_bonus','redeem','referral_bonus','adjustment_credit','promotion_credit','refund'].includes(type) ? '#10b981' : '#f87171'
 
   return (
     <AdminLayout>
