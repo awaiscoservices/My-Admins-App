@@ -51,18 +51,41 @@ function StarIcon({ filled, size = 17 }) {
 }
 
 // ─── ConversationList ─────────────────────────────────────────────────────────
-function ConversationList({ convs, selected, onSelect, loading, search, onSearch, onToggleStar }) {
-  const filtered = search.trim()
-    ? convs.filter(c => {
-        const p = c.player ?? {}
-        const hay = `${p.username ?? ''}`.toLowerCase()
-        return hay.includes(search.toLowerCase())
-      })
-    : convs
+function ConversationList({ convs, selected, onSelect, loading, search, onSearch, filter, onFilter, onToggleStar }) {
+  const unreadCount  = convs.filter(c => c.unread > 0).length
+  const starredCount = convs.filter(c => c.is_starred).length
+
+  let filtered = convs
+  if (filter === 'unread')  filtered = filtered.filter(c => c.unread > 0)
+  if (filter === 'starred') filtered = filtered.filter(c => c.is_starred)
+  if (search.trim()) {
+    const q = search.toLowerCase()
+    filtered = filtered.filter(c => `${c.player?.username ?? ''}`.toLowerCase().includes(q))
+  }
+
+  const filterBox = (key, label, count) => {
+    const active = filter === key
+    return (
+      <button type="button" onClick={() => onFilter(active ? 'all' : key)}
+        style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
+          fontSize: 12, fontWeight: 800, fontFamily: "'Outfit',sans-serif",
+          background: active ? 'rgba(251,191,36,.14)' : 'rgba(255,255,255,.05)',
+          border: `1px solid ${active ? 'rgba(251,191,36,.5)' : 'rgba(255,255,255,.1)'}`,
+          color: active ? GOLD : 'rgba(255,255,255,.65)',
+        }}>
+        {label}
+        {count > 0 && (
+          <span style={{ background: active ? GOLD : 'rgba(255,255,255,.14)', color: active ? '#000' : 'rgba(255,255,255,.8)', borderRadius: 9, fontSize: 10, fontWeight: 800, padding: '1px 6px', minWidth: 16, textAlign: 'center' }}>{count}</span>
+        )}
+      </button>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Search */}
+      {/* Search + filters */}
       <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
         <input
           value={search}
@@ -75,13 +98,17 @@ function ConversationList({ convs, selected, onSelect, loading, search, onSearch
             color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none',
           }}
         />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {filterBox('unread', 'Unread', unreadCount)}
+          {filterBox('starred', 'Starred', starredCount)}
+        </div>
       </div>
 
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {loading && <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>Loading…</div>}
         {!loading && !filtered.length && (
           <div style={{ padding: 24, textAlign: 'center', color: SUBTLE, fontSize: 13 }}>
-            {search ? 'No matches' : 'No conversations yet'}
+            {search || filter !== 'all' ? 'No matches' : 'No conversations yet'}
           </div>
         )}
         {filtered.map(c => {
@@ -226,6 +253,7 @@ export default function AdminChat() {
   const [convs, setConvs]           = useState([])
   const [convLoading, setConvLoading] = useState(true)
   const [search, setSearch]         = useState('')
+  const [filter, setFilter]         = useState('all')   // 'all' | 'unread' | 'starred'
   const [selected, setSelected]     = useState(null)
   const [messages, setMessages]     = useState([])
   const [msgLoading, setMsgLoading] = useState(false)
@@ -464,10 +492,7 @@ export default function AdminChat() {
     <AdminLayout title="Chat">
       <Head><title>Chat — Casinoze Support</title></Head>
       <div style={{ boxSizing: 'border-box' }}>
-        <h1 style={{ fontFamily: "'Cinzel',serif", fontSize: 24, fontWeight: 700, color: '#fff', marginBottom: 20 }}>
-          Live Chat
-        </h1>
-        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, height: 'calc(100vh - 180px)', minHeight: 360 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, height: 'calc(100vh - 104px)', minHeight: 420 }}>
           {/* Left */}
           <div style={{ ...PANEL, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
@@ -479,6 +504,7 @@ export default function AdminChat() {
               <ConversationList
                 convs={convs} selected={selected} onSelect={handleSelect}
                 loading={convLoading} search={search} onSearch={setSearch}
+                filter={filter} onFilter={setFilter}
                 onToggleStar={toggleStar}
               />
             </div>
