@@ -324,7 +324,7 @@ function SignupBonusTab({ config, onSave, saving }) {
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Signup Bonus %</div>
           <div style={{ position: 'relative', width: 130 }}>
-            <input type="number" min="0" max="100" step="0.5" value={pct}
+            <input type="number" min="0" max="1000" step="0.5" value={pct}
               onChange={e => setPct(e.target.value)} placeholder="0"
               style={{ width: '100%', padding: '10px 28px 10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.05)', border: BDR, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: "'Outfit',sans-serif", outline: 'none', MozAppearance: 'textfield' }} />
             <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: G, fontWeight: 700, pointerEvents: 'none' }}>%</span>

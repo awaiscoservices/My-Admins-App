@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   if (req.method === 'PUT') {
     const { pct, is_active } = req.body ?? {}
     const p = parseFloat(pct)
-    if (isNaN(p) || p < 0 || p > 100) return res.status(400).json({ error: 'pct must be 0–100' })
+    if (isNaN(p) || p < 0 || p > 1000) return res.status(400).json({ error: 'pct must be 0–1000' })
     const { data, error } = await admin
       .from('signup_bonus_config')
       .upsert(
