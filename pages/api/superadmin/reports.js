@@ -209,6 +209,7 @@ export default async function handler(req, res) {
       deposits: {
         table: 'deposits',
         select: 'id, reference_id, amount_cents, bonus_cents, status, created_at, user_id, tenant_id, payment_method_id, payment_methods ( name )',
+        filter: (query) => query.in('status', SETTLED.deposits),
         breakdown: 'method',
         kpis: (rows) => [
           money('Total Deposits', rows.reduce((s, r) => s + (r.amount_cents || 0), 0)),
@@ -230,6 +231,7 @@ export default async function handler(req, res) {
       withdrawals: {
         table: 'withdrawals',
         select: 'id, reference_id, amount_cents, status, created_at, user_id, tenant_id, method',
+        filter: (query) => query.in('status', SETTLED.withdrawals),
         breakdown: 'method',
         kpis: (rows) => [
           money('Total Withdraw', rows.reduce((s, r) => s + (r.amount_cents || 0), 0)),
