@@ -31,6 +31,8 @@ const ICONS = {
   logout:  'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',
   menu:    'M3 6h18M3 12h18M3 18h18',
   shield:  'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4',
+  chart:   'M3 3v18h18M7 15l3-4 3 2 4-6',
+  user:    'M20 21v-1a6 6 0 00-6-6h-4a6 6 0 00-6 6v1M12 11a4 4 0 100-8 4 4 0 000 8z',
 }
 
 function Icon({ name, size = 18 }) {
@@ -49,6 +51,7 @@ const NAV_SECTIONS = [
     items: [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
       { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
+      { href: '/superadmin/reports',  icon: 'chart',   label: 'Reports'    },
       { href: '/superadmin/admins',   icon: 'user',    label: 'Super Admins' },
     ],
   },
@@ -65,7 +68,7 @@ const NAV_SECTIONS = [
 
 // Only these pages exist. The rest render as disabled rows rather than links,
 // because a nav item that 404s is worse than one that says "soon".
-const BUILT = new Set(['/superadmin', '/superadmin/tenants', '/superadmin/admins'])
+const BUILT = new Set(['/superadmin', '/superadmin/tenants', '/superadmin/reports', '/superadmin/admins'])
 
 export default function SuperAdminLayout({ children, title }) {
   const router = useRouter()
