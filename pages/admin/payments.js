@@ -28,6 +28,7 @@ function MethodModal({ method, onClose, onSave }) {
   const [form, setForm] = useState({
     name: method?.name || '',
     type: method?.type || 'cashapp',
+    logo_url: method?.logo_url || '',
     min_deposit_cents: method?.min_deposit_cents != null ? (method.min_deposit_cents / 100).toFixed(2) : '5.00',
     max_deposit_cents: method?.max_deposit_cents != null ? (method.max_deposit_cents / 100).toFixed(2) : '1000.00',
     sort_order: method?.sort_order ?? 0,
@@ -47,10 +48,13 @@ function MethodModal({ method, onClose, onSave }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [qrUploading, setQrUploading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
 
-  async function uploadQr(file) {
+  // Shared uploader — the endpoint returns a public image URL. `target` is the
+  // form field it fills: qr_image_url (player QR) or logo_url (method logo).
+  async function uploadImage(file, target, setBusy) {
     if (!file) return
-    setQrUploading(true); setError('')
+    setBusy(true); setError('')
     try {
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader()
@@ -66,10 +70,12 @@ function MethodModal({ method, onClose, onSave }) {
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Upload failed')
-      setForm(p => ({ ...p, qr_image_url: d.url }))
-    } catch (err) { setError(err.message || 'QR upload failed') }
-    finally { setQrUploading(false) }
+      setForm(p => ({ ...p, [target]: d.url }))
+    } catch (err) { setError(err.message || 'Upload failed') }
+    finally { setBusy(false) }
   }
+  const uploadQr   = file => uploadImage(file, 'qr_image_url', setQrUploading)
+  const uploadLogo = file => uploadImage(file, 'logo_url', setLogoUploading)
 
   async function submit() {
     if (!form.name.trim()) { setError('Method name is required'); return }
@@ -124,6 +130,22 @@ function MethodModal({ method, onClose, onSave }) {
               style={{ width: '100%', padding: '11px 14px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 13, fontFamily: "'Outfit',sans-serif", outline: 'none' }}>
               {TYPES.map(t => <option key={t} value={t} style={{ background: '#0e1a2e' }}>{t.replace(/_/g, ' ')}</option>)}
             </select>
+          </div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 6 }}>Method Logo (optional)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)' }}>
+                {form.logo_url
+                  ? <img src={form.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  : <span style={{ fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,.5)' }}>{(form.name || '?').charAt(0).toUpperCase()}</span>}
+              </span>
+              <input type="file" accept="image/*" disabled={logoUploading} onChange={e => uploadLogo(e.target.files?.[0])}
+                style={{ flex: 1, minWidth: 0, padding: '9px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 12, fontFamily: "'Outfit',sans-serif", boxSizing: 'border-box' }} />
+              {form.logo_url && !logoUploading && (
+                <button type="button" onClick={() => setForm(p => ({ ...p, logo_url: '' }))} style={{ flexShrink: 0, background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', fontSize: 11, fontWeight: 700, padding: '8px 12px', cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Remove</button>
+              )}
+            </div>
+            {logoUploading && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 6 }}>Uploading…</div>}
           </div>
           {[['min_deposit_cents', 'Min Deposit ($)'], ['max_deposit_cents', 'Max Deposit ($)'], ['sort_order', 'Sort Order']].map(([key, label]) => (
             <div key={key}>
@@ -273,7 +295,16 @@ export default function AdminPayments() {
                   <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.name}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: r.logo_url ? '#fff' : tc + '22', border: '1px solid rgba(255,255,255,.1)' }}>
+                          {r.logo_url
+                            ? <img src={r.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            : <span style={{ fontSize: 13, fontWeight: 800, color: tc }}>{(r.name || '?').charAt(0).toUpperCase()}</span>}
+                        </span>
+                        {r.name}
+                      </div>
+                    </td>
                     <td style={{ padding: '12px 14px' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: tc + '22', color: tc, textTransform: 'capitalize' }}>{r.type?.replace(/_/g, ' ')}</span>
                     </td>

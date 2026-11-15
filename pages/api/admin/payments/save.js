@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   const user = gate.actor
 
   const {
-    id, name, type, icon, description, instructions, account_details,
+    id, name, type, icon, logo_url, description, instructions, account_details,
     min_deposit_cents, max_deposit_cents,
     is_active, is_auto, requires_proof, requires_reference, sort_order,
     allow_deposit, allow_withdraw,
@@ -47,6 +47,7 @@ export default async function handler(req, res) {
     name:               name.trim(),
     type:               TYPES.includes(type) ? type : 'other',
     icon:               icon?.trim() || null,
+    logo_url:           logo_url?.trim() || null,
     description:        description?.trim() || null,
     instructions:       instructions?.trim() || null,
     // jsonb and NOT NULL — an object or {}, never a string and never null.
