@@ -144,9 +144,9 @@ const TOPBAR_TABS = [
   { href: '/admin/chat',          label: 'Support',     color: '#8b5cf6', roles: ['super_admin','admin','support'] },
   { href: '/admin/game-accounts', label: 'Games',       color: '#06b6d4', roles: ['super_admin','admin','game_ops','support','finance'] },
   { href: '/admin/deposits',      label: 'Deposits',    color: '#10b981', roles: ['super_admin','admin','finance'] },
+  { href: '/admin/withdrawals',   label: 'Withdraw',    color: '#3b82f6', roles: ['super_admin','admin','finance'] },
   { href: '/admin/game-loads',    label: 'Scores',      color: '#fbbf24', roles: ['super_admin','admin','game_ops'] },
   { href: '/admin/redemptions',   label: 'Redeem',      color: '#f59e0b', roles: ['super_admin','admin','finance','game_ops'] },
-  { href: '/admin/withdrawals',   label: 'Withdraw',    color: '#3b82f6', roles: ['super_admin','admin','finance'] },
   { href: '/admin/kyc',           label: 'KYC',         color: '#ec4899', roles: ['super_admin','admin','kyc_agent','risk'] },
 ]
 
