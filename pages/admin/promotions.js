@@ -2,13 +2,13 @@
  * pages/admin/promotions.js — Player Bonuses
  *
  * Layout:
- *   Tab 1 – Deposit Bonuses
+ *   Tab 1 – Daily Bonuses
  *     Accordion list of Payment Methods.
  *     Expand one → grid: Rows = Levels, Cols = Mon–Sun (7 days)
  *     Each cell = editable % input.  Blur saves that single cell.
  *
- *   Tab 2 – Referral Bonuses
- *     3 rows (deposit 1/2/3), one % field each.
+ *   Tab 2 – Other Bonuses
+ *     Bonus Balance, Referral Bonuses and Signup Bonus settings stacked.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Head from 'next/head'
@@ -383,9 +383,19 @@ function BonusBalanceTab({ config, onSave, saving }) {
   )
 }
 
+// ─── Section heading (used inside the Other Bonuses tab) ──────────────────────
+function SectionHead({ title }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 14px' }}>
+      <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 16, fontWeight: 700, color: '#fff', margin: 0, whiteSpace: 'nowrap' }}>{title}</h2>
+      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function PlayerBonuses() {
-  const [tab, setTab]           = useState('deposit')
+  const [tab, setTab]           = useState('daily')
   const [paymentMethods, setPaymentMethods] = useState([])
   const [levels, setLevels]     = useState([])
   const [bonusMap, setBonusMap] = useState({})   // { [pmId]: { [levelId]: { [day]: percent } } }
@@ -514,7 +524,7 @@ export default function PlayerBonuses() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 12, width: 'fit-content', marginBottom: 24 }}>
-        {[['deposit','Deposit Bonuses'], ['referral','Referral Bonuses'], ['signup','Signup Bonus'], ['bonus','Bonus Balance']].map(([key, label]) => (
+        {[['daily','Daily Bonuses'], ['other','Other Bonuses']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
             fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700,
@@ -525,8 +535,8 @@ export default function PlayerBonuses() {
         ))}
       </div>
 
-      {/* ── Deposit Bonuses tab ── */}
-      {tab === 'deposit' && (
+      {/* ── Daily Bonuses tab ── */}
+      {tab === 'daily' && (
         <>
           {loading ? (
             <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
@@ -568,34 +578,25 @@ export default function PlayerBonuses() {
         </>
       )}
 
-      {/* ── Referral Bonuses tab ── */}
-      {tab === 'referral' && (
+      {/* ── Other Bonuses tab (Bonus Balance + Referral + Signup) ── */}
+      {tab === 'other' && (
         loading ? (
           <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
         ) : (
-          <ReferralTab
-            tiers={referralTiers}
-            onSave={handleReferralSave}
-            saving={savingReferral}
-          />
-        )
-      )}
-
-      {/* ── Signup Bonus tab ── */}
-      {tab === 'signup' && (
-        loading ? (
-          <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
-        ) : (
-          <SignupBonusTab config={signupConfig} onSave={handleSignupSave} saving={savingSignup} />
-        )
-      )}
-
-      {/* ── Bonus Balance tab ── */}
-      {tab === 'bonus' && (
-        loading ? (
-          <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
-        ) : (
-          <BonusBalanceTab config={bonusConfig} onSave={handleConfigSave} saving={savingConfig} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+            <section>
+              <SectionHead title="Bonus Balance" />
+              <BonusBalanceTab config={bonusConfig} onSave={handleConfigSave} saving={savingConfig} />
+            </section>
+            <section>
+              <SectionHead title="Referral Bonuses" />
+              <ReferralTab tiers={referralTiers} onSave={handleReferralSave} saving={savingReferral} />
+            </section>
+            <section>
+              <SectionHead title="Signup Bonus" />
+              <SignupBonusTab config={signupConfig} onSave={handleSignupSave} saving={savingSignup} />
+            </section>
+          </div>
         )
       )}
     </AdminLayout>
