@@ -33,7 +33,7 @@ function ReviewModal({ load, onClose, onAction }) {
           <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 700, marginTop: 8 }}>−{fmt(load.amount_cents)}</div>
           <div style={{ fontSize: 11, color: '#a855f7', marginTop: 4 }}>Game: {load.game_panel_name || '—'}</div>
           <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 2, fontFamily: 'monospace' }}>Account: {load.game_account_username || '—'}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Bucket: {load.wallet_bucket || 'cash'}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Wallet: {load.wallet_bucket || 'cash'}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>Ref: {load.reference_id}</div>
         </div>
         <div style={{ background: 'rgba(168,85,247,.07)', border: '1px solid rgba(168,85,247,.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
@@ -150,7 +150,7 @@ export default function AdminGameLoads() {
             </colgroup>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Player', 'Game', 'Account', 'Amount', 'Bucket', 'Status', 'Date', 'Actions'].map(h => (
+                {['Reference', 'Player', 'Game', 'Account', 'Amount', 'Wallet', 'Status', 'Date', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
