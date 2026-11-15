@@ -319,13 +319,7 @@ function SignupBonusTab({ config, onSave, saving }) {
   }, [config])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
-      <div style={{ fontSize: 13, color: DIM }}>
-        A new player who hasn’t deposited yet gets this % on their <strong style={{ color: G }}>first deposit</strong>.
-        It shows on every payment method and the home banner, and replaces the normal deposit bonus for that one deposit.
-        After the first deposit, the player’s level bonuses apply.
-      </div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: BG_CARD, border: BDR, borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Signup Bonus %</div>
