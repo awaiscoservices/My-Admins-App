@@ -287,7 +287,7 @@ export default async function handler(req, res) {
     let q = supabaseAdmin.from('ledger')
       .select('id, type, wallet_bucket, amount_cents, direction, balance_after_cents, reference_id, description, created_at', { count: 'exact' })
       .eq('user_id', player_id)
-      .in('type', ['deposit_bonus', 'promotion_credit', 'referral_bonus', 'level_bonus', 'bonus', 'spin_win', 'spin_bet'])
+      .in('type', ['deposit_bonus', 'promotion_credit', 'referral_bonus', 'bonus', 'spin_win', 'spin_bet'])
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1)
     if (from_date) q = q.gte('created_at', from_date)
