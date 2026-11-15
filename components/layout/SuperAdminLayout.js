@@ -50,8 +50,8 @@ const NAV_SECTIONS = [
     icon: 'tenants',
     items: [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
-      { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
       { href: '/superadmin/reports',  icon: 'chart',   label: 'Reports'    },
+      { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
       { href: '/superadmin/admins',   icon: 'user',    label: 'Super Admins' },
     ],
   },
