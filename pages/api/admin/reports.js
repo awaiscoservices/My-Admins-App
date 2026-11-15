@@ -114,8 +114,8 @@ export default async function handler(req, res) {
     // ── OVERVIEW ──────────────────────────────────────────────────────────
     if (report === 'overview') {
       const [dep, wd, players] = await Promise.all([
-        inRange(q('deposits', 'amount_cents, created_at').in('status', SETTLED.deposits)),
-        inRange(q('withdrawals', 'amount_cents, created_at').in('status', SETTLED.withdrawals)),
+        inRange(q('deposits', 'amount_cents, created_at, payment_methods ( name )').in('status', SETTLED.deposits)),
+        inRange(q('withdrawals', 'amount_cents, created_at, method').in('status', SETTLED.withdrawals)),
         inRange(q('profiles', 'created_at').eq('role', 'player')),
       ])
       const depRows = (dep.data || []).filter(matchesShift)
@@ -159,6 +159,11 @@ export default async function handler(req, res) {
             { key: 'Withdraw', count: wdRows.length, amount_cents: wdTotal },
           ],
         },
+        // Payment-method-wise splits, one per flow.
+        method_breakdowns: [
+          { label: 'Deposits by Method', items: breakdownBy(depRows.map(r => ({ ...r, method: r.payment_methods?.name || '—' })), 'method') },
+          { label: 'Withdraw by Method', items: breakdownBy(wdRows.map(r => ({ ...r, method: r.method || '—' })), 'method') },
+        ],
         shift_breakdown: { dimension: 'shift', items: breakdownBy(depRows.map(r => ({ ...r, shift: shiftLabelOf(r.created_at) })), 'shift') },
         columns: [], rows: [], total_count: depRows.length + wdRows.length,
       })

@@ -164,6 +164,8 @@ export default function AdminReports() {
         @media (max-width:620px){ .kpi-grid{ grid-template-columns:repeat(2,1fr); } }
         .rep-row { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
         @media (max-width:900px){ .rep-row{ grid-template-columns:1fr; } }
+        .method-row { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        @media (max-width:900px){ .method-row{ grid-template-columns:1fr; } }
       `}</style>
 
       <div style={{ fontFamily:"'Outfit',sans-serif", color:'#fff' }}>
@@ -259,6 +261,36 @@ export default function AdminReports() {
                 })}
               </div>
             </div>
+
+            {/* ── Payment-method-wise breakdowns (overview) ── */}
+            {(d.method_breakdowns || []).some(b => (b.items || []).length) && (
+              <div className="method-row" style={{ marginBottom:22 }}>
+                {(d.method_breakdowns || []).map((bk, bi) => {
+                  const total = (bk.items || []).reduce((s, x) => s + (x.amount_cents || 0), 0)
+                  return (
+                    <div key={bi} style={{ background:'rgba(255,255,255,.025)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, padding:'20px' }}>
+                      <h3 style={{ fontSize:13, fontWeight:700, color:'#22c55e', margin:'0 0 16px', textTransform:'uppercase', letterSpacing:'.06em' }}>{bk.label}</h3>
+                      {(bk.items || []).length === 0 ? (
+                        <div style={{ color:'rgba(255,255,255,.3)', fontSize:13 }}>No data</div>
+                      ) : bk.items.map((it, i) => {
+                        const pct = total ? Math.round((it.amount_cents / total) * 100) : 0
+                        return (
+                          <div key={i} style={{ marginBottom:12 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
+                              <span style={{ color:'rgba(255,255,255,.7)', textTransform:'capitalize' }}>{pretty(it.key)} <span style={{ color:'rgba(255,255,255,.3)' }}>({fmtNum(it.count)})</span></span>
+                              <span style={{ color:'#fff', fontWeight:700 }}>{fmtMoney(it.amount_cents)}</span>
+                            </div>
+                            <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:99, overflow:'hidden' }}>
+                              <div style={{ width:`${pct}%`, height:'100%', background:'linear-gradient(90deg,#22c55e,#fbbf24)', borderRadius:99 }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* ── Detailed table ── */}
             {cols.length > 0 && (
