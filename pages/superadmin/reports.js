@@ -3,6 +3,7 @@ import Head from 'next/head'
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout'
 import DateRange from '../../components/ui/DateRange'
 import StatusBadge from '../../components/ui/StatusBadge'
+import { BarChart, LineChart } from '../../components/ui/Charts'
 import { supabase } from '../../lib/supabase'
 
 const gold = '#fbbf24'
@@ -34,58 +35,6 @@ const fmtNum   = n => Number(n || 0).toLocaleString()
 const fmtDate  = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 const isoDay   = (d) => { const z = new Date(d); z.setMinutes(z.getMinutes() - z.getTimezoneOffset()); return z.toISOString().slice(0, 10) }
 const pretty   = t => String(t || '—').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-
-function BarChart({ labels, data, display, color = gold, height = 180 }) {
-  if (!data?.length) return <div style={{ height, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,.2)', fontSize:13 }}>No data</div>
-  const max = Math.max(...data, 1)
-  const step = Math.ceil(data.length / 10)
-  return (
-    <div>
-      <div style={{ display:'flex', alignItems:'flex-end', gap: data.length > 40 ? 1 : 4, height }}>
-        {data.map((v, i) => (
-          <div key={i} style={{ flex:1, display:'flex', alignItems:'flex-end', height:'100%', minWidth:0 }}
-            title={`${labels[i]}: ${display ? display[i] : v}`}>
-            <div style={{ width:'100%', height:`${Math.max((v / max) * (height - 10), 2)}px`, background:`linear-gradient(to top,${color}dd,${color}55)`, borderRadius:'4px 4px 0 0', transition:'height .4s ease' }} />
-          </div>
-        ))}
-      </div>
-      <div style={{ display:'flex', marginTop:6 }}>
-        {labels.map((l, i) => (
-          <span key={i} style={{ flex:1, textAlign:'center', fontSize:9, color:'rgba(255,255,255,.3)', overflow:'hidden', whiteSpace:'nowrap', minWidth:0 }}>{i % step === 0 ? l : ''}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function LineChart({ labels, datasets, height = 200 }) {
-  const all = datasets.flatMap(s => s.data)
-  if (!all.length) return <div style={{ height, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,.2)', fontSize:13 }}>No data</div>
-  const max = Math.max(...all, 1), min = Math.min(...all, 0), range = max - min || 1
-  const w = 100, h = height, n = labels.length, step = Math.ceil(n / 10)
-  const pts = vals => vals.map((v, i) => `${n === 1 ? 0 : (i / (n - 1)) * w},${h - ((v - min) / range) * (h - 10) - 5}`).join(' ')
-  const zeroY = h - ((0 - min) / range) * (h - 10) - 5
-  return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width:'100%', height }}>
-        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="rgba(255,255,255,.12)" strokeWidth="0.5" />
-        {datasets.map((s, i) => (
-          <polyline key={i} points={pts(s.data)} fill="none" stroke={s.color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        ))}
-      </svg>
-      <div style={{ display:'flex', marginTop:6 }}>
-        {labels.map((l, i) => <span key={i} style={{ flex:1, textAlign:'center', fontSize:9, color:'rgba(255,255,255,.3)', overflow:'hidden', whiteSpace:'nowrap', minWidth:0 }}>{i % step === 0 ? l : ''}</span>)}
-      </div>
-      <div style={{ display:'flex', gap:16, marginTop:10, flexWrap:'wrap' }}>
-        {datasets.map((s, i) => (
-          <span key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'rgba(255,255,255,.55)' }}>
-            <span style={{ width:10, height:3, borderRadius:2, background:s.color }} /> {s.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export default function SuperAdminReports() {
   const [report, setReport] = useState('overview')
@@ -250,12 +199,13 @@ export default function SuperAdminReports() {
                   )}
                 </div>
                 {chart?.type === 'line' ? (
-                  <LineChart labels={chart.labels} datasets={chart.datasets} />
+                  <LineChart labels={chart.labels} datasets={chart.datasets} formatY={fmtMoney} />
                 ) : chart ? (
                   <BarChart
                     labels={chart.labels}
                     data={metric === 'count' ? (chart.counts || []) : (chart.datasets?.[0]?.data || [])}
                     display={metric === 'count' ? null : (chart.datasets?.[0]?.data || []).map(fmtMoney)}
+                    formatY={metric === 'count' ? fmtNum : fmtMoney}
                   />
                 ) : null}
               </div>

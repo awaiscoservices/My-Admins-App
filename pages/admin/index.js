@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import AdminLayout from '../../components/layout/AdminLayout'
 import DateRange from '../../components/ui/DateRange'
+import { BarChart, LineChart, Donut } from '../../components/ui/Charts'
 import { supabase } from '../../lib/supabase'
 
 const gold   = '#fbbf24'
@@ -75,127 +76,6 @@ function StatCard({ label, value, sub, color = gold, icon, live }) {
       <div style={{ fontSize:30, fontWeight:800, color, fontFamily:"'Outfit',sans-serif", letterSpacing:'-.5px' }}>{value}</div>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:'auto', paddingTop:8 }}>
         {sub && <div style={{ fontSize:12, color:'rgba(255,255,255,.35)' }}>{sub}</div>}
-      </div>
-    </div>
-  )
-}
-
-function BarChart({ data, color = gold, height = 120 }) {
-  if (!data?.length) return (
-    <div style={{ height, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,.2)', fontSize:13 }}>No data</div>
-  )
-  const max = Math.max(...data.map(d => d.value), 1)
-  // With long ranges there are too many day-labels to read; show about 8.
-  const step = Math.ceil(data.length / 8)
-  return (
-    <div style={{ display:'flex', alignItems:'flex-end', gap: data.length > 40 ? 1 : 4, height, padding:'0 2px' }}>
-      {data.map((d, i) => (
-        <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3, height:'100%', justifyContent:'flex-end', minWidth:0 }}>
-          <div
-            title={`${d.label}: ${d.display || d.value}`}
-            style={{
-              width:'100%',
-              height:`${Math.max((d.value / max) * (height - 20), 2)}px`,
-              background:`linear-gradient(to top,${color}dd,${color}55)`,
-              borderRadius:'4px 4px 0 0',
-              transition:'height .4s ease',
-              cursor:'default',
-            }}
-          />
-          <span style={{ fontSize:9, color:'rgba(255,255,255,.3)', whiteSpace:'nowrap', overflow:'hidden', maxWidth:'100%', textAlign:'center', height:12 }}>
-            {i % step === 0 ? d.label : ''}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// Multi-series line chart over the range (deposits, withdrawals, net).
-function LineChart({ series, labels, height = 180, fmtVal = v => v }) {
-  const all = series.flatMap(s => s.values)
-  if (!all.length) return <div style={{ height, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,.2)', fontSize:13 }}>No data</div>
-  const max = Math.max(...all, 1)
-  const min = Math.min(...all, 0)
-  const range = max - min || 1
-  const w = 100, h = height
-  const n = labels.length
-  const step = Math.ceil(n / 8)
-  const toPts = (vals) => vals.map((v, i) => {
-    const x = n === 1 ? 0 : (i / (n - 1)) * w
-    const y = h - ((v - min) / range) * (h - 10) - 5
-    return `${x},${y}`
-  }).join(' ')
-  // y where value 0 sits, for a baseline
-  const zeroY = h - ((0 - min) / range) * (h - 10) - 5
-  return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width:'100%', height }}>
-        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="rgba(255,255,255,.12)" strokeWidth="0.5" />
-        {series.map((s, si) => (
-          <g key={si}>
-            <polyline points={toPts(s.values)} fill="none" stroke={s.color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          </g>
-        ))}
-      </svg>
-      <div style={{ display:'flex', justifyContent:'space-between', marginTop:6 }}>
-        {labels.map((l, i) => (
-          <span key={i} style={{ fontSize:9, color:'rgba(255,255,255,.3)', flex:1, textAlign:'center', overflow:'hidden', whiteSpace:'nowrap' }}>{i % step === 0 ? l : ''}</span>
-        ))}
-      </div>
-      <div style={{ display:'flex', gap:16, marginTop:10, flexWrap:'wrap' }}>
-        {series.map((s, i) => (
-          <span key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'rgba(255,255,255,.55)' }}>
-            <span style={{ width:10, height:3, borderRadius:2, background:s.color }} /> {s.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Donut / pie. segments: [{ label, value, color }]
-function Donut({ segments, size = 160, thickness = 26, centerLabel, centerSub }) {
-  const total = segments.reduce((s, x) => s + x.value, 0)
-  const r = (size - thickness) / 2
-  const C = 2 * Math.PI * r
-  let offset = 0
-  return (
-    <div style={{ display:'flex', alignItems:'center', gap:22, flexWrap:'wrap' }}>
-      <div style={{ position:'relative', width:size, height:size, flexShrink:0 }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-            {total === 0 ? (
-              <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth={thickness} />
-            ) : segments.map((s, i) => {
-              const len = (s.value / total) * C
-              const el = (
-                <circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={s.color} strokeWidth={thickness}
-                  strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset}
-                  style={{ transition:'stroke-dasharray .4s ease' }} />
-              )
-              offset += len
-              return el
-            })}
-          </g>
-        </svg>
-        <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center' }}>
-          {centerLabel && <div style={{ fontSize:17, fontWeight:800, color:'#fff' }}>{centerLabel}</div>}
-          {centerSub && <div style={{ fontSize:10, color:'rgba(255,255,255,.4)', marginTop:2 }}>{centerSub}</div>}
-        </div>
-      </div>
-      <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:120 }}>
-        {segments.map((s, i) => {
-          const pct = total ? Math.round((s.value / total) * 100) : 0
-          return (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12 }}>
-              <span style={{ width:10, height:10, borderRadius:3, background:s.color, flexShrink:0 }} />
-              <span style={{ color:'rgba(255,255,255,.6)', flex:1 }}>{s.label}</span>
-              <span style={{ color:'#fff', fontWeight:700 }}>{s.display != null ? s.display : s.value}</span>
-              <span style={{ color:'rgba(255,255,255,.3)', width:34, textAlign:'right' }}>{pct}%</span>
-            </div>
-          )
-        })}
       </div>
     </div>
   )
@@ -340,6 +220,7 @@ export default function AdminDashboard() {
                 <LineChart
                   height={190}
                   labels={labels}
+                  formatY={fmtShort}
                   series={[
                     { label:'Deposits',    color:green, values: depDays.map(d => d.value) },
                     { label:'Withdraw',    color:red,   values: wdDays.map(d => d.value) },
@@ -365,12 +246,12 @@ export default function AdminDashboard() {
             <div className="chart-row" style={{ marginBottom:20 }}>
               <Panel title="Deposits by Day" color={green}
                 right={<span style={{ fontSize:18, fontWeight:800, color:green }}>{fmt(s.total_deposits_cents)}</span>}>
-                <BarChart color={green} height={120}
+                <BarChart color={green} height={130} formatY={fmtShort}
                   data={depDays.map(d => ({ ...d, display: fmt(d.value) }))} />
               </Panel>
               <Panel title="Withdraw by Day" color={red}
                 right={<span style={{ fontSize:18, fontWeight:800, color:red }}>{fmt(s.total_withdrawals_cents)}</span>}>
-                <BarChart color={red} height={120}
+                <BarChart color={red} height={130} formatY={fmtShort}
                   data={wdDays.map(d => ({ ...d, display: fmt(d.value) }))} />
               </Panel>
             </div>
@@ -379,7 +260,7 @@ export default function AdminDashboard() {
             <div className="chart-row" style={{ marginBottom:24 }}>
               <Panel title="New Players by Day" color={blue}
                 right={<span style={{ fontSize:18, fontWeight:800, color:blue }}>{fmtNum(s.new_players_range)}</span>}>
-                <BarChart color={blue} height={120}
+                <BarChart color={blue} height={130} formatY={fmtNum}
                   data={(s.signups_by_day || []).map(d => ({ ...d, display: `${d.value}` }))} />
               </Panel>
 
