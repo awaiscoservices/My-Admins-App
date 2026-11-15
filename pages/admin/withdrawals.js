@@ -234,7 +234,7 @@ export default function AdminWithdrawals() {
                   <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
                   <td style={{ padding:'12px 14px', fontSize:11, color:'rgba(255,255,255,.3)', whiteSpace:'nowrap' }}>{fmtDate(r.created_at)}</td>
                   <td style={{ padding:'12px 14px' }}>
-                    <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
+                    <div style={{ display:'flex', gap:6, justifyContent:'flex-start' }}>
                       {/* Available on every row, not just pending ones: the
                           question "what has this player been doing" comes up
                           just as often after a payout as before one. */}

@@ -224,7 +224,7 @@ export default function AdminRedemptions() {
                   <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
                   <td style={{ padding:'12px 14px', fontSize:11, color:'rgba(255,255,255,.3)', whiteSpace:'nowrap' }}>{fmtDate(r.created_at)}</td>
                   <td style={{ padding:'12px 14px' }}>
-                    <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
+                    <div style={{ display:'flex', gap:6, justifyContent:'flex-start' }}>
                       <button onClick={() => setWalletFor(r)}
                         title="See this player's balances and history"
                         style={{ padding:'6px 12px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.14)', borderRadius:8, color:'rgba(255,255,255,.75)', fontSize:11, fontWeight:800, cursor:'pointer', fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap' }}>
