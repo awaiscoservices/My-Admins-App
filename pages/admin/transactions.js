@@ -83,7 +83,7 @@ export default function AdminTransactions() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Player', 'Type', 'Amount', 'Bucket', 'Balance After', 'Date'].map(h => (
+                {['Reference', 'Player', 'Type', 'Amount', 'Wallet', 'Balance After', 'Date'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
