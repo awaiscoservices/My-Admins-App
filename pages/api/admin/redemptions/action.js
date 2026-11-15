@@ -220,7 +220,7 @@ export default async function handler(req, res) {
 
     supabaseAdmin.from('ledger').insert({
       tenant_id: tenantId,
-      reference_id:        idempKey,
+      reference_id:        `${redemption.reference_id}-CASH`,
       user_id:             playerId,
       type:                'redeem',
       wallet_bucket:       'cash',

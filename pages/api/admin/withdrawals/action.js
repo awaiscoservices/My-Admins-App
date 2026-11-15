@@ -114,7 +114,7 @@ export default async function handler(req, res) {
 
       await supabaseAdmin.from('ledger').insert({
         tenant_id:           tenantId,
-        reference_id:        `wd-refund-${withdrawal_id}`,
+        reference_id:        `${withdrawal.reference_id}-REFUND`,
         user_id:             playerId,
         type:                'withdrawal_refund',
         wallet_bucket:       'cash',
@@ -281,7 +281,7 @@ export default async function handler(req, res) {
 
     supabaseAdmin.from('ledger').insert({
       tenant_id: tenantId,
-      reference_id:        idempKey,
+      reference_id:        `${withdrawal.reference_id}-CASH`,
       user_id:             playerId,
       type:                'withdrawal',
       wallet_bucket:       'cash',

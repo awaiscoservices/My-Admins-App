@@ -87,7 +87,7 @@ export default async function handler(req, res) {
 
       await supabaseAdmin.from('ledger').insert({
         tenant_id:           tenantId,
-        reference_id:        `gl-refund-${load_id}`,
+        reference_id:        `${load.reference_id}-REFUND`,
         user_id:             playerId,
         type:                'game_load_refund',
         wallet_bucket:       refundBucket,
@@ -195,7 +195,7 @@ export default async function handler(req, res) {
   const afterCents = bucket === 'bonus' ? wallet.bonus_balance_cents : wallet.cash_balance_cents
   const ledgerRows = [{
     tenant_id:         tenantId,
-    reference_id:      `${idempKey}-${bucket}`,
+    reference_id:      `${load.reference_id}-${bucket.toUpperCase()}`,
     user_id:           playerId,
     type:              'game_load',
     wallet_bucket:     bucket,
