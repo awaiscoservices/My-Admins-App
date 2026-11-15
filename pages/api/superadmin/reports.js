@@ -11,7 +11,7 @@
  * service-role client does the querying.
  */
 import { guardSuperAdmin, supabaseAdmin } from './_guard'
-import { SETTLED } from '../../../lib/statuses'
+import { SETTLED, DONE } from '../../../lib/statuses'
 
 function resolveRange(req) {
   const { from, to } = req.query
@@ -251,7 +251,8 @@ export default async function handler(req, res) {
       redeems: {
         table: 'redemptions',
         select: 'id, reference_id, amount_cents, approved_cents, source_bucket, status, created_at, user_id, tenant_id',
-        breakdown: 'status',
+        filter: (query) => query.eq('status', DONE.redemptions),
+        breakdown: 'source_bucket',
         kpis: (rows) => [
           money('Requested', rows.reduce((s, r) => s + (r.amount_cents || 0), 0)),
           money('Approved', rows.reduce((s, r) => s + (r.approved_cents || 0), 0)),
@@ -271,7 +272,8 @@ export default async function handler(req, res) {
       scores: {
         table: 'game_loads',
         select: 'id, reference_id, amount_cents, wallet_bucket, status, created_at, user_id, tenant_id',
-        breakdown: 'status',
+        filter: (query) => query.eq('status', DONE.game_loads),
+        breakdown: 'wallet_bucket',
         kpis: (rows) => [
           money('Total Scored', rows.reduce((s, r) => s + (r.amount_cents || 0), 0)),
           num('Count', rows.length),
