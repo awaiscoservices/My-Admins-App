@@ -36,5 +36,27 @@ export default async function handler(req, res) {
   const { data, error } = await q
   if (error) return res.status(400).json({ error: error.message })
 
-  return res.status(200).json({ data: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })) })
+  // ── Payout-tag fraud signal ────────────────────────────────────────────────
+  // How many DISTINCT player accounts in this casino have ever used the same
+  // payout (method + tag). One tag shared across many accounts is a classic
+  // multi-account / fraud pattern, so we surface the count on every row.
+  // Scoped to the caller's casino (tenant) and grouped by method + tag.
+  let tagQ = gate.db.from('withdrawals').select('user_id, method, destination').limit(5000)
+  tagQ = scopeToTenant(tagQ, gate)
+  const { data: allWd } = await tagQ
+
+  const norm = s => (s || '').trim().toLowerCase()
+  const key  = (method, tag) => norm(method) + '|' + norm(tag)
+  const tagUsers = new Map()               // "method|tag" → Set(user_id)
+  for (const w of allWd || []) {
+    if (!w.destination) continue
+    const k = key(w.method, w.destination)
+    if (!tagUsers.has(k)) tagUsers.set(k, new Set())
+    tagUsers.get(k).add(w.user_id)
+  }
+  const countFor = r => (r.destination ? (tagUsers.get(key(r.method, r.destination))?.size || 0) : 0)
+
+  return res.status(200).json({
+    data: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles), tag_account_count: countFor(r) })),
+  })
 }

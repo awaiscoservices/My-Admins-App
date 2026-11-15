@@ -158,16 +158,16 @@ export default function AdminDeposits() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Player', 'Amount', 'Bonus', 'Status', 'Date', 'Actions'].map(h => (
+                {['Reference', 'Player', 'Method', 'Amount', 'Bonus', 'Status', 'Date', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
                   {filter === 'pending' ? 'No pending deposits' : 'No deposits found'}
                 </td></tr>
               ) : rows.map(d => (
@@ -179,6 +179,9 @@ export default function AdminDeposits() {
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{d.profiles?.username || d.profiles?.full_name || '—'}</div>
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.75)', whiteSpace: 'nowrap' }}>
+                    {d.payment_method_name || '—'}
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmt(d.amount_cents)}</div>

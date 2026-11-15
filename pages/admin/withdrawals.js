@@ -45,6 +45,20 @@ function ReviewModal({ item, onClose, onAction }) {
             </div>
           )}
           <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginTop:2 }}>Ref: {item.reference_id}</div>
+          {(item.method || item.destination) && (
+            <div style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginTop:6, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span>Payout: <b style={{ color:'#fff' }}>{item.method || '—'}</b>{item.destination ? <> · <span style={{ fontFamily:'monospace', color:'#fff' }}>{item.destination}</span></> : null}</span>
+              {item.tag_account_count > 1 && (
+                <span title={`This tag has been used by ${item.tag_account_count} accounts in this casino`}
+                  style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:20,
+                    background: item.tag_account_count >= 3 ? 'rgba(239,68,68,.16)' : 'rgba(251,191,36,.16)',
+                    border: `1px solid ${item.tag_account_count >= 3 ? 'rgba(239,68,68,.45)' : 'rgba(251,191,36,.45)'}`,
+                    color: item.tag_account_count >= 3 ? '#f87171' : '#fbbf24' }}>
+                  ⚠ used by {item.tag_account_count} accounts
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={{ display:'block', fontSize:11, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.45)', marginBottom:6 }}>Reason / note <span style={{ textTransform:'none', fontWeight:400, color:'rgba(255,255,255,.3)' }}>(required to reject — player sees it)</span></label>
@@ -165,16 +179,16 @@ export default function AdminWithdrawals() {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ background:'rgba(255,255,255,.04)' }}>
-                {['Reference','Player','Amount','Level','Status','Date','Actions'].map(h => (
+                {['Reference','Player','Method','Payout Tag','Amount','Level','Status','Date','Actions'].map(h => (
                   <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={9} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={9} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
                   {filter === 'pending' ? 'No pending withdrawals' : 'No withdrawals found'}
                 </td></tr>
               ) : rows.map(r => (
@@ -186,6 +200,27 @@ export default function AdminWithdrawals() {
                   </td>
                   <td style={{ padding:'12px 14px' }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'#fff', fontFamily:'monospace' }}>{r.profiles?.username || r.profiles?.full_name || '—'}</div>
+                  </td>
+                  <td style={{ padding:'12px 14px', fontSize:12, color:'rgba(255,255,255,.75)', whiteSpace:'nowrap' }}>
+                    {r.method || '—'}
+                  </td>
+                  <td style={{ padding:'12px 14px' }}>
+                    {r.destination ? (
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontSize:12.5, color:'#fff', fontFamily:'monospace' }}>{r.destination}</span>
+                        {/* Distinct accounts in this casino that used this exact
+                            method+tag. 1 = unique (fine); 2+ = shared → flag. */}
+                        {r.tag_account_count > 1 && (
+                          <span title={`Used by ${r.tag_account_count} accounts in this casino`}
+                            style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:20, whiteSpace:'nowrap',
+                              background: r.tag_account_count >= 3 ? 'rgba(239,68,68,.16)' : 'rgba(251,191,36,.16)',
+                              border: `1px solid ${r.tag_account_count >= 3 ? 'rgba(239,68,68,.45)' : 'rgba(251,191,36,.45)'}`,
+                              color: r.tag_account_count >= 3 ? '#f87171' : '#fbbf24' }}>
+                            ⚠ {r.tag_account_count} accts
+                          </span>
+                        )}
+                      </div>
+                    ) : <span style={{ fontSize:12, color:'rgba(255,255,255,.25)' }}>—</span>}
                   </td>
                   <td style={{ padding:'12px 14px' }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'#3b82f6' }}>{fmt(r.amount_cents)}</div>
