@@ -97,17 +97,17 @@ export default function TenantsPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,.07)' }}>
-                {['Name', 'Slug', 'Plan', 'Status', 'Created', ''].map(h => (
+                {['Name', 'Slug', 'Status', 'Created', ''].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: 'rgba(255,255,255,.4)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               )}
               {!loading && tenants.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No tenants found</td></tr>
+                <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No tenants found</td></tr>
               )}
               {tenants.map((t, i) => {
                 const sc = statusColor(t.status)
@@ -117,7 +117,6 @@ export default function TenantsPage() {
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '14px 16px', color: '#fff', fontWeight: 500 }}>{t.name}</td>
                     <td style={{ padding: '14px 16px', color: 'rgba(255,255,255,.5)', fontFamily: 'monospace' }}>{t.slug}</td>
-                    <td style={{ padding: '14px 16px', color: 'rgba(255,255,255,.6)' }}>{t.plan || 'free'}</td>
                     <td style={{ padding: '14px 16px' }}>
                       <span style={{ background: sc.bg, color: sc.text, padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>
                         {t.status}
@@ -153,7 +152,7 @@ export default function TenantsPage() {
 }
 
 function CreateTenantModal({ token, onClose, onCreated }) {
-  const [form, setForm] = useState({ name: '', slug: '', plan: 'free', admin_username: '', admin_password: '' })
+  const [form, setForm] = useState({ name: '', slug: '', admin_username: '', admin_password: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -203,17 +202,7 @@ function CreateTenantModal({ token, onClose, onCreated }) {
             sign in with this username and password on the staff login. Leave
             both blank to add someone later from Staff &amp; Roles.
           </div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Plan</label>
-
-          <select value={form.plan} onChange={e => setForm(x => ({ ...x, plan: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}>
-            <option value="free">Free</option>
-            <option value="starter">Starter</option>
-            <option value="pro">Pro</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
           <button onClick={onClose} style={{ ...btnStyle, background: 'rgba(255,255,255,.06)', color: 'rgba(255,255,255,.6)', flex: 1 }}>Cancel</button>
           <button onClick={submit} disabled={saving} style={{ ...btnStyle, flex: 1, opacity: saving ? .6 : 1 }}>
             {saving ? 'Creating…' : 'Create Tenant'}

@@ -12,6 +12,9 @@ import AdminLayout from '../../components/layout/AdminLayout'
 
 const ROLES = ['admin', 'finance', 'game_ops', 'support']
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+// Display-only: role keys are stored lowercase (admin, game_ops) but shown
+// title-cased like a name — "Admin", "Game Ops", "Super Admin".
+const prettyRole = r => String(r || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
 const ROLE_COLOR = {
   super_admin: '#f59e0b',
@@ -180,7 +183,7 @@ export default function AdminStaff() {
         <div style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
           <div style={{ background:'#0d1f35', border:'1px solid rgba(34,197,94,.3)', borderRadius:20, padding:28, maxWidth:420, width:'100%' }}>
             <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:6, fontFamily:"'Cinzel',serif" }}>Staff account created ✅</div>
-            <div style={{ fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:18 }}>Send these login details to the <strong style={{color:'#fbbf24'}}>{created.role}</strong>. They sign in on the normal login page.</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,.5)', marginBottom:18 }}>Send these login details to the <strong style={{color:'#fbbf24'}}>{prettyRole(created.role)}</strong>. They sign in on the normal login page.</div>
             {[['Email', created.email], ['Password', created.password]].map(([k,v]) => (
               <div key={k} style={{ marginBottom:12 }}>
                 <label style={{ display:'block', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', marginBottom:6 }}>{k}</label>
@@ -227,7 +230,7 @@ export default function AdminStaff() {
                     background: invite.role===r ? `${ROLE_COLOR[r]}22` : 'rgba(255,255,255,.05)',
                     border: invite.role===r ? `1px solid ${ROLE_COLOR[r]}55` : '1px solid rgba(255,255,255,.1)',
                     color: invite.role===r ? (ROLE_COLOR[r]||'#fbbf24') : 'rgba(255,255,255,.4)',
-                  }}>{r}</button>
+                  }}>{prettyRole(r)}</button>
                 ))}
               </div>
             </div>
@@ -278,7 +281,7 @@ export default function AdminStaff() {
                   color: modal.member.role===r ? (ROLE_COLOR[r]||'#fbbf24') : 'rgba(255,255,255,.6)',
                   opacity: modal.member.role===r ? 1 : undefined,
                 }}>
-                  {r} {modal.member.role===r && '← current'}
+                  {prettyRole(r)} {modal.member.role===r && '← current'}
                 </button>
               ))}
             </div>
@@ -327,7 +330,7 @@ export default function AdminStaff() {
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <span style={{ padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${color}22`, color }}>
-                    {member.role}
+                    {prettyRole(member.role)}
                   </span>
                   {canManage && !isMe && member.role !== 'super_admin' && member.status !== 'suspended' && (
                     <>

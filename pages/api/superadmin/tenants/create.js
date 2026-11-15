@@ -1,7 +1,7 @@
 /**
  * POST /api/superadmin/tenants/create
  * Creates a new tenant. Optionally invites an admin user.
- * Body: { name, slug, plan?, admin_email?, brand_name?, primary_domain? }
+ * Body: { name, slug, admin_email?, brand_name?, primary_domain? }
  *
  * Columns on `tenants`: id, name, slug, status, owner_email, brand_name,
  * primary_domain, plan, settings, created_at, updated_at. There is no
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
   const admin = await guardSuperAdmin(req, res)
   if (!admin) return
 
-  const { name, slug, plan = 'free', admin_email, admin_username, admin_password, brand_name, primary_domain } = req.body
+  const { name, slug, admin_email, admin_username, admin_password, brand_name, primary_domain } = req.body
 
   if (!name?.trim())  return res.status(400).json({ error: 'name is required' })
   if (!slug?.trim())  return res.status(400).json({ error: 'slug is required' })
@@ -73,7 +73,6 @@ export default async function handler(req, res) {
     .insert({
       name: name.trim(),
       slug: slug.trim(),
-      plan,
       status: 'active',
       owner_email:    admin_email?.trim() || null,
       brand_name:     brand_name?.trim() || null,
@@ -93,7 +92,7 @@ export default async function handler(req, res) {
     action:      'tenant_created',
     target_type: 'tenant',
     target_id:   tenant.id,
-    after_state: { name: tenant.name, slug: tenant.slug, plan },
+    after_state: { name: tenant.name, slug: tenant.slug },
   }).then(() => {}, () => {})
 
   // Set the casino up from the built-in starter set (lib/platformDefaults):

@@ -56,7 +56,6 @@ export default function TenantDetail() {
         setTenant(data.tenant)
         setForm({
           name: data.tenant.name || '',
-          plan: data.tenant.plan || 'free',
           owner_email:    data.tenant.owner_email || '',
           brand_name:     data.tenant.brand_name || '',
           primary_domain: data.tenant.primary_domain || '',
@@ -177,16 +176,6 @@ export default function TenantDetail() {
                   style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
               </div>
             ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Plan</label>
-              <select value={form.plan || 'free'} onChange={e => setForm(x => ({ ...x, plan: e.target.value }))}
-                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}>
-                <option value="free">Free</option>
-                <option value="starter">Starter</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </div>
             <button onClick={save} disabled={saving} style={{ ...goldBtn, opacity: saving ? .6 : 1, gridColumn: '1 / -1', justifySelf: 'start' }}>
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
