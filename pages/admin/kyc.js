@@ -163,7 +163,10 @@ export default function AdminKYC() {
 
       <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.07)', borderRadius:16, overflow:'hidden' }}>
         <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <table style={{ width:'100%', minWidth:760, borderCollapse:'collapse', tableLayout:'fixed' }}>
+            <colgroup>
+              {[20, 20, 15, 13, 16, 16].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+            </colgroup>
             <thead>
               <tr style={{ background:'rgba(255,255,255,.04)' }}>
                 {['Player','Document','KYC Status','Status','Submitted','Actions'].map(h => (

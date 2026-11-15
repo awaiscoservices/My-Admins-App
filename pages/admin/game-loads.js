@@ -144,7 +144,10 @@ export default function AdminGameLoads() {
 
       <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', minWidth: 1040, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <colgroup>
+              {[11, 13, 12, 12, 11, 9, 11, 10, 11].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+            </colgroup>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
                 {['Reference', 'Player', 'Game', 'Account', 'Amount', 'Bucket', 'Status', 'Date', 'Actions'].map(h => (
