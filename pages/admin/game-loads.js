@@ -155,18 +155,18 @@ export default function AdminGameLoads() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: 1040, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
-              {[11, 14, 16, 10, 12, 12, 11, 14].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+              {[11, 13, 12, 12, 9, 11, 11, 10, 11].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
             </colgroup>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Reference', 'Player', 'Game Account', 'Wallet', 'Amount', 'Status', 'Date', 'Actions'].map(h => (
+                {['Reference', 'Player', 'Game', 'Account', 'Wallet', 'Amount', 'Status', 'Date', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'pending' ? 'No pending scores' : 'No scores found'}</td></tr>
+              {loading ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>{filter === 'pending' ? 'No pending scores' : 'No scores found'}</td></tr>
               : filtered.map(r => (
                 <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
@@ -175,10 +175,8 @@ export default function AdminGameLoads() {
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{r.profiles?.username || r.profiles?.full_name}</div>
                   </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{r.game_panel_name || '—'}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{r.game_account_username || '—'}</div>
-                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#a855f7', fontWeight: 600 }}>{r.game_panel_name || '—'}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 12, color: '#fbbf24', fontFamily: 'monospace' }}>{r.game_account_username || '—'}</td>
                   <td style={{ padding: '12px 14px' }}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, textTransform: 'capitalize', background: r.wallet_bucket === 'bonus' ? 'rgba(168,85,247,.15)' : 'rgba(255,255,255,.08)', color: r.wallet_bucket === 'bonus' ? '#a855f7' : 'rgba(255,255,255,.4)' }}>{r.wallet_bucket || 'cash'}</span></td>
                   <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: '#ef4444' }}>−{fmt(r.amount_cents)}</td>
                   <td style={{ padding: '12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>

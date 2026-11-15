@@ -177,20 +177,20 @@ export default function AdminRedemptions() {
         <div style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', minWidth:1040, borderCollapse:'collapse', tableLayout:'fixed' }}>
             <colgroup>
-              {[11, 13, 13, 9, 11, 11, 10, 10, 12].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+              {[10, 12, 11, 11, 8, 10, 10, 9, 9, 10].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
             </colgroup>
             <thead>
               <tr style={{ background:'rgba(255,255,255,.04)' }}>
-                {['Reference','Player','Game Account','Wallet','Requested','Approved','Status','Date','Actions'].map(h => (
+                {['Reference','Player','Game','Account','Wallet','Requested','Approved','Status','Date','Actions'].map(h => (
                   <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={10} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={9} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={10} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
                   {filter === 'pending' ? 'No pending redeems' : 'No redemptions found'}
                 </td></tr>
               ) : rows.map(r => (
@@ -203,10 +203,8 @@ export default function AdminRedemptions() {
                   <td style={{ padding:'12px 14px' }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'#fff', fontFamily:'monospace' }}>{r.profiles?.username || r.profiles?.full_name || '—'}</div>
                   </td>
-                  <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{r.game_accounts?.game_panels?.name || '—'}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.game_accounts?.game_username}</div>
-                  </td>
+                  <td style={{ padding:'12px 14px', fontSize:13, color:'#a855f7', fontWeight:600 }}>{r.game_accounts?.game_panels?.name || '—'}</td>
+                  <td style={{ padding:'12px 14px', fontSize:12, color:'#fbbf24', fontFamily:'monospace' }}>{r.game_accounts?.game_username || '—'}</td>
                   <td style={{ padding:'12px 14px' }}><BucketPill bucket={r.source_bucket} /></td>
                   <td style={{ padding:'12px 14px' }}>
                     {r.source_bucket === 'bonus' ? (<>
