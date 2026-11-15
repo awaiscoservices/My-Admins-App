@@ -35,6 +35,10 @@ const fmtNum   = n => Number(n || 0).toLocaleString()
 const fmtDate  = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 const isoDay   = (d) => { const z = new Date(d); z.setMinutes(z.getMinutes() - z.getTimezoneOffset()); return z.toISOString().slice(0, 10) }
 const pretty   = t => String(t || '—').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+// Transaction/ledger type keys → their display names (never "Withdrawal",
+// "Redemption" or "Game Load"). Falls back to pretty() for anything else.
+const TYPE_LABELS = { deposit: 'Deposit', deposit_bonus: 'Bonus', referral_bonus: 'Referral Bonus', bonus: 'Bonus', withdrawal: 'Withdraw', withdrawal_refund: 'Withdraw Refund', game_load: 'Scores', game_load_refund: 'Scores Refund', redeem: 'Redeem' }
+const label    = k => TYPE_LABELS[k] || pretty(k)
 
 export default function SuperAdminReports() {
   const [report, setReport] = useState('overview')
@@ -89,7 +93,7 @@ export default function SuperAdminReports() {
     if (col.type === 'money') return fmtMoney(v)
     if (col.type === 'num')   return fmtNum(v)
     if (col.type === 'date')  return fmtDate(v)
-    if (col.type === 'badge') return pretty(v)
+    if (col.type === 'badge') return label(v)
     return v ?? '—'
   }
 
@@ -219,7 +223,7 @@ export default function SuperAdminReports() {
                   return (
                     <div key={i} style={{ marginBottom:12 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
-                        <span style={{ color:'rgba(255,255,255,.7)', textTransform:'capitalize' }}>{pretty(it.key)} <span style={{ color:'rgba(255,255,255,.3)' }}>({fmtNum(it.count)})</span></span>
+                        <span style={{ color:'rgba(255,255,255,.7)', textTransform:'capitalize' }}>{label(it.key)} <span style={{ color:'rgba(255,255,255,.3)' }}>({fmtNum(it.count)})</span></span>
                         <span style={{ color:'#fff', fontWeight:700 }}>{fmtMoney(it.amount_cents)}</span>
                       </div>
                       <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:99, overflow:'hidden' }}>
@@ -267,7 +271,7 @@ export default function SuperAdminReports() {
                         return (
                           <div key={i} style={{ marginBottom:12 }}>
                             <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
-                              <span style={{ color:'rgba(255,255,255,.7)', textTransform:'capitalize' }}>{pretty(it.key)} <span style={{ color:'rgba(255,255,255,.3)' }}>({fmtNum(it.count)})</span></span>
+                              <span style={{ color:'rgba(255,255,255,.7)', textTransform:'capitalize' }}>{label(it.key)} <span style={{ color:'rgba(255,255,255,.3)' }}>({fmtNum(it.count)})</span></span>
                               <span style={{ color:'#fff', fontWeight:700 }}>{fmtMoney(it.amount_cents)}</span>
                             </div>
                             <div style={{ height:6, background:'rgba(255,255,255,.06)', borderRadius:99, overflow:'hidden' }}>

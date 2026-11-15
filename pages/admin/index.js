@@ -309,7 +309,7 @@ export default function AdminDashboard() {
                           <span style={{ padding:'3px 9px', borderRadius:5, fontSize:10, fontWeight:800,
                             background: tx.type==='deposit' ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)',
                             color: tx.type==='deposit' ? green : red }}>
-                            {tx.type?.toUpperCase()}
+                            {tx.type === 'deposit' ? 'Deposit' : 'Withdraw'}
                           </span>
                         </td>
                         <td style={{ padding:'11px 16px', color: tx.type==='deposit' ? green : red, fontWeight:700 }}>
