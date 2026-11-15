@@ -96,17 +96,12 @@ export default async function handler(req, res) {
     after_state: { name: tenant.name, slug: tenant.slug, plan },
   }).then(() => {}, () => {})
 
-  // Set the casino up from the platform defaults: levels, games, payment
-  // methods, referral tiers and settings.
+  // Set the casino up from the built-in starter set (lib/platformDefaults):
+  // levels, games, payment methods, referral tiers and settings.
   //
   // Without these a casino exists but cannot operate — no games to request an
   // account in, no way to take a deposit, no levels for the bonus grid, and
   // the withdrawal path reads a setting that would not be there.
-  //
-  // The defaults belong to the platform, not to a casino. They used to be
-  // copied from the first casino, which made that casino a template nobody
-  // could see and meant deleting it would quietly stop every future casino
-  // getting anything.
   const seeded = await applyDefaultsToTenant(supabaseAdmin, tenant.id)
 
   // Create the first admin, if credentials were given.
