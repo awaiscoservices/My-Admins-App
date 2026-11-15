@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   const sq = (table, select) => scopeToTenant(admin.from(table).select(select), gate)
 
   const [pmRes, levelRes, bonusRes, referralRes] = await Promise.all([
-    sq('payment_methods', 'id, name, type, description, is_active, sort_order, allow_deposit, allow_withdraw')
+    sq('payment_methods', 'id, name, type, description, logo_url, is_active, sort_order, allow_deposit, allow_withdraw')
       .order('sort_order', { ascending: true }),
 
     sq('player_levels', 'id, name, sort_order, accent_color, xp_required')

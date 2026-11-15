@@ -135,11 +135,16 @@ function MethodAccordion({ method, levels, bonusMap, onCellSave, savingCell }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(251,191,36,.12)', border: '1px solid rgba(251,191,36,.2)',
+            width: 36, height: 36, borderRadius: 10, overflow: 'hidden',
+            background: method.logo_url ? '#fff' : 'rgba(251,191,36,.12)',
+            border: '1px solid rgba(251,191,36,.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, flexShrink: 0,
-          }}><Icon name="card" size={20} /></div>
+          }}>
+            {method.logo_url
+              ? <img src={method.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              : <Icon name="card" size={20} />}
+          </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: "'Outfit',sans-serif" }}>
               {method.name}
