@@ -305,6 +305,53 @@ function ReferralTab({ tiers, onSave, saving }) {
   )
 }
 
+// ─── Signup Bonus tab ─────────────────────────────────────────────────────────
+// A first-deposit bonus for brand-new players. One % per casino; it overrides
+// the normal deposit bonus on a player's very first deposit and is shown on
+// every payment method and the home banner on the player side.
+function SignupBonusTab({ config, onSave, saving }) {
+  const [pct, setPct]       = useState('')
+  const [active, setActive] = useState(false)
+
+  useEffect(() => {
+    setPct(config?.pct ?? '')
+    setActive(config?.is_active ?? false)
+  }, [config])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+      <div style={{ fontSize: 13, color: DIM }}>
+        A new player who hasn’t deposited yet gets this % on their <strong style={{ color: G }}>first deposit</strong>.
+        It shows on every payment method and the home banner, and replaces the normal deposit bonus for that one deposit.
+        After the first deposit, the player’s level bonuses apply.
+      </div>
+
+      <div style={{ background: BG_CARD, border: BDR, borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Signup Bonus %</div>
+          <div style={{ position: 'relative', width: 130 }}>
+            <input type="number" min="0" max="100" step="0.5" value={pct}
+              onChange={e => setPct(e.target.value)} placeholder="0"
+              style={{ width: '100%', padding: '10px 28px 10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.05)', border: BDR, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: "'Outfit',sans-serif", outline: 'none', MozAppearance: 'textfield' }} />
+            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: G, fontWeight: 700, pointerEvents: 'none' }}>%</span>
+          </div>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', paddingBottom: 10 }}>
+          <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} style={{ width: 17, height: 17, accentColor: G }} />
+          <span style={{ fontSize: 13, color: DIM, fontFamily: "'Outfit',sans-serif" }}>Active</span>
+        </label>
+      </div>
+
+      <div>
+        <button onClick={() => onSave({ pct, is_active: active })} disabled={saving}
+          style={{ padding: '11px 28px', borderRadius: 10, background: saving ? 'rgba(255,255,255,.08)' : 'linear-gradient(135deg,#fbbf24,#f59e0b)', border: 'none', color: saving ? DIM : '#000', fontSize: 13, fontWeight: 800, cursor: saving ? 'default' : 'pointer', fontFamily: "'Outfit',sans-serif" }}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Bonus Balance tab ────────────────────────────────────────────────────────
 // Universal settings (one global row, every casino shares them) for how
 // bonus-funded scores redeem.
@@ -345,10 +392,12 @@ export default function PlayerBonuses() {
   const [bonusMap, setBonusMap] = useState({})   // { [pmId]: { [levelId]: { [day]: percent } } }
   const [referralTiers, setReferralTiers] = useState([])
   const [bonusConfig, setBonusConfig] = useState(null)
+  const [signupConfig, setSignupConfig] = useState(null)
   const [loading, setLoading]   = useState(true)
   const [savingCell, setSavingCell] = useState(null)
   const [savingReferral, setSavingReferral] = useState(null)
   const [savingConfig, setSavingConfig] = useState(false)
+  const [savingSignup, setSavingSignup] = useState(false)
   const [toast, setToast]       = useState(null)
 
   function showToast(msg, type = 'success') {
@@ -367,6 +416,11 @@ export default function PlayerBonuses() {
       try {
         const bc = await apiFetch('/api/admin/bonuses/bonus-config')
         setBonusConfig(bc.config || null)
+      } catch { /* leave null — tab shows defaults */ }
+
+      try {
+        const sc = await apiFetch('/api/admin/bonuses/signup-config')
+        setSignupConfig(sc.config || null)
       } catch { /* leave null — tab shows defaults */ }
 
       // Build bonusMap from flat bonuses array
@@ -431,6 +485,19 @@ export default function PlayerBonuses() {
     setSavingConfig(false)
   }
 
+  async function handleSignupSave(next) {
+    setSavingSignup(true)
+    try {
+      const r = await apiFetch('/api/admin/bonuses/signup-config', {
+        method: 'PUT',
+        body: JSON.stringify(next),
+      })
+      setSignupConfig(r.config)
+      showToast('Signup Bonus saved')
+    } catch (e) { showToast(e.message, 'error') }
+    setSavingSignup(false)
+  }
+
   return (
     <AdminLayout>
       <Head><title>Player Bonuses — Admin</title></Head>
@@ -448,7 +515,7 @@ export default function PlayerBonuses() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.04)', padding: 4, borderRadius: 12, width: 'fit-content', marginBottom: 24 }}>
-        {[['deposit','Deposit Bonuses'], ['referral','Referral Bonuses'], ['bonus','Bonus Balance']].map(([key, label]) => (
+        {[['deposit','Deposit Bonuses'], ['referral','Referral Bonuses'], ['signup','Signup Bonus'], ['bonus','Bonus Balance']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
             fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 700,
@@ -512,6 +579,15 @@ export default function PlayerBonuses() {
             onSave={handleReferralSave}
             saving={savingReferral}
           />
+        )
+      )}
+
+      {/* ── Signup Bonus tab ── */}
+      {tab === 'signup' && (
+        loading ? (
+          <div style={{ color: DIM2, padding: 40, textAlign: 'center' }}>Loading…</div>
+        ) : (
+          <SignupBonusTab config={signupConfig} onSave={handleSignupSave} saving={savingSignup} />
         )
       )}
 
