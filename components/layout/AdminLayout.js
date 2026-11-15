@@ -54,7 +54,7 @@ const NAV_SECTIONS = [
       { href: '/admin/levels',       icon: 'star',    label: 'Levels Management',  roles: ['admin','super_admin','marketing'] },
       { href: '/admin/payments',     icon: 'coin',    label: 'Methods Management', roles: ['admin','super_admin','finance'] },
       { href: '/admin/promotions',   icon: 'gift',    label: 'Bonuses Management', roles: ['admin','super_admin','marketing'] },
-      { href: '/admin/promo-codes',  icon: 'gift',    label: 'Promos Management',  roles: ['admin','super_admin','marketing'] },
+      { href: '/admin/promo-codes',  icon: 'sparkle',  label: 'Promos Management',  roles: ['admin','super_admin','marketing'] },
     ],
   },
   {
