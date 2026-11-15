@@ -12,7 +12,7 @@
  *    on profiles join (multiple FKs to profiles → must name the constraint)
  *  - ledger.notes → description  (column was renamed)
  */
-import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
+import { guardAdmin, loadOwnedRow, runPaged, PERMS } from '../../../../lib/adminGuard'
 import { SETTLED } from '../../../../lib/statuses'
 
 export default async function handler(req, res) {
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     if (status) q = q.eq('status', status)
     if (from_date) q = q.gte('created_at', from_date)
     if (to_date)   q = q.lte('created_at', to_date)
-    const { data, count, error } = await q
+    const { data, count, error } = await runPaged(q)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
@@ -164,7 +164,7 @@ export default async function handler(req, res) {
     if (status) q = q.eq('status', status)
     if (from_date) q = q.gte('created_at', from_date)
     if (to_date)   q = q.lte('created_at', to_date)
-    const { data, count, error } = await q
+    const { data, count, error } = await runPaged(q)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
@@ -187,7 +187,7 @@ export default async function handler(req, res) {
     if (status) q = q.eq('status', status)
     if (from_date) q = q.gte('created_at', from_date)
     if (to_date)   q = q.lte('created_at', to_date)
-    const { data, count, error } = await q
+    const { data, count, error } = await runPaged(q)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
@@ -210,7 +210,7 @@ export default async function handler(req, res) {
     if (status) q = q.eq('status', status)
     if (from_date) q = q.gte('created_at', from_date)
     if (to_date)   q = q.lte('created_at', to_date)
-    const { data, count, error } = await q
+    const { data, count, error } = await runPaged(q)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }
@@ -262,16 +262,16 @@ export default async function handler(req, res) {
       { data: history, count: hCount },
       { data: xpLog,   count: xCount },
     ] = await Promise.all([
-      supabaseAdmin.from('player_level_history')
+      runPaged(supabaseAdmin.from('player_level_history')
         .select('id, trigger, created_at, from_level:from_level_id(name,accent_color), to_level:to_level_id(name,accent_color), triggered_by_profile:triggered_by(full_name)', { count: 'exact' })
         .eq('user_id', player_id)
         .order('created_at', { ascending: false })
-        .range(offset, offset + limitNum - 1),
-      supabaseAdmin.from('player_xp_transactions')
+        .range(offset, offset + limitNum - 1)),
+      runPaged(supabaseAdmin.from('player_xp_transactions')
         .select('id, xp_amount, source, reference_id, notes, created_at', { count: 'exact' })
         .eq('user_id', player_id)
         .order('created_at', { ascending: false })
-        .range(offset, offset + limitNum - 1),
+        .range(offset, offset + limitNum - 1)),
     ])
     return res.status(200).json({
       history: history || [], history_total: hCount || 0,
@@ -292,7 +292,7 @@ export default async function handler(req, res) {
       .range(offset, offset + limitNum - 1)
     if (from_date) q = q.gte('created_at', from_date)
     if (to_date)   q = q.lte('created_at', to_date)
-    const { data, count, error } = await q
+    const { data, count, error } = await runPaged(q)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ rows: data || [], total: count || 0, page: pageNum, pages: Math.ceil((count || 0) / limitNum) })
   }

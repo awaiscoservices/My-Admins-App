@@ -1,5 +1,6 @@
 /** GET /api/admin/browse?kind=wallets|transactions|adjustments|audit&q=&page=0  — read-only lists */
 import { supabaseAdmin, requireStaff } from '../../../lib/adminApi'
+import { runPaged } from '../../../lib/adminGuard'
 import { BROWSE } from '../../../lib/adminSchemas'
 
 const PAGE = 50
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
     query = query.in('user_id', ids)
   }
 
-  const { data, error, count } = await query
+  const { data, error, count } = await runPaged(query)
   if (error) return res.status(500).json({ error: error.message })
   const rows = data || []
 

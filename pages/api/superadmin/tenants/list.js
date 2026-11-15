@@ -3,6 +3,7 @@
  * Paginated tenant list with search + status filter.
  */
 import { guardSuperAdmin, supabaseAdmin } from '../_guard'
+import { runPaged } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
   if (search) q = q.or(`name.ilike.%${search}%,slug.ilike.%${search}%`)
   if (status) q = q.eq('status', status)
 
-  const { data: tenants, count, error } = await q
+  const { data: tenants, count, error } = await runPaged(q)
   if (error) return res.status(500).json({ error: error.message })
 
   return res.status(200).json({ tenants: tenants || [], total: count || 0, page, limit })

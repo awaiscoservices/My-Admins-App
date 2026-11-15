@@ -4,7 +4,7 @@
  * Lists player profiles belonging to the caller's own casino.
  * Super admins see players across all casinos.
  */
-import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, runPaged, PERMS } from '../../../../lib/adminGuard'
 import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const { data, error, count } = await query
+  const { data, error, count } = await runPaged(query)
   if (error) return res.status(500).json({ error: error.message })
 
   return res.status(200).json({

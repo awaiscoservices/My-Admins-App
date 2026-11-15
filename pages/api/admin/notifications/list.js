@@ -1,4 +1,4 @@
-import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, runPaged, PERMS } from '../../../../lib/adminGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   if (status === 'unread') query = query.eq('is_read', false)
   if (status === 'read') query = query.eq('is_read', true)
 
-  const { data: rows, error: listErr, count } = await query
+  const { data: rows, error: listErr, count } = await runPaged(query)
 
   if (listErr) {
     console.error('notifications list error:', listErr)

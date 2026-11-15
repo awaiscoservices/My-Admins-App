@@ -1,4 +1,4 @@
-import { guardAdmin, scopeToTenant, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, loadOwnedRow, runPaged, PERMS } from '../../../../lib/adminGuard'
 import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   if (search) q = q.ilike('reason', `%${search}%`)
 
-  const { data, count, error } = await q
+  const { data, count, error } = await runPaged(q)
   if (error) return res.status(500).json({ error: error.message })
   return res.status(200).json({ rows: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })), total: count || 0 })
 }

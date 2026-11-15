@@ -6,7 +6,7 @@
  *
  * Note: `page` here is 0-based.
  */
-import { guardAdmin, scopeToTenant, PERMS, safeSearchTerm } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, runPaged, PERMS, safeSearchTerm } from '../../../../lib/adminGuard'
 import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   const term = safeSearchTerm(search)
   if (term) q = q.ilike('reference_id', `%${term}%`)
 
-  const { data, count, error } = await q
+  const { data, count, error } = await runPaged(q)
   if (error) return res.status(500).json({ error: error.message })
 
   return res.status(200).json({ rows: (data || []).map(r => ({ ...r, profiles: maskPlayer(r.profiles) })), total: count || 0 })

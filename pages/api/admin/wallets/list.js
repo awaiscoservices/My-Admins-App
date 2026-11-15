@@ -4,7 +4,7 @@
  * Super admins see wallets across all casinos.
  * Roles: super_admin, finance, support, risk, reporting
  */
-import { guardAdmin, scopeToTenant, PERMS, safeSearchTerm } from '../../../../lib/adminGuard'
+import { guardAdmin, scopeToTenant, runPaged, PERMS, safeSearchTerm } from '../../../../lib/adminGuard'
 import { maskPlayer } from '../../../../lib/playerLabel'
 
 export default async function handler(req, res) {
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     query = query.ilike('profiles.username', `%${term}%`)
   }
 
-  const { data, error, count } = await query
+  const { data, error, count } = await runPaged(query)
   if (error) return res.status(500).json({ error: error.message })
 
   return res.status(200).json({
