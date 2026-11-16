@@ -1,0 +1,63 @@
+name: Supabase DB Backup
+
+# Scheduled logical backup of the Supabase Postgres database.
+# Runs daily and can also be triggered by hand (Actions tab → Run workflow).
+# Dumps roles + schema + data with the Supabase CLI (bundles the matching
+# pg_dump, so no server-version mismatch), gzips them, and uploads one
+# artifact per run.
+#
+# Requires one repository secret:
+#   SUPABASE_DB_URL — the Postgres connection URI. In Supabase: Project
+#   Settings → Database → Connection string → URI, pick "Session pooler"
+#   (IPv4-compatible for GitHub runners) and put your DB password in it,
+#   URL-encoding any special characters.
+#
+# NOTE: the data dump contains all player PII. Keep this repo private and
+# treat the artifacts as sensitive.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'    # every day at 03:00 UTC
+  workflow_dispatch: {}      # manual trigger button
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set."
+            exit 1
+          fi
+          stamp="$(date -u +%Y%m%d-%H%M%S)"
+          echo "stamp=$stamp" >> "$GITHUB_ENV"
+          mkdir -p backups
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "backups/${stamp}-roles.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL"             -f "backups/${stamp}-schema.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only -f "backups/${stamp}-data.sql"
+          gzip backups/*.sql
+          ls -lh backups
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ env.stamp }}
+          path: backups/*.sql.gz
+          retention-days: 30
+          if-no-files-found: error
