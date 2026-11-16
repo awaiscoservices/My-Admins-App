@@ -17,8 +17,22 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short
 const DOC_LABELS = {
   passport: 'Passport',
   national_id: 'National ID',
-  drivers_license: "Driver's License",
+  drivers_license: 'Driving License',
   utility_bill: 'Utility Bill',
+}
+
+// Prefer the split name parts; fall back to the stored full name, then the profile.
+const fullName = (r) =>
+  [r.first_name, r.middle_name, r.last_name].filter(Boolean).join(' ') ||
+  r.full_legal_name || r.profiles?.full_name || '—'
+
+function Row({ label, value, wide }) {
+  return (
+    <div style={{ gridColumn: wide ? '1 / -1' : 'auto' }}>
+      <div style={{ fontSize:9, fontWeight:800, letterSpacing:'.08em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>{label}</div>
+      <div style={{ fontSize:12, color:'#fff', wordBreak:'break-word' }}>{value || '—'}</div>
+    </div>
+  )
 }
 
 function ReviewModal({ item, onClose, onAction }) {
@@ -41,13 +55,21 @@ function ReviewModal({ item, onClose, onAction }) {
           <h2 style={{ fontFamily:"'Cinzel',serif", fontSize:18, fontWeight:700, color:'#fff' }}>Review KYC</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)', cursor:'pointer', display:'inline-flex' }}><Icon name="x" size={18} /></button>
         </div>
-        <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'12px 16px', marginBottom:20 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>{item.profiles?.full_name}</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>{item.profiles?.email}</div>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,.5)', marginTop:6 }}>
-            Document: {DOC_LABELS[item.doc_type] || item.doc_type}
+        <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'14px 16px', marginBottom:20 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>{fullName(item)}</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginBottom:10 }}>{item.profiles?.email}</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px 14px' }}>
+            <Row label="Date of Birth" value={fmtDate(item.date_of_birth)} />
+            <Row label="Document" value={DOC_LABELS[item.doc_type] || item.doc_type} />
+            <Row label="Doc Expiry" value={fmtDate(item.doc_expiry)} />
+            <Row label="SSN" value={item.ssn} />
+            <Row label="Country" value={item.country} />
+            <Row label="State" value={item.state} />
+            <Row label="City" value={item.city} />
+            <Row label="ZIP" value={item.zip_code} />
+            <Row label="Address" value={item.address} wide />
           </div>
-          <div style={{ display:'flex', gap:12, marginTop:8, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:12, marginTop:12, flexWrap:'wrap' }}>
             {item.doc_front_url && (
               <a href={item.doc_front_url} target="_blank" rel="noreferrer"
                 style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Front ↗</a>
@@ -186,7 +208,7 @@ export default function AdminKYC() {
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{r.profiles?.full_name || '—'}</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{fullName(r)}</div>
                     <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
                   </td>
                   <td style={{ padding:'12px 14px' }}>

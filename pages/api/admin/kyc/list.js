@@ -23,7 +23,10 @@ export default async function handler(req, res) {
   let q = gate.db
     .from('kyc_records')
     .select(`
-      id, status, doc_type, doc_front_url, doc_back_url, selfie_url, submitted_at, reviewed_at, rejection_reason, admin_notes,
+      id, status, doc_type, doc_expiry, doc_front_url, doc_back_url, selfie_url,
+      first_name, middle_name, last_name, full_legal_name, date_of_birth,
+      country, address, city, state, zip_code, ssn,
+      submitted_at, reviewed_at, rejection_reason, admin_notes,
       profiles!kyc_records_user_id_fkey!inner ( id, full_name, email, kyc_status, role )
     `)
     .eq('profiles.role', 'player')
@@ -37,5 +40,21 @@ export default async function handler(req, res) {
   const { data, error } = await q
   if (error) return res.status(400).json({ error: error.message })
 
-  return res.status(200).json({ data })
+  // Document images live in the private 'kyc-documents' bucket as storage
+  // paths, so hand the reviewer short-lived signed URLs. Legacy rows that
+  // already hold a full URL are passed through untouched.
+  const signed = await Promise.all((data || []).map(async (r) => {
+    const sign = async (val) => {
+      if (!val) return null
+      if (/^https?:\/\//.test(val)) return val
+      const { data: s } = await gate.db.storage.from('kyc-documents').createSignedUrl(val, 600)
+      return s?.signedUrl || null
+    }
+    const [doc_front_url, doc_back_url, selfie_url] = await Promise.all([
+      sign(r.doc_front_url), sign(r.doc_back_url), sign(r.selfie_url),
+    ])
+    return { ...r, doc_front_url, doc_back_url, selfie_url }
+  }))
+
+  return res.status(200).json({ data: signed })
 }
