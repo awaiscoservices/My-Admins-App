@@ -10,7 +10,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 
-const ROLES = ['admin', 'finance', 'game_ops', 'support']
+const ROLES = ['admin', 'finance', 'game_ops', 'support', 'risk', 'kyc_agent', 'reporting', 'marketing']
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 // Display-only: role keys are stored lowercase (admin, game_ops) but shown
 // title-cased like a name — "Admin", "Game Ops", "Super Admin".
@@ -22,6 +22,10 @@ const ROLE_COLOR = {
   finance:     '#22c55e',
   game_ops:    '#38bdf8',
   support:     '#a78bfa',
+  risk:        '#f87171',
+  kyc_agent:   '#2dd4bf',
+  reporting:   '#c084fc',
+  marketing:   '#fb923c',
 }
 
 export default function AdminStaff() {

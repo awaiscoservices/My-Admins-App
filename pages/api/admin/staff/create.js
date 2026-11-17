@@ -13,7 +13,9 @@
  */
 import { guardAdmin, PERMS } from '../../../../lib/adminGuard'
 
-const ASSIGNABLE_ROLES = ['admin', 'finance', 'game_ops', 'support']
+// Every operational staff role an admin may assign. super_admin is deliberately
+// excluded — this route must never mint a platform owner (privilege escalation).
+const ASSIGNABLE_ROLES = ['admin', 'finance', 'game_ops', 'support', 'risk', 'kyc_agent', 'reporting', 'marketing']
 
 function nameFromEmail(email) {
   const local = String(email).split('@')[0] || 'New User'

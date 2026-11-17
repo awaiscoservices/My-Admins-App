@@ -22,12 +22,21 @@ export async function guardSuperAdmin(req, res) {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id, role, full_name, email')
+    .select('id, role, full_name, email, status')
     .eq('id', user.id)
     .single()
 
   if (profile?.role !== 'super_admin') {
     res.status(403).json({ error: 'Super admin access required' })
+    return null
+  }
+
+  // A suspended or banned super admin must lose access even while their token
+  // is still valid — same rule guardAdmin/requireStaff already enforce for
+  // staff. Without this, deactivating a super admin did nothing until their
+  // session expired.
+  if (profile.status === 'suspended' || profile.status === 'banned') {
+    res.status(403).json({ error: 'This account has been deactivated' })
     return null
   }
 

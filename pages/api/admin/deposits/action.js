@@ -308,21 +308,41 @@ async function triggerReferralBonus(client, userId, depositId, amountCents, tena
   const bonusCents = Math.floor(amountCents * (parseFloat(tier.bonus_percent) / 100))
   if (bonusCents <= 0) return
 
-  // Credit referrer's cash balance directly (service role bypasses RLS)
+  // The referrer must belong to the same casino as this deposit. Service role
+  // bypasses RLS, and the tenant on the ledger row below is taken from the
+  // referee's deposit — paying a referrer from another tenant would move money
+  // across casino boundaries. Refuse rather than pay.
+  const { data: refProfile } = await client
+    .from('profiles').select('tenant_id').eq('id', referral.referrer_id).maybeSingle()
+  if (!refProfile || refProfile.tenant_id !== tenantId) {
+    console.warn(`[deposits/action] referral ${referral.id}: referrer tenant mismatch — skipped`)
+    return
+  }
+
+  // Credit referrer's cash balance with an optimistic version lock, so a
+  // concurrent wallet change can't be clobbered by a stale read-modify-write.
   const { data: rw } = await client
     .from('wallets')
-    .select('cash_balance_cents, total_bonus_cents')
+    .select('cash_balance_cents, total_bonus_cents, version')
     .eq('user_id', referral.referrer_id)
     .single()
 
   if (!rw) return
 
   const referrerCashAfter = rw.cash_balance_cents + bonusCents
-  await client.from('wallets').update({
+  const { data: updatedRw } = await client.from('wallets').update({
     cash_balance_cents: referrerCashAfter,
     total_bonus_cents:  rw.total_bonus_cents  + bonusCents,
     updated_at:         new Date().toISOString(),
-  }).eq('user_id', referral.referrer_id)
+    version:            (rw.version || 0) + 1,
+  }).eq('user_id', referral.referrer_id).eq('version', rw.version).select().maybeSingle()
+
+  // Lost the race — another write touched the wallet first. Skip the ledger
+  // and tracking rather than record a credit that did not land.
+  if (!updatedRw) {
+    console.warn(`[deposits/action] referral ${referral.id}: referrer wallet changed concurrently — skipped`)
+    return
+  }
 
   // Ledger entry for referrer — bucket/direction/balance_after so it renders
   // in the player's Transactions like any other movement.
