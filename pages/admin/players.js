@@ -167,20 +167,25 @@ export default function AdminPlayers() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Player', 'Phone', 'KYC', 'Status', 'Joined', 'Actions'].map(h => (
+                {['Player', 'Level', 'Phone', 'KYC', 'Status', 'Joined', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No players found</td></tr>
+              {loading ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No players found</td></tr>
               : filtered.map(r => (
                 <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{r.username || r.full_name}</div>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    {r.level_name
+                      ? <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, textTransform: 'uppercase', background: 'rgba(99,102,241,.15)', color: '#818cf8', whiteSpace: 'nowrap' }}>{r.level_name}</span>
+                      : <span style={{ fontSize: 12, color: 'rgba(255,255,255,.3)' }}>—</span>}
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,.5)' }}>{r.phone || '—'}</td>
                   <td style={{ padding: '12px 14px' }}>

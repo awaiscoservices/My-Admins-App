@@ -45,8 +45,21 @@ export default async function handler(req, res) {
   const { data, error, count } = await runPaged(query)
   if (error) return res.status(500).json({ error: error.message })
 
+  // Resolve level names for this page's rows. profiles.player_level_id has no
+  // FK to player_levels, so a PostgREST embed isn't available — one small
+  // lookup over the distinct ids on the page instead.
+  const levelIds = [...new Set((data || []).map(r => r.player_level_id).filter(Boolean))]
+  let levelMap = {}
+  if (levelIds.length) {
+    const { data: levels } = await gate.db.from('player_levels').select('id, name').in('id', levelIds)
+    levelMap = Object.fromEntries((levels || []).map(l => [l.id, l.name]))
+  }
+
   return res.status(200).json({
-    rows: (data || []).map(maskPlayer),
+    rows: (data || []).map(r => ({
+      ...maskPlayer(r),
+      level_name: r.player_level_id ? (levelMap[r.player_level_id] || null) : null,
+    })),
     total: count || 0,
     page: pageNum,
     pages: Math.ceil((count || 0) / limitNum),
