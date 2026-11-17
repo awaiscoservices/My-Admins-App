@@ -1,0 +1,35 @@
+name: Security scan
+
+# Dependency vulnerabilities + committed-secret detection on every push/PR,
+# plus a weekly scheduled run. Non-blocking for audit (report-only) so a new
+# advisory doesn't wedge deploys; gitleaks fails the job if a secret is found.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Report high/critical advisories; does not fail the build.
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high || true
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so gitleaks scans past commits too
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
