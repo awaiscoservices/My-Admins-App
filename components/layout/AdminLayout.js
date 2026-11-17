@@ -7,6 +7,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import TwoFactorSetup from '../TwoFactorSetup'
+import ForcePasswordChange from '../ForcePasswordChange'
 
 const NAV_SECTIONS = [
   {
@@ -161,6 +162,7 @@ export default function AdminLayout({ children }) {
   const [menuOpen, setMenuOpen]           = useState(false)
   const [show2fa, setShow2fa]             = useState(false)
   const [force2fa, setForce2fa]           = useState(false)
+  const [mustChange, setMustChange]       = useState(false)
 
   // The layout remounts on every page, which reset the sidebar scroll to the
   // top each time. Remember where it was and put it back so the active page
@@ -190,6 +192,7 @@ export default function AdminLayout({ children }) {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (!prof || prof.role === 'player') { router.push('/auth/login'); return }
     setProfile(prof)
+    setMustChange(!!prof.must_change_password)
     setAuthorized(true)
     loadPendingCounts()
     loadMe()
@@ -356,6 +359,9 @@ export default function AdminLayout({ children }) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-gradient,#060b18)', backgroundAttachment: 'fixed', fontFamily: "'Outfit', sans-serif", color: '#fff' }}>
+      {mustChange && (
+        <ForcePasswordChange onDone={() => { setMustChange(false); loadAdminData() }} />
+      )}
       {show2fa && (
         <TwoFactorSetup
           forced={force2fa}

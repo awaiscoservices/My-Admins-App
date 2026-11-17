@@ -79,6 +79,10 @@ export default async function handler(req, res) {
     role,
     tenant_id: targetTenant,
     status:    'active',
+    // The admin set this password and must hand it over, so they know it. Force
+    // the staff member to replace it on first sign-in — until they do, the guard
+    // keeps them out of everything but the set-password screen.
+    must_change_password: true,
   }, { onConflict: 'id', ignoreDuplicates: false })
 
   if (profileErr) {
