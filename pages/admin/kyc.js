@@ -10,7 +10,11 @@ import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import Icon from '../../components/ui/Icon'
+import ImageLightbox from '../../components/ui/ImageLightbox'
 import DateRange, { inDateRange } from '../../components/ui/DateRange'
+
+// A link-styled button that opens an image in the in-page viewer.
+const imgBtn = (size) => ({ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#fbbf24', fontWeight: 700, fontSize: size, fontFamily: "'Outfit',sans-serif" })
 
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
@@ -35,7 +39,7 @@ function Row({ label, value, wide }) {
   )
 }
 
-function ReviewModal({ item, onClose, onAction }) {
+function ReviewModal({ item, onClose, onAction, onView }) {
   const [reason, setReason]   = useState('')
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
@@ -57,7 +61,7 @@ function ReviewModal({ item, onClose, onAction }) {
         </div>
         <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.2)', borderRadius:12, padding:'14px 16px', marginBottom:20 }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>{fullName(item)}</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginBottom:10 }}>{item.profiles?.email}</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.5)', marginBottom:10, fontFamily:'monospace' }}>{item.profiles?.username ? `@${item.profiles.username}` : ''}</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px 14px' }}>
             <Row label="Date of Birth" value={fmtDate(item.date_of_birth)} />
             <Row label="Document" value={DOC_LABELS[item.doc_type] || item.doc_type} />
@@ -69,19 +73,10 @@ function ReviewModal({ item, onClose, onAction }) {
             <Row label="ZIP" value={item.zip_code} />
             <Row label="Address" value={item.address} wide />
           </div>
-          <div style={{ display:'flex', gap:12, marginTop:12, flexWrap:'wrap' }}>
-            {item.doc_front_url && (
-              <a href={item.doc_front_url} target="_blank" rel="noreferrer"
-                style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Front ↗</a>
-            )}
-            {item.doc_back_url && (
-              <a href={item.doc_back_url} target="_blank" rel="noreferrer"
-                style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Back ↗</a>
-            )}
-            {item.selfie_url && (
-              <a href={item.selfie_url} target="_blank" rel="noreferrer"
-                style={{ fontSize:12, color:'#fbbf24', textDecoration:'none' }}>Selfie ↗</a>
-            )}
+          <div style={{ display:'flex', gap:14, marginTop:12, flexWrap:'wrap' }}>
+            {item.doc_front_url && <button type="button" onClick={() => onView(item.doc_front_url)} style={imgBtn(12)}>Front</button>}
+            {item.doc_back_url && <button type="button" onClick={() => onView(item.doc_back_url)} style={imgBtn(12)}>Back</button>}
+            {item.selfie_url && <button type="button" onClick={() => onView(item.selfie_url)} style={imgBtn(12)}>Selfie</button>}
           </div>
         </div>
         <div style={{ marginBottom:20 }}>
@@ -108,6 +103,7 @@ export default function AdminKYC() {
   const [loading,  setLoading]  = useState(true)
   const [selected, setSelected] = useState(null)
   const [toast,    setToast]    = useState(null)
+  const [lightbox, setLightbox] = useState(null)
 
   useEffect(() => { load() }, [filter])
 
@@ -155,7 +151,7 @@ export default function AdminKYC() {
     if (!search) return true
     const s = search.toLowerCase()
     return r.profiles?.full_name?.toLowerCase().includes(s) ||
-      r.profiles?.email?.toLowerCase().includes(s) ||
+      r.profiles?.username?.toLowerCase().includes(s) ||
       r.doc_type?.toLowerCase().includes(s)
   })
 
@@ -163,7 +159,8 @@ export default function AdminKYC() {
     <AdminLayout>
       <Head><title>KYC Review — Admin</title></Head>
       {toast && <div style={{ position:'fixed', top:16, left:'50%', transform:'translateX(-50%)', zIndex:9999, background: toast.type==='error' ? 'rgba(239,68,68,.95)' : 'rgba(34,197,94,.95)', borderRadius:12, padding:'12px 24px', color:'#fff', fontSize:14, fontWeight:600, fontFamily:"'Outfit',sans-serif", whiteSpace:'nowrap', boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>{toast.msg}</div>}
-      {selected && <ReviewModal item={selected} onClose={() => setSelected(null)} onAction={handleAction} />}
+      {selected && <ReviewModal item={selected} onClose={() => setSelected(null)} onAction={handleAction} onView={setLightbox} />}
+      <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
 
       <div style={{ marginBottom:20 }}>
         <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:22, fontWeight:700, color:'#fff', marginBottom:4 }}>KYC Review</h1>
@@ -178,7 +175,7 @@ export default function AdminKYC() {
             <button key={s} onClick={() => setFilter(s)} style={{ padding:'7px 16px', borderRadius:8, border:'none', cursor:'pointer', fontFamily:"'Outfit',sans-serif", fontSize:12, fontWeight:700, background: filter===s ? 'rgba(251,191,36,.7)' : 'transparent', color: filter===s ? '#fff' : 'rgba(255,255,255,.4)', textTransform:'capitalize', transition:'all .15s' }}>{s}</button>
           ))}
         </div>
-        <input type="text" placeholder="Search player, email, document type…" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Search player, document type…" value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding:'9px 14px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#fff', fontSize:13, fontFamily:"'Outfit',sans-serif", outline:'none', minWidth:260 }} />
         <DateRange from={dates.from} to={dates.to} onChange={setDates} />
       </div>
@@ -209,7 +206,7 @@ export default function AdminKYC() {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding:'12px 14px' }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{fullName(r)}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)', fontFamily:'monospace' }}>{r.profiles?.username ? `@${r.profiles.username}` : ''}</div>
                   </td>
                   <td style={{ padding:'12px 14px', fontSize:12, color:'rgba(255,255,255,.7)', whiteSpace:'nowrap' }}>{fmtDate(r.date_of_birth)}</td>
                   <td style={{ padding:'12px 14px' }}>
@@ -220,9 +217,9 @@ export default function AdminKYC() {
                     <div style={{ fontSize:13, color:'#fff' }}>{DOC_LABELS[r.doc_type] || r.doc_type || '—'}</div>
                     <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.doc_expiry ? `exp ${fmtDate(r.doc_expiry)}` : ''}</div>
                     <div style={{ display:'flex', gap:8, marginTop:2 }}>
-                      {r.doc_front_url && <a href={r.doc_front_url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Front ↗</a>}
-                      {r.doc_back_url  && <a href={r.doc_back_url}  target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Back ↗</a>}
-                      {r.selfie_url    && <a href={r.selfie_url}    target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Selfie ↗</a>}
+                      {r.doc_front_url && <button type="button" onClick={() => setLightbox(r.doc_front_url)} style={imgBtn(10)}>Front</button>}
+                      {r.doc_back_url  && <button type="button" onClick={() => setLightbox(r.doc_back_url)}  style={imgBtn(10)}>Back</button>}
+                      {r.selfie_url    && <button type="button" onClick={() => setLightbox(r.selfie_url)}    style={imgBtn(10)}>Selfie</button>}
                     </div>
                   </td>
                   <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>

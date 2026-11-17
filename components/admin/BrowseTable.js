@@ -9,7 +9,7 @@ import { txTypeLabel } from '../../lib/wallet'
 const G = '#fbbf24'
 const dim = { color: 'rgba(255,255,255,.4)', fontSize: 12 }
 const when = r => new Date(r.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-const who = (p, id) => p ? <div><div style={{ fontWeight: 700 }}>{p.name || 'Unnamed'}</div><div style={dim}>{p.email}</div></div> : <span style={dim}>{id ? String(id).slice(0, 8) : '—'}</span>
+const who = (p, id) => p ? <div><div style={{ fontWeight: 700 }}>{p.name || 'Unnamed'}</div></div> : <span style={dim}>{id ? String(id).slice(0, 8) : '—'}</span>
 const signed = (c, dir) => <span style={{ fontWeight: 800, color: dir === 'credit' ? '#10b981' : '#f87171' }}>{dir === 'credit' ? '+' : '−'}{m(c)}</span>
 const money = k => r => m(r[k] || 0)
 

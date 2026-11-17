@@ -79,7 +79,7 @@ function Row({ kind, cfg, r, onAct }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{r._player?.name || 'Unknown player'}</div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', wordBreak: 'break-all' }}>
-            {[r._player?.email, r._player?.phone].filter(Boolean).join(' · ') || r.user_id} · {fmt(r.created_at)}
+            {[r._player?.phone].filter(Boolean).join(' · ') || r.user_id} · {fmt(r.created_at)}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>

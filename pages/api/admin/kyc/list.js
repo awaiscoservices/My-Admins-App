@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       first_name, middle_name, last_name, full_legal_name, date_of_birth,
       country, address, city, state, zip_code, ssn,
       submitted_at, reviewed_at, rejection_reason, admin_notes,
-      profiles!kyc_records_user_id_fkey!inner ( id, full_name, email, kyc_status, role )
+      profiles!kyc_records_user_id_fkey!inner ( id, full_name, username, kyc_status, role )
     `)
     .eq('profiles.role', 'player')
     .order('submitted_at', { ascending: false })

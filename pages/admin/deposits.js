@@ -5,6 +5,7 @@ import AdminLayout from '../../components/layout/AdminLayout'
 import StatusBadge from '../../components/ui/StatusBadge'
 import PlayerWalletModal from '../../components/PlayerWalletModal'
 import Icon from '../../components/ui/Icon'
+import ImageLightbox from '../../components/ui/ImageLightbox'
 import DateRange, { inDateRange } from '../../components/ui/DateRange'
 
 const II = { verticalAlign: '-2px', marginRight: 5 }
@@ -15,6 +16,7 @@ function ReviewModal({ deposit, onClose, onAction }) {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [proof, setProof] = useState(null)
 
   async function submit(action) {
     setSaving(true); setError('')
@@ -24,6 +26,7 @@ function ReviewModal({ deposit, onClose, onAction }) {
   }
 
   return (
+    <>
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ background: '#0e1a2e', border: '1px solid rgba(251,191,36,.3)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -38,7 +41,7 @@ function ReviewModal({ deposit, onClose, onAction }) {
           )}
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 2 }}>Ref: {deposit.reference_id}</div>
           {deposit.player_reference && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>Player ref: {deposit.player_reference}</div>}
-          {deposit.screenshot_url && <a href={deposit.screenshot_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: '#fbbf24' }}>View Proof ↗</a>}
+          {deposit.screenshot_url && <button type="button" onClick={() => setProof(deposit.screenshot_url)} style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: '#fbbf24', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>View Proof</button>}
           {deposit.player_notes && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 4 }}>Note: {deposit.player_notes}</div>}
         </div>
         <div style={{ marginBottom: 20 }}>
@@ -54,6 +57,8 @@ function ReviewModal({ deposit, onClose, onAction }) {
         </div>
       </div>
     </div>
+    <ImageLightbox src={proof} onClose={() => setProof(null)} />
+    </>
   )
 }
 
