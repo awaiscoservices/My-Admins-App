@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
   let query = supabaseAdmin
     .from('game_accounts')
-    .select('*, profiles!game_accounts_user_id_fkey(id, username, kyc_status, status), game_panels!game_accounts_game_panel_id_fkey(name, accent_color)')
+    .select('*, profiles!game_accounts_user_id_fkey(id, username, kyc_status, status), game_panels(name, accent_color)')
     .order('created_at', { ascending: true })
     .limit(100)
 
