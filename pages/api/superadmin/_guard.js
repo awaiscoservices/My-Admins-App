@@ -4,6 +4,7 @@
  * Returns { admin } on success, or sends 401/403 and returns null.
  */
 import { createClient } from '@supabase/supabase-js'
+import { mfaSessionError } from '../../../lib/adminGuard'
 
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,6 +40,11 @@ export async function guardSuperAdmin(req, res) {
     res.status(403).json({ error: 'This account has been deactivated' })
     return null
   }
+
+  // A super admin who has enrolled 2FA must present it — a password-only token
+  // can't reach super-admin APIs directly.
+  const mfaErr = await mfaSessionError(token, profile.id, {})
+  if (mfaErr) { res.status(403).json({ error: mfaErr.message, code: mfaErr.code }); return null }
 
   return profile
 }
