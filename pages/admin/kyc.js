@@ -187,20 +187,20 @@ export default function AdminKYC() {
         <div style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', minWidth:760, borderCollapse:'collapse', tableLayout:'fixed' }}>
             <colgroup>
-              {[20, 20, 15, 13, 16, 16].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+              {[18, 11, 16, 19, 12, 12, 12].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
             </colgroup>
             <thead>
               <tr style={{ background:'rgba(255,255,255,.04)' }}>
-                {['Player','Document','KYC Status','Status','Submitted','Actions'].map(h => (
+                {['Player','DOB','Location','Document','Status','Submitted','Actions'].map(h => (
                   <th key={h} style={{ padding:'11px 14px', textAlign:'left', fontSize:10, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.35)', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+                <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={7} style={{ padding:'40px', textAlign:'center', color:'rgba(255,255,255,.3)' }}>
                   {filter === 'pending' ? 'No pending KYC' : 'No KYC records found'}
                 </td></tr>
               ) : rows.map(r => (
@@ -211,18 +211,19 @@ export default function AdminKYC() {
                     <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{fullName(r)}</div>
                     <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.profiles?.email}</div>
                   </td>
+                  <td style={{ padding:'12px 14px', fontSize:12, color:'rgba(255,255,255,.7)', whiteSpace:'nowrap' }}>{fmtDate(r.date_of_birth)}</td>
+                  <td style={{ padding:'12px 14px' }}>
+                    <div style={{ fontSize:12, color:'#fff' }}>{[r.city, r.state].filter(Boolean).join(', ') || '—'}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.country || ''}</div>
+                  </td>
                   <td style={{ padding:'12px 14px' }}>
                     <div style={{ fontSize:13, color:'#fff' }}>{DOC_LABELS[r.doc_type] || r.doc_type || '—'}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,.4)' }}>{r.doc_expiry ? `exp ${fmtDate(r.doc_expiry)}` : ''}</div>
                     <div style={{ display:'flex', gap:8, marginTop:2 }}>
                       {r.doc_front_url && <a href={r.doc_front_url} target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Front ↗</a>}
                       {r.doc_back_url  && <a href={r.doc_back_url}  target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Back ↗</a>}
                       {r.selfie_url    && <a href={r.selfie_url}    target="_blank" rel="noreferrer" style={{ fontSize:10, color:'#fbbf24', textDecoration:'none' }}>Selfie ↗</a>}
                     </div>
-                  </td>
-                  <td style={{ padding:'12px 14px' }}>
-                    <span style={{ fontSize:11, fontWeight:700, color: r.profiles?.kyc_status === 'verified' ? '#22c55e' : 'rgba(255,255,255,.3)' }}>
-                      {r.profiles?.kyc_status === 'verified' ? 'Verified' : r.profiles?.kyc_status || '—'}
-                    </span>
                   </td>
                   <td style={{ padding:'12px 14px' }}><StatusBadge status={r.status} size="xs" /></td>
                   <td style={{ padding:'12px 14px', fontSize:11, color:'rgba(255,255,255,.3)', whiteSpace:'nowrap' }}>{fmtDate(r.submitted_at)}</td>
