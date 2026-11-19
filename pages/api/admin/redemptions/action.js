@@ -160,19 +160,25 @@ export default async function handler(req, res) {
 async function _recalculateLevelOnReject(client, playerId) {
   try {
     const { data: profile } = await client
-      .from('profiles').select('total_xp, player_level_id').eq('id', playerId).single()
+      .from('profiles').select('total_xp, player_level_id, tenant_id').eq('id', playerId).single()
     if (!profile) return
 
+    // Scope to the player's OWN casino and use xp_required (the column the admin
+    // Levels editor writes). Without the tenant filter the tiers of every casino
+    // tie on identical thresholds and an arbitrary one wins — which is how a
+    // player ends up pointing at another tenant's level ("Unranked" on the site).
     const { data: correctLevel } = await client
       .from('player_levels').select('id')
-      .lte('min_xp', profile.total_xp).eq('is_active', true)
-      .order('min_xp', { ascending: false }).limit(1).maybeSingle()
+      .eq('tenant_id', profile.tenant_id)
+      .lte('xp_required', profile.total_xp || 0).eq('is_active', true)
+      .order('xp_required', { ascending: false }).limit(1).maybeSingle()
     if (!correctLevel || correctLevel.id === profile.player_level_id) return
 
     const oldLevelId = profile.player_level_id
     await client.from('profiles').update({ player_level_id: correctLevel.id }).eq('id', playerId)
     await client.from('player_level_history').insert({
-      user_id: playerId, from_level_id: oldLevelId, to_level_id: correctLevel.id, trigger: 'redeem_rejected',
+      user_id: playerId, from_level_id: oldLevelId, to_level_id: correctLevel.id,
+      trigger: 'redeem_rejected', tenant_id: profile.tenant_id,
     }).then(() => {}, () => {})
   } catch (e) {
     console.error('Level recalc on reject failed:', e)
