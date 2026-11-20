@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       'accent_color', 'badge_color', 'badge_icon',
       'kyc_required', 'is_active', 'description',
       'max_redeem_cap_cents', 'min_redeem_multiplier', 'max_redeem_multiplier',
-      'min_withdrawal_cents', 'max_withdrawal_cents',
+      'min_withdrawal_cents', 'max_withdrawal_cents', 'daily_withdrawal_limit_cents',
       'created_at',
     ].join(', '))
     .order('sort_order', { ascending: true }),

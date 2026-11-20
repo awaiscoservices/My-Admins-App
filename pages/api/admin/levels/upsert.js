@@ -34,6 +34,7 @@ export default async function handler(req, res) {
     max_redeem_multiplier,
     min_withdrawal_cents,
     max_withdrawal_cents,
+    daily_withdrawal_limit_cents,
   } = req.body
 
   if (!name) return res.status(400).json({ error: 'name is required' })
@@ -61,6 +62,10 @@ export default async function handler(req, res) {
     redeem_multiplier: parseFloat(max_redeem_multiplier) || 5,
     min_withdrawal_cents: min_withdrawal_cents ?? null,
     max_withdrawal_cents: max_withdrawal_cents ?? null,
+    // Enforced on both the request path (withdraw/submit.js) and the admin
+    // approve path (withdrawal_action_atomic) via get_daily_withdrawn_cents —
+    // rolling 24h of settled payouts. Defaults to $500 when left blank.
+    daily_withdrawal_limit_cents: daily_withdrawal_limit_cents ?? 50000,
     // No updated_at: player_levels has created_at only. Sending a column
     // that does not exist failed every save on the Player Levels page.
   }

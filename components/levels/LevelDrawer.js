@@ -80,6 +80,7 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
     // Withdraw
     min_withdrawal_cents:  c2d(level?.min_withdrawal_cents),
     max_withdrawal_cents:  c2d(level?.max_withdrawal_cents),
+    daily_withdrawal_limit_cents: c2d(level?.daily_withdrawal_limit_cents),
   })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -104,6 +105,7 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
       max_redeem_multiplier: parseFloat(form.max_redeem_multiplier) || 5,
       min_withdrawal_cents:  d2c(form.min_withdrawal_cents) ?? 0,
       max_withdrawal_cents:  d2c(form.max_withdrawal_cents),
+      daily_withdrawal_limit_cents: d2c(form.daily_withdrawal_limit_cents) ?? 50000,
     }
 
     const result = await onSave(body)
@@ -201,6 +203,14 @@ export default function LevelDrawer({ level, onClose, onSave, subtitle }) {
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,.4)', fontSize: 13 }}>$</span>
                   <input style={{ ...inp, paddingLeft: 22 }} type="number" min="0" step="0.01" value={form.max_withdrawal_cents} onChange={e => set('max_withdrawal_cents', e.target.value)} placeholder="Unlimited" />
+                </div>
+              </Field>
+            </Row2>
+            <Row2>
+              <Field label="Daily Withdraw Limit ($)" hint="Rolling 24h total across all withdraws; blank = $500 default" col="1 / -1">
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,.4)', fontSize: 13 }}>$</span>
+                  <input style={{ ...inp, paddingLeft: 22 }} type="number" min="0" step="0.01" value={form.daily_withdrawal_limit_cents} onChange={e => set('daily_withdrawal_limit_cents', e.target.value)} placeholder="500.00" />
                 </div>
               </Field>
             </Row2>
