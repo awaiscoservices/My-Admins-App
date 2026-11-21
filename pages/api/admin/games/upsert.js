@@ -1,27 +1,15 @@
-import crypto from 'crypto'
-import { guardAdmin, scopeToTenant, PERMS } from '../../../../lib/adminGuard'
-
-const ALGO = 'aes-256-gcm'
+import { guardAdmin, loadOwnedRow, PERMS } from '../../../../lib/adminGuard'
 
 /**
- * Throws if ENCRYPTION_KEY is absent or malformed, rather than letting
- * Buffer.from(undefined) fail with something unreadable. The caller must let
- * this reach the client: storing a game credential unencrypted would be worse
- * than refusing to store it.
+ * POST /api/admin/games/upsert
+ *   create: { name, panel_url, accent_color, description, is_active }
+ *   update: { game_id, ...same fields }
+ *
+ * Backs the Panels Management Add/Edit modal. Persists only columns that exist
+ * on game_panels and that the form edits. (The old version wrote a `code`
+ * column that doesn't exist — so every save failed — read `id` while the page
+ * posts `game_id`, and dropped panel_url/accent_color.)
  */
-function encrypt(text) {
-  const raw = process.env.ENCRYPTION_KEY
-  if (!raw || !/^[0-9a-fA-F]{64}$/.test(raw)) {
-    throw new Error('ENCRYPTION_KEY must be exactly 64 hex characters')
-  }
-  const key = Buffer.from(raw, 'hex')
-  const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv(ALGO, key, iv)
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted.toString('hex')
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -30,30 +18,32 @@ export default async function handler(req, res) {
   const supabaseAdmin = gate.db
   const admin = gate.actor
 
-  const { id, name, code, description, is_active, credentials_json } = req.body
+  const { id, game_id, name, panel_url, accent_color, description, is_active } = req.body
+  const panelId = game_id || id
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
 
   const payload = {
     tenant_id: gate.tenantId,
-    name: name.trim(), code: code?.trim() || null, description: description?.trim() || null,
-    is_active: is_active !== false, updated_at: new Date().toISOString()
+    name: name.trim(),
+    panel_url: panel_url?.trim() || null,
+    accent_color: accent_color || null,
+    description: description?.trim() || null,
+    is_active: is_active !== false,
+    updated_at: new Date().toISOString(),
   }
 
-  if (credentials_json?.trim()) {
-    try { JSON.parse(credentials_json) }
-    catch { return res.status(400).json({ error: 'Credentials must be valid JSON' }) }
-    if (process.env.ENCRYPTION_KEY) payload.encrypted_credentials = encrypt(credentials_json.trim())
-  }
-
-  if (id) {
-    const { error } = await supabaseAdmin.from('game_panels').update(payload).eq('id', id)
+  if (panelId) {
+    // Tenant-scoped: an admin can only edit a panel in their own casino.
+    const { row: existing } = await loadOwnedRow(gate, 'game_panels', panelId, 'id')
+    if (!existing) return res.status(404).json({ error: 'Game not found' })
+    const { error } = await supabaseAdmin.from('game_panels').update(payload).eq('id', panelId)
     if (error) return res.status(500).json({ error: error.message })
-    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'game_update', target_type: 'game_panel', target_id: id, description: `Game panel updated: ${name}`, metadata: { name } })
-  } else {
-    const { data, error } = await supabaseAdmin.from('game_panels').insert({ ...payload, created_at: new Date().toISOString() }).select('id').single()
-    if (error) return res.status(500).json({ error: error.message })
-    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'game_create', target_type: 'game_panel', target_id: data.id, description: `Game panel created: ${name}`, metadata: { name } })
+    await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'game_update', target_type: 'game_panel', target_id: panelId, description: `Game panel updated: ${payload.name}`, metadata: { name: payload.name } }).then(() => {}, () => {})
+    return res.status(200).json({ success: true, id: panelId })
   }
 
-  return res.status(200).json({ success: true })
+  const { data, error } = await supabaseAdmin.from('game_panels').insert({ ...payload, created_at: new Date().toISOString() }).select('id').single()
+  if (error) return res.status(500).json({ error: error.message })
+  await supabaseAdmin.from('audit_logs').insert({ tenant_id: gate.tenantId, actor_id: admin.id, actor_role: admin.role, action: 'game_create', target_type: 'game_panel', target_id: data.id, description: `Game panel created: ${payload.name}`, metadata: { name: payload.name } }).then(() => {}, () => {})
+  return res.status(200).json({ success: true, id: data.id })
 }
