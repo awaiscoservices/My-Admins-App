@@ -18,15 +18,8 @@ import { supabase } from '../../lib/supabase'
 const GOLD = '#fbbf24'
 
 const ICONS = {
-  coin:     'M12 21c4.4 0 8-1.8 8-4V7c0-2.2-3.6-4-8-4S4 4.8 4 7v10c0 2.2 3.6 4 8 4zM20 7c0 2.2-3.6 4-8 4S4 9.2 4 7M20 12c0 2.2-3.6 4-8 4s-8-1.8-8-4',
-  clock:    'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2',
-  layers:   'M12 3l9 5-9 5-9-5 9-5zM3 14l9 5 9-5M3 10.5l9 5 9-5',
-  grid:     'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   home:    'M3 11l9-8 9 8M5 10v10h14V10',
   tenants: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 22V12h6v10',
-  card:    'M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20',
-  search:  'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3',
-  gear:    'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z',
   back:    'M19 12H5M12 19l-7-7 7-7',
   logout:  'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',
   menu:    'M3 6h18M3 12h18M3 18h18',
@@ -55,20 +48,7 @@ const NAV_SECTIONS = [
       { href: '/superadmin/admins',   icon: 'user',    label: 'Super Admins' },
     ],
   },
-  {
-    label: 'Coming soon',
-    icon: 'clock',
-    items: [
-      { href: '/superadmin/billing',  icon: 'card',   label: 'Billing'    },
-      { href: '/superadmin/audit',    icon: 'search', label: 'Audit Logs' },
-      { href: '/superadmin/settings', icon: 'gear',   label: 'Settings'   },
-    ],
-  },
 ]
-
-// Only these pages exist. The rest render as disabled rows rather than links,
-// because a nav item that 404s is worse than one that says "soon".
-const BUILT = new Set(['/superadmin', '/superadmin/tenants', '/superadmin/reports', '/superadmin/admins'])
 
 export default function SuperAdminLayout({ children, title }) {
   const router = useRouter()
@@ -227,16 +207,6 @@ export default function SuperAdminLayout({ children, title }) {
               </div>
               {section.items.map(item => {
                 const active = isActive(item.href)
-                const built  = BUILT.has(item.href)
-
-                if (!built) return (
-                  <div key={item.href} title={`${item.label} — not built yet`}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 3, fontSize: 14, color: 'rgba(255,255,255,.25)', cursor: 'not-allowed' }}>
-                    <Icon name={item.icon} />
-                    <span className="rail-label" style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>
-                    <span className="rail-label" style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,.25)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>soon</span>
-                  </div>
-                )
 
                 return (
                   <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
