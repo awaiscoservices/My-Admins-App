@@ -90,6 +90,25 @@ export default function AdminGames() {
     setLoading(false)
   }
 
+  async function toggleMaintenance(r) {
+    const next = !r.under_maintenance
+    setRows(prev => prev.map(x => x.id === r.id ? { ...x, under_maintenance: next } : x))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/games/maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ id: r.id, under_maintenance: next }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed')
+      showToast(next ? `${r.name} is now under maintenance` : `${r.name} is back online`)
+    } catch (e) {
+      setRows(prev => prev.map(x => x.id === r.id ? { ...x, under_maintenance: r.under_maintenance } : x))
+      showToast(e.message || 'Could not update maintenance', 'error')
+    }
+  }
+
   async function handleSave(id, form) {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/admin/games/upsert', {
@@ -138,14 +157,14 @@ export default function AdminGames() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,.04)' }}>
-                {['Game', 'Panel URL', 'Status', 'Actions'].map(h => (
+                {['Game', 'Panel URL', 'Status', 'Maintenance', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
-              : filtered.length === 0 ? <tr><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No games found</td></tr>
+              {loading ? <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>Loading…</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>No games found</td></tr>
               : filtered.map(r => (
                 <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.04)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.02)'}
@@ -161,6 +180,15 @@ export default function AdminGames() {
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 12, color: '#06b6d4' }}>{r.panel_url ? <a href={r.panel_url} target="_blank" rel="noreferrer" style={{ color: '#06b6d4' }}>{r.panel_url}</a> : '—'}</td>
                   <td style={{ padding: '12px 14px' }}><StatusBadge status={r.is_active ? 'active' : 'inactive'} size="xs" /></td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button onClick={() => toggleMaintenance(r)} title={r.under_maintenance ? 'Under maintenance — players blocked. Click to bring back online.' : 'Online. Click to put under maintenance.'}
+                        style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: 'pointer', background: r.under_maintenance ? '#f59e0b' : 'rgba(255,255,255,.15)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: r.under_maintenance ? 21 : 3, transition: 'left .2s' }} />
+                      </button>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: r.under_maintenance ? '#f59e0b' : 'rgba(255,255,255,.3)' }}>{r.under_maintenance ? 'Under maintenance' : 'Online'}</span>
+                    </div>
+                  </td>
                   <td style={{ padding: '12px 14px' }}>
                     <button onClick={() => setSelected(r)} style={{ padding: '6px 12px', background: 'rgba(251,191,36,.15)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, color: '#fbbf24', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}>Edit</button>
                   </td>
