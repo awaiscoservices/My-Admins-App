@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 import AdminLayout from '../../components/layout/AdminLayout'
-import StatusBadge from '../../components/ui/StatusBadge'
 import Icon from '../../components/ui/Icon'
 
 function GameModal({ game, onClose, onSave }) {
@@ -109,6 +108,25 @@ export default function AdminGames() {
     }
   }
 
+  async function toggleActive(r) {
+    const next = !r.is_active
+    setRows(prev => prev.map(x => x.id === r.id ? { ...x, is_active: next } : x))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/games/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ game_id: r.id, name: r.name, panel_url: r.panel_url, accent_color: r.accent_color, description: r.description, is_active: next }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed')
+      showToast(next ? `${r.name} is now active` : `${r.name} is now inactive`)
+    } catch (e) {
+      setRows(prev => prev.map(x => x.id === r.id ? { ...x, is_active: r.is_active } : x))
+      showToast(e.message || 'Could not update status', 'error')
+    }
+  }
+
   async function handleSave(id, form) {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/admin/games/upsert', {
@@ -179,7 +197,15 @@ export default function AdminGames() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 12, color: '#06b6d4' }}>{r.panel_url ? <a href={r.panel_url} target="_blank" rel="noreferrer" style={{ color: '#06b6d4' }}>{r.panel_url}</a> : '—'}</td>
-                  <td style={{ padding: '12px 14px' }}><StatusBadge status={r.is_active ? 'active' : 'inactive'} size="xs" /></td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button onClick={() => toggleActive(r)} title={r.is_active ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+                        style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: 'pointer', background: r.is_active ? '#22c55e' : 'rgba(255,255,255,.15)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: r.is_active ? 21 : 3, transition: 'left .2s' }} />
+                      </button>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: r.is_active ? '#22c55e' : 'rgba(255,255,255,.3)' }}>{r.is_active ? 'Active' : 'Inactive'}</span>
+                    </div>
+                  </td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button onClick={() => toggleMaintenance(r)} title={r.under_maintenance ? 'Under maintenance — players blocked. Click to bring back online.' : 'Online. Click to put under maintenance.'}
