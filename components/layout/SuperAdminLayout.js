@@ -26,6 +26,7 @@ const ICONS = {
   shield:  'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4',
   chart:   'M3 3v18h18M7 15l3-4 3 2 4-6',
   user:    'M20 21v-1a6 6 0 00-6-6h-4a6 6 0 00-6 6v1M12 11a4 4 0 100-8 4 4 0 000 8z',
+  support: 'M21 12a8 8 0 01-11.6 7.1L3 21l1.9-6.4A8 8 0 1121 12z',
 }
 
 function Icon({ name, size = 18 }) {
@@ -45,6 +46,7 @@ const NAV_SECTIONS = [
       { href: '/superadmin',          icon: 'home',    label: 'Dashboard'  },
       { href: '/superadmin/reports',  icon: 'chart',   label: 'Reports'    },
       { href: '/superadmin/tenants',  icon: 'tenants', label: 'Tenants'    },
+      { href: '/superadmin/support',  icon: 'support', label: 'Support'    },
       { href: '/superadmin/admins',   icon: 'user',    label: 'Super Admins' },
     ],
   },
